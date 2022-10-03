@@ -1,2 +1,3 @@
 app/test.py
 .idea
+app/__pycache__
