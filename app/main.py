@@ -1,4 +1,5 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
+from fastapi.middleware.gzip import GZipMiddleware
 
 from app import meteoswiss
 
@@ -15,6 +16,9 @@ app = FastAPI(
         "url": "https://www.apache.org/licenses/LICENSE-2.0.html",
     },
 )
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+filesystem = "../filesystem"
 
 
 @app.get("/")
@@ -25,7 +29,8 @@ def welcome():
 
 @app.get("/meteoswiss/cosmo/reanalysis/{model}/{start_time}/{end_time}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}", tags=["Meteoswiss"])
 async def meteoswiss_cosmo_reanalysis(model: meteoswiss.CosmoReanalysis, start_time: int, end_time: int, ll_lat: float,
-                                      ll_lng: float, ur_lat: float, ur_lng: float):
+                                      ll_lng: float, ur_lat: float, ur_lng: float,
+                                      variables: list[str] = Query(default=["T_2M", "U", "V", "GLOB", "RELHUM_2M", "PMSL", "CLCT"])):
     """
     Weather data from MeteoSwiss COSMO reanalysis:
     - **cosmo**: select a COSMO product
@@ -38,13 +43,14 @@ async def meteoswiss_cosmo_reanalysis(model: meteoswiss.CosmoReanalysis, start_t
     - **ur_lat**: Latitude of upper right corner of bounding box (WGS 84)
     - **ur_lng**: Longitude of upper right corner of bounding box (WGS 84)
     """
-    meteoswiss.verify_cosmo_reanalysis(model, start_time, end_time, ll_lat, ll_lng, ur_lat, ur_lng)
-    return meteoswiss.get_cosmo_reanalysis(model, start_time, end_time, ll_lat, ll_lng, ur_lat, ur_lng)
+    meteoswiss.verify_cosmo_reanalysis(model, variables, start_time, end_time, ll_lat, ll_lng, ur_lat, ur_lng)
+    return meteoswiss.get_cosmo_reanalysis(filesystem, model, variables, start_time, end_time, ll_lat, ll_lng, ur_lat, ur_lng)
 
 
 @app.get("/meteoswiss/cosmo/forecast/{model}/{forecast_date}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}", tags=["Meteoswiss"])
-async def meteoswiss_cosmo_forecast(model: meteoswiss.CosmoForecast, forecast_date: str, ll_lat: float, ll_lng: float,
-                                    ur_lat: float, ur_lng: float):
+async def meteoswiss_cosmo_forecast(model: meteoswiss.CosmoForecast, forecast_date: str,
+                                    ll_lat: float, ll_lng: float, ur_lat: float, ur_lng: float,
+                                    variables: list[str] = Query(default=["T_2M", "U", "V", "GLOB", "RELHUM_2M", "PMSL", "CLCT"])):
     """
     Weather data from MeteoSwiss COSMO forecasts:
     - **cosmo**: select a COSMO product
@@ -56,6 +62,6 @@ async def meteoswiss_cosmo_forecast(model: meteoswiss.CosmoForecast, forecast_da
     - **ur_lat**: latitude of upper right corner of bounding box (WGS 84)
     - **ur_lng**: longitude of upper right corner of bounding box (WGS 84)
     """
-    meteoswiss.verify_cosmo_forecast(model, forecast_date, ll_lat, ll_lng, ur_lat, ur_lng)
-    return meteoswiss.get_cosmo_forecast(model, forecast_date, ll_lat, ll_lng, ur_lat, ur_lng)
+    meteoswiss.verify_cosmo_forecast(model, variables, forecast_date, ll_lat, ll_lng, ur_lat, ur_lng)
+    return meteoswiss.get_cosmo_forecast(filesystem, model, variables, forecast_date, ll_lat, ll_lng, ur_lat, ur_lng)
 
