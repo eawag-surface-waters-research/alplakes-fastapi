@@ -1,10 +1,8 @@
 import os
-import json
 import numpy as np
 import xarray as xr
 from enum import Enum
 from datetime import datetime, timedelta
-from app.functions import NumpyArrayEncoder
 from fastapi import HTTPException
 
 
@@ -32,23 +30,23 @@ def get_cosmo_forecast(filesystem, model, variables, forecast_date, ll_lat, ll_l
                                 detail="{} are bad variables for COSMO {}. Please select from: {}".format(
                                     ", ".join(bad_variables), model, ", ".join(ds.keys())))
 
-        output["time"] = np.array(ds.variables["time"].values, dtype=str)
+        output["time"] = np.array(ds.variables["time"].values, dtype=str).tolist()
         x, y = np.where(((ds.variables["lat_1"] >= ll_lat) & (ds.variables["lat_1"] <= ur_lat) & (ds.variables["lon_1"] >= ll_lng) & (ds.variables["lon_1"] <= ur_lng)))
         x_min, x_max, y_min, y_max = min(x), max(x), min(y), max(y)
-        output["lat"] = ds.variables["lat_1"][x_min:x_max, y_min:y_max].values
-        output["lng"] = ds.variables["lon_1"][x_min:x_max, y_min:y_max].values
+        output["lat"] = ds.variables["lat_1"][x_min:x_max, y_min:y_max].values.tolist()
+        output["lng"] = ds.variables["lon_1"][x_min:x_max, y_min:y_max].values.tolist()
         for var in variables:
             if var in ds.variables.keys():
-                if ds.variables[var].dims == ('time', 'epsd_1', 'y_1', 'x_1'):
+                if len(ds.variables[var].dims) == 4:
                     data = ds.variables[var][:, 0, x_min:x_max, y_min:y_max].values
                 elif len(ds.variables[var].dims) == 5:
                     data = ds.variables[var][:, 0, 0, x_min:x_max, y_min:y_max].values
                 else:
                     data = []
-                output[var] = np.where(np.isnan(data), None, data)
+                output[var] = np.where(np.isnan(data), None, data).tolist()
             else:
                 output[var] = []
-    return json.loads(json.dumps(output, cls=NumpyArrayEncoder))
+    return output
 
 
 class CosmoReanalysis(str, Enum):
@@ -60,12 +58,13 @@ def verify_cosmo_reanalysis(model, variables, start_time, end_time, ll_lat, ll_l
     return True
 
 
-def get_cosmo_reanalysis(filesystem, model, variables, start_time, end_time, ll_lat, ll_lng, ur_lat, ur_lng):
+def get_cosmo_reanalysis(filesystem, model, variables, start_date, end_date, ll_lat, ll_lng, ur_lat, ur_lng):
+    # For reanalysis files the date on the file is one day after the data in the file
     folder = os.path.join(filesystem, "media/meteoswiss/cosmo", model)
-    start_time = datetime.fromtimestamp(start_time)
-    end_time = datetime.fromtimestamp(end_time)
-    files = [os.path.join(folder, "{}.{}0000.nc".format(model, (start_time+timedelta(days=x)).strftime("%Y%m%d")))
-             for x in range((end_time-start_time).days + 1)]
+    start_date = datetime.strptime(start_date, '%Y%m%d')
+    end_date = datetime.strptime(end_date, '%Y%m%d')
+    files = [os.path.join(folder, "{}.{}0000.nc".format(model, (start_date+timedelta(days=x)).strftime("%Y%m%d")))
+             for x in range(1, (end_date-start_date).days + 2)]
     bad_files = []
     for file in files:
         if not os.path.isfile(file):
@@ -80,21 +79,21 @@ def get_cosmo_reanalysis(filesystem, model, variables, start_time, end_time, ll_
                 bad_variables.append(var)
         if len(bad_variables) > 0:
             raise HTTPException(status_code=400, detail="{} are bad variables for COSMO {}. Please select from: {}".format(", ".join(bad_variables), model, ", ".join(ds.keys())))
-        output["time"] = np.array(ds.variables["time"].values, dtype=str)
+        output["time"] = np.array(ds.variables["time"].values, dtype=str).tolist()
         x, y = np.where(((ds.variables["lat_1"] >= ll_lat) & (ds.variables["lat_1"] <= ur_lat) & (
                     ds.variables["lon_1"] >= ll_lng) & (ds.variables["lon_1"] <= ur_lng)))
         x_min, x_max, y_min, y_max = min(x), max(x), min(y), max(y)
-        output["lat"] = ds.variables["lat_1"][x_min:x_max, y_min:y_max].values
-        output["lng"] = ds.variables["lon_1"][x_min:x_max, y_min:y_max].values
+        output["lat"] = ds.variables["lat_1"][x_min:x_max, y_min:y_max].values.tolist()
+        output["lng"] = ds.variables["lon_1"][x_min:x_max, y_min:y_max].values.tolist()
         for var in variables:
             if var in ds.variables.keys():
-                if ds.variables[var].dims == ('time', 'epsd_1', 'y_1', 'x_1'):
+                if len(ds.variables[var].dims) == 3:
+                    data = ds.variables[var][:, x_min:x_max, y_min:y_max].values
+                elif len(ds.variables[var].dims) == 4:
                     data = ds.variables[var][:, 0, x_min:x_max, y_min:y_max].values
-                elif len(ds.variables[var].dims) == 5:
-                    data = ds.variables[var][:, 0, 0, x_min:x_max, y_min:y_max].values
                 else:
                     data = []
-                output[var] = np.where(np.isnan(data), None, data)
+                output[var] = np.where(np.isnan(data), None, data).tolist()
             else:
                 output[var] = []
-    return json.loads(json.dumps(output, cls=NumpyArrayEncoder))
+    return output

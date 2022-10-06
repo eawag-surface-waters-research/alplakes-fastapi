@@ -27,8 +27,8 @@ def welcome():
             "queries please contact James Runnalls (james.runnall@eawag.ch)."}
 
 
-@app.get("/meteoswiss/cosmo/reanalysis/{model}/{start_time}/{end_time}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}", tags=["Meteoswiss"])
-async def meteoswiss_cosmo_reanalysis(model: meteoswiss.CosmoReanalysis, start_time: int, end_time: int, ll_lat: float,
+@app.get("/meteoswiss/cosmo/reanalysis/{model}/{start_date}/{end_date}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}", tags=["Meteoswiss"])
+async def meteoswiss_cosmo_reanalysis(model: meteoswiss.CosmoReanalysis, start_date: str, end_date: str, ll_lat: float,
                                       ll_lng: float, ur_lat: float, ur_lng: float,
                                       variables: list[str] = Query(default=["T_2M", "U", "V", "GLOB", "RELHUM_2M", "PMSL", "CLCT"])):
     """
@@ -36,15 +36,15 @@ async def meteoswiss_cosmo_reanalysis(model: meteoswiss.CosmoReanalysis, start_t
     - **cosmo**: select a COSMO product
         - VNXQ34 (reanalysis): Cosmo-1e 1 day deterministic
         - VNJK21 (reanalysis): Cosmo-1e 1 day ensemble forecast
-    - **start_time**: unix time
-    - **end_time**: unix time
+    - **start_date**: start date "YYYYMMDD"
+    - **end_date**: end date "YYYYMMDD"
     - **ll_lat**: Latitude of lower left corner of bounding box (WGS 84)
     - **ll_lng**: Longitude of lower left corner of bounding box (WGS 84)
     - **ur_lat**: Latitude of upper right corner of bounding box (WGS 84)
     - **ur_lng**: Longitude of upper right corner of bounding box (WGS 84)
     """
-    meteoswiss.verify_cosmo_reanalysis(model, variables, start_time, end_time, ll_lat, ll_lng, ur_lat, ur_lng)
-    return meteoswiss.get_cosmo_reanalysis(filesystem, model, variables, start_time, end_time, ll_lat, ll_lng, ur_lat, ur_lng)
+    meteoswiss.verify_cosmo_reanalysis(model, variables, start_date, end_date, ll_lat, ll_lng, ur_lat, ur_lng)
+    return meteoswiss.get_cosmo_reanalysis(filesystem, model, variables, start_date, end_date, ll_lat, ll_lng, ur_lat, ur_lng)
 
 
 @app.get("/meteoswiss/cosmo/forecast/{model}/{forecast_date}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}", tags=["Meteoswiss"])
