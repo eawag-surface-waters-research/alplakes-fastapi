@@ -1,7 +1,9 @@
 from fastapi import FastAPI, Query
+from fastapi.responses import RedirectResponse
 from fastapi.middleware.gzip import GZipMiddleware
 
 from app import meteoswiss
+from app import bafu
 
 app = FastAPI(
     title="Alplakes API",
@@ -65,3 +67,56 @@ async def meteoswiss_cosmo_forecast(model: meteoswiss.CosmoForecast, forecast_da
     meteoswiss.verify_cosmo_forecast(model, variables, forecast_date, ll_lat, ll_lng, ur_lat, ur_lng)
     return meteoswiss.get_cosmo_forecast(filesystem, model, variables, forecast_date, ll_lat, ll_lng, ur_lat, ur_lng)
 
+
+@app.get("/bafu/hydrodata/metadata", tags=["Bafu"])
+async def bafu_hydrodata_metadata():
+    """
+    Geojson of all the available Bafu hydrodata.
+    """
+    return RedirectResponse("https://alplakes-eawag.s3.eu-central-1.amazonaws.com/static/bafu/bafu_hydrodata.json")
+
+
+@app.get("/bafu/hydrodata/measured/{station_id}/{parameter}/{start_date}/{end_date}", tags=["Bafu"])
+async def bafu_hydrodata_measured(station_id: int, parameter: str, start_date: str, end_date: str):
+    """
+    Measured hydrodata from Bafu:
+    - **station_id**: 4 digit station identification code
+    - **parameter**: parameter to retrieve (get list from /bafu/hydrodata/metadata)
+    - **start_date**: start date "YYYYMMDD"
+    - **end_date**: end date "YYYYMMDD"
+    """
+    bafu.verify_hydrodata_measured(station_id, parameter, start_date, end_date)
+    return bafu.get_hydrodata_measured(filesystem, station_id, parameter, start_date, end_date)
+
+
+@app.get("/bafu/hydrodata/predicted/{status}/{station_id}/{parameter}", tags=["Bafu"])
+async def bafu_hydrodata_predicted(status: bafu.HydrodataPredicted, station_id: int, parameter: str):
+    """
+    Predicted hydrodata from Bafu:
+    - **status**:
+        - official: pqprevi-official
+        - unofficial: pqprevi-unofficial
+    - **station_id**: 4 digit station identification code
+    - **parameter**: parameter to retrieve (get list from /bafu/hydrodata/metadata)
+    """
+    bafu.verify_hydrodata_predicted(status, station_id, parameter)
+    return bafu.get_hydrodata_predicted(filesystem, status, station_id, parameter)
+
+
+@app.get("/bafu/hydrodata/total_lake_inflow/metadata", tags=["Bafu"])
+async def bafu_hydrodata_total_lake_inflow_metadata():
+    """
+    Metadata for the Bafu total lake inflow predictions.
+    """
+    return bafu.metadata_hydrodata_total_lake_inflow(filesystem)
+
+
+@app.get("/bafu/hydrodata/total_lake_inflow/{lake}/{parameter}/{start_date}/{end_date}", tags=["Bafu"])
+async def bafu_hydrodata_total_lake_inflow(lake, parameter: str, start_date: str, end_date: str):
+    """
+    Predicted total lake inflow from Bafu:
+    - **lake**: lake name
+    - **parameter**: parameter to retrieve (get list from /bafu/hydrodata/total_lake_inflow)
+    """
+    bafu.verify_hydrodata_total_lake_inflow(lake, parameter, start_date, end_date)
+    return bafu.get_hydrodata_total_lake_inflow(filesystem, lake, parameter, start_date, end_date)

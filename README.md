@@ -27,7 +27,7 @@ mkdir -p filesystem
 ### 3. Launch service
 ```console
 cd alplakes-fastapi
-docker-compose up --build -d
+docker compose up --build -d
 ```
 
 ## Local Development
@@ -67,7 +67,7 @@ uvicorn app.main:app --host 0.0.0.0 --reload
 
 ### Terminate containers
 ```console 
-docker-compose down
+docker compose down
 ```
 
 ### List active containers
