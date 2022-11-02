@@ -29,12 +29,15 @@ def welcome():
             "queries please contact James Runnalls (james.runnall@eawag.ch)."}
 
 
-@app.get("/meteoswiss/cosmo/reanalysis/{model}/{start_date}/{end_date}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}", tags=["Meteoswiss"])
-async def meteoswiss_cosmo_reanalysis(model: meteoswiss.CosmoReanalysis, start_date: str, end_date: str, ll_lat: float,
-                                      ll_lng: float, ur_lat: float, ur_lng: float,
-                                      variables: list[str] = Query(default=["T_2M", "U", "V", "GLOB", "RELHUM_2M", "PMSL", "CLCT"])):
+@app.get("/meteoswiss/cosmo/area/reanalysis/{model}/{start_date}/{end_date}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}",
+         tags=["Meteoswiss"])
+async def meteoswiss_cosmo_area_reanalysis(model: meteoswiss.CosmoReanalysis, start_date: str, end_date: str,
+                                           ll_lat: float,
+                                           ll_lng: float, ur_lat: float, ur_lng: float,
+                                           variables: list[str] = Query(
+                                               default=["T_2M", "U", "V", "GLOB", "RELHUM_2M", "PMSL", "CLCT"])):
     """
-    Weather data from MeteoSwiss COSMO reanalysis:
+    Weather data from MeteoSwiss COSMO reanalysis for a rectangular area:
     - **cosmo**: select a COSMO product
         - VNXQ34 (reanalysis): Cosmo-1e 1 day deterministic
         - VNJK21 (reanalysis): Cosmo-1e 1 day ensemble forecast
@@ -45,16 +48,19 @@ async def meteoswiss_cosmo_reanalysis(model: meteoswiss.CosmoReanalysis, start_d
     - **ur_lat**: Latitude of upper right corner of bounding box (WGS 84)
     - **ur_lng**: Longitude of upper right corner of bounding box (WGS 84)
     """
-    meteoswiss.verify_cosmo_reanalysis(model, variables, start_date, end_date, ll_lat, ll_lng, ur_lat, ur_lng)
-    return meteoswiss.get_cosmo_reanalysis(filesystem, model, variables, start_date, end_date, ll_lat, ll_lng, ur_lat, ur_lng)
+    meteoswiss.verify_cosmo_area_reanalysis(model, variables, start_date, end_date, ll_lat, ll_lng, ur_lat, ur_lng)
+    return meteoswiss.get_cosmo_area_reanalysis(filesystem, model, variables, start_date, end_date, ll_lat, ll_lng, ur_lat,
+                                           ur_lng)
 
 
-@app.get("/meteoswiss/cosmo/forecast/{model}/{forecast_date}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}", tags=["Meteoswiss"])
-async def meteoswiss_cosmo_forecast(model: meteoswiss.CosmoForecast, forecast_date: str,
-                                    ll_lat: float, ll_lng: float, ur_lat: float, ur_lng: float,
-                                    variables: list[str] = Query(default=["T_2M", "U", "V", "GLOB", "RELHUM_2M", "PMSL", "CLCT"])):
+@app.get("/meteoswiss/cosmo/area/forecast/{model}/{forecast_date}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}",
+         tags=["Meteoswiss"])
+async def meteoswiss_cosmo_area_forecast(model: meteoswiss.CosmoForecast, forecast_date: str,
+                                         ll_lat: float, ll_lng: float, ur_lat: float, ur_lng: float,
+                                         variables: list[str] = Query(
+                                             default=["T_2M", "U", "V", "GLOB", "RELHUM_2M", "PMSL", "CLCT"])):
     """
-    Weather data from MeteoSwiss COSMO forecasts:
+    Weather data from MeteoSwiss COSMO forecasts for a rectangular area:
     - **cosmo**: select a COSMO product
         - VNXQ94 (forecast): Cosmo-1e 33 hour ensemble forecast
         - VNXZ32 (forecast): Cosmo-2e 5 day ensemble forecast
@@ -64,8 +70,45 @@ async def meteoswiss_cosmo_forecast(model: meteoswiss.CosmoForecast, forecast_da
     - **ur_lat**: latitude of upper right corner of bounding box (WGS 84)
     - **ur_lng**: longitude of upper right corner of bounding box (WGS 84)
     """
-    meteoswiss.verify_cosmo_forecast(model, variables, forecast_date, ll_lat, ll_lng, ur_lat, ur_lng)
-    return meteoswiss.get_cosmo_forecast(filesystem, model, variables, forecast_date, ll_lat, ll_lng, ur_lat, ur_lng)
+    meteoswiss.verify_cosmo_area_forecast(model, variables, forecast_date, ll_lat, ll_lng, ur_lat, ur_lng)
+    return meteoswiss.get_cosmo_area_forecast(filesystem, model, variables, forecast_date, ll_lat, ll_lng, ur_lat, ur_lng)
+
+
+@app.get("/meteoswiss/cosmo/point/reanalysis/{model}/{start_date}/{end_date}/{lat}/{lng}", tags=["Meteoswiss"])
+async def meteoswiss_cosmo_point_reanalysis(model: meteoswiss.CosmoReanalysis, start_date: str, end_date: str,
+                                            lat: float, lng: float,
+                                            variables: list[str] = Query(
+                                                default=["T_2M", "U", "V", "GLOB", "RELHUM_2M", "PMSL", "CLCT"])):
+    """
+    Weather data from MeteoSwiss COSMO reanalysis for a single point:
+    - **cosmo**: select a COSMO product
+        - VNXQ34 (reanalysis): Cosmo-1e 1 day deterministic
+        - VNJK21 (reanalysis): Cosmo-1e 1 day ensemble forecast
+    - **start_date**: start date "YYYYMMDD"
+    - **end_date**: end date "YYYYMMDD"
+    - **lat**: Latitude of point (WGS 84)
+    - **lng**: Longitude of point (WGS 84)
+    """
+    meteoswiss.verify_cosmo_point_reanalysis(model, variables, start_date, end_date, lat, lng)
+    return meteoswiss.get_cosmo_point_reanalysis(filesystem, model, variables, start_date, end_date, lat, lng)
+
+
+@app.get("/meteoswiss/cosmo/point/forecast/{model}/{forecast_date}/{lat}/{lng}", tags=["Meteoswiss"])
+async def meteoswiss_cosmo_point_forecast(model: meteoswiss.CosmoForecast, forecast_date: str,
+                                          lat: float, lng: float,
+                                          variables: list[str] = Query(
+                                              default=["T_2M", "U", "V", "GLOB", "RELHUM_2M", "PMSL", "CLCT"])):
+    """
+    Weather data from MeteoSwiss COSMO forecasts for a single point:
+    - **cosmo**: select a COSMO product
+        - VNXQ94 (forecast): Cosmo-1e 33 hour ensemble forecast
+        - VNXZ32 (forecast): Cosmo-2e 5 day ensemble forecast
+    - **forecast_date**: date of forecast "YYYYMMDD"
+    - **lat**: latitude of point (WGS 84)
+    - **lng**: longitude of point (WGS 84)
+    """
+    meteoswiss.verify_cosmo_point_forecast(model, variables, forecast_date, lat, lng)
+    return meteoswiss.get_cosmo_point_forecast(filesystem, model, variables, forecast_date, lat, lng)
 
 
 @app.get("/bafu/hydrodata/metadata", tags=["Bafu"])
