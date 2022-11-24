@@ -34,7 +34,7 @@ async def meteoswiss_cosmo_metadata():
     """
     JSON of all the available MeteoSwiss COSMO data.
     """
-    return meteoswiss.get_cosmo_availability(filesystem)
+    return meteoswiss.get_cosmo_metadata(filesystem)
 
 
 @app.get("/meteoswiss/cosmo/area/reanalysis/{model}/{start_date}/{end_date}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}",

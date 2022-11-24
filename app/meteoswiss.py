@@ -4,10 +4,10 @@ import xarray as xr
 from enum import Enum
 from datetime import datetime, timedelta
 from fastapi import HTTPException
-from functions import daterange
+from app.functions import daterange
 
 
-def get_cosmo_availability(filesystem):
+def get_cosmo_metadata(filesystem):
     models = [{"model": "VNXQ34", "description": "Cosmo-1e 1 day deterministic"},
               {"model": "VNJK21", "description": "Cosmo-1e 1 day ensemble forecast"},
               {"model": "VNXQ94", "description": "Cosmo-1e 33 hour ensemble forecast"},
