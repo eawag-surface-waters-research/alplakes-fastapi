@@ -29,6 +29,14 @@ def welcome():
             "queries please contact James Runnalls (james.runnall@eawag.ch)."}
 
 
+@app.get("/meteoswiss/cosmo/metadata", tags=["Meteoswiss"])
+async def meteoswiss_cosmo_metadata():
+    """
+    JSON of all the available MeteoSwiss COSMO data.
+    """
+    return meteoswiss.get_cosmo_availability(filesystem)
+
+
 @app.get("/meteoswiss/cosmo/area/reanalysis/{model}/{start_date}/{end_date}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}",
          tags=["Meteoswiss"])
 async def meteoswiss_cosmo_area_reanalysis(model: meteoswiss.CosmoReanalysis, start_date: str, end_date: str,
@@ -114,7 +122,7 @@ async def meteoswiss_cosmo_point_forecast(model: meteoswiss.CosmoForecast, forec
 @app.get("/bafu/hydrodata/metadata", tags=["Bafu"])
 async def bafu_hydrodata_metadata():
     """
-    Geojson of all the available Bafu hydrodata.
+    GEOJSON of all the available BAFU hydrodata.
     """
     return RedirectResponse("https://alplakes-eawag.s3.eu-central-1.amazonaws.com/static/bafu/bafu_hydrodata.json")
 
