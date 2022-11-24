@@ -33,7 +33,8 @@ docker compose up --build -d
 ### 3. Restart service
 When there are changes to the API the service needs to be rebuilt to reflect those changes.
 ```console
-docker compose build
+docker compose down
+docker compose up --build -d
 ```
 
 ## Local Development
