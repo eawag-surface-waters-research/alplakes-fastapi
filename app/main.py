@@ -140,18 +140,18 @@ async def bafu_hydrodata_measured(station_id: int, parameter: str, start_date: s
     return bafu.get_hydrodata_measured(filesystem, station_id, parameter, start_date, end_date)
 
 
-@app.get("/bafu/hydrodata/predicted/{status}/{station_id}/{parameter}", tags=["Bafu"])
-async def bafu_hydrodata_predicted(status: bafu.HydrodataPredicted, station_id: int, parameter: str):
+@app.get("/bafu/hydrodata/predicted/{status}/{station_id}/{model}", tags=["Bafu"])
+async def bafu_hydrodata_predicted(status: bafu.HydrodataPredicted, station_id: int, model: str):
     """
     Predicted hydrodata from Bafu:
     - **status**:
         - official: pqprevi-official
         - unofficial: pqprevi-unofficial
     - **station_id**: 4 digit station identification code
-    - **parameter**: parameter to retrieve (get list from /bafu/hydrodata/metadata)
+    - **model**: model to retrieve (get list from /bafu/hydrodata/metadata)
     """
-    bafu.verify_hydrodata_predicted(status, station_id, parameter)
-    return bafu.get_hydrodata_predicted(filesystem, status, station_id, parameter)
+    bafu.verify_hydrodata_predicted(status, station_id, model)
+    return bafu.get_hydrodata_predicted(filesystem, status, station_id, model)
 
 
 @app.get("/bafu/hydrodata/total_lake_inflow/metadata", tags=["Bafu"])

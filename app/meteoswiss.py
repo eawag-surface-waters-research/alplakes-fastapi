@@ -163,7 +163,8 @@ def get_cosmo_area_reanalysis(filesystem, model, variables, start_date, end_date
     bad_files = []
     for file in files:
         if not os.path.isfile(file):
-            bad_files.append(file.split("/")[-1].split(".")[1][:8])
+            actual_date = datetime.strptime(file.split("/")[-1].split(".")[1][:8], '%Y%m%d') - timedelta(days=1)
+            bad_files.append(actual_date.strftime("%Y-%m-%d"))
     if len(bad_files) > 0:
         raise HTTPException(status_code=400,
                             detail="Data not available for COSMO {} for the following dates: {}".format(model,

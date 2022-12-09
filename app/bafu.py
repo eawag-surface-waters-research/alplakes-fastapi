@@ -45,11 +45,11 @@ def verify_hydrodata_predicted(status, station_id, parameter):
     return True
 
 
-def get_hydrodata_predicted(filesystem, status, station_id, parameter):
-    file = os.path.join(filesystem, "media/bafu/hydrodata", "pqprevi-" + status, "Pqprevi_{}_{}.txt".format(parameter, station_id))
+def get_hydrodata_predicted(filesystem, status, station_id, model):
+    file = os.path.join(filesystem, "media/bafu/hydrodata", "pqprevi-" + status, "Pqprevi_{}_{}.txt".format(model, station_id))
     if not os.path.exists(file):
         raise HTTPException(status_code=400,
-                            detail="Prediction not available for parameter {} at station {}.".format(parameter, station_id))
+                            detail="Prediction not available for model {} at station {}.".format(model, station_id))
     return FileResponse(file)
 
 
