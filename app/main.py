@@ -66,7 +66,8 @@ async def meteoswiss_cosmo_area_reanalysis(model: meteoswiss.CosmoReanalysis, st
 async def meteoswiss_cosmo_area_forecast(model: meteoswiss.CosmoForecast, forecast_date: str,
                                          ll_lat: float, ll_lng: float, ur_lat: float, ur_lng: float,
                                          variables: list[str] = Query(
-                                             default=["T_2M", "U", "V", "GLOB", "RELHUM_2M", "PMSL", "CLCT"])):
+                                             default=["T_2M_MEAN", "U_MEAN", "V_MEAN", "GLOB_MEAN", "RELHUM_2M_MEAN",
+                                                       "PMSL_MEAN", "CLCT_MEAN"])):
     """
     Weather data from MeteoSwiss COSMO forecasts for a rectangular area:
     - **cosmo**: select a COSMO product
@@ -105,7 +106,8 @@ async def meteoswiss_cosmo_point_reanalysis(model: meteoswiss.CosmoReanalysis, s
 async def meteoswiss_cosmo_point_forecast(model: meteoswiss.CosmoForecast, forecast_date: str,
                                           lat: float, lng: float,
                                           variables: list[str] = Query(
-                                              default=["T_2M", "U", "V", "GLOB", "RELHUM_2M", "PMSL", "CLCT"])):
+                                              default=["T_2M_MEAN", "U_MEAN", "V_MEAN", "GLOB_MEAN", "RELHUM_2M_MEAN",
+                                                       "PMSL_MEAN", "CLCT_MEAN"])):
     """
     Weather data from MeteoSwiss COSMO forecasts for a single point:
     - **cosmo**: select a COSMO product
