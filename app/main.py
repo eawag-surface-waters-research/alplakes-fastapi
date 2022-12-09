@@ -2,6 +2,7 @@ from fastapi import FastAPI, Query
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.gzip import GZipMiddleware
 
+from app import simulations
 from app import meteoswiss
 from app import bafu
 
@@ -173,3 +174,23 @@ async def bafu_hydrodata_total_lake_inflow(lake, parameter: str, start_date: str
     """
     bafu.verify_hydrodata_total_lake_inflow(lake, parameter, start_date, end_date)
     return bafu.get_hydrodata_total_lake_inflow(filesystem, lake, parameter, start_date, end_date)
+
+
+@app.get("/simulations/layer/{model}/{lake}/{datetime}/{depth}", tags=["Simulations"])
+async def simulations_layer(model: str, lake: str, datetime: int, depth: float):
+    """
+    Simulations results for a given lake simulation at a specific depth and time:
+    - **model**: model name
+    - **lake**: lake name
+    - **datetime**: unix time in seconds
+    - **depth**: depth of layer in meters
+    """
+    return "Endpoint still under construction."
+
+
+@app.post("/simulations/notify", tags=["Simulations"])
+async def simulations_notify(notification: simulations.Notification):
+    """
+    Endpoint for notifying Alplakes API about new simulation results
+    """
+    return simulations.notify(filesystem, notification)
