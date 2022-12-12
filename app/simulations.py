@@ -20,17 +20,12 @@ def notify(filesystem, notification):
 
 
 def notify_new(filesystem, file):
-    prefix = "https://alplakes-eawag.s3.eu-central-1.amazonaws.com/simulations/"
-    if file[:31] == "s3://alplakes-eawag/simulations":
-        path = file[32:]
-        url = prefix + path
-        p1 = path.split("/")
-        model = p1[0]
-        p2 = p1[-1].split("_")
-        lake = p2[-3]
-        filename = "{}.nc".format(p2[-2])
-        local = os.path.join(filesystem, "media/simulations", model, "results", lake, filename)
-        functions.download_file(url, local)
+    accepted_buckets = ["https://alplakes-eawag.s3"]
+    if file[:25] in accepted_buckets:
+        u = file.split("_")
+        s = file.split("/")
+        local = os.path.join(filesystem, "media/simulations", s[-3], "results", u[-2], u[-1])
+        functions.download_file(file, local)
         return "Successfully downloaded {} to API storage.".format(file)
     else:
         raise HTTPException(status_code=500,
