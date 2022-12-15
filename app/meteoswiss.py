@@ -13,6 +13,7 @@ def get_cosmo_metadata(filesystem):
               {"model": "VNXQ94", "description": "Cosmo-1e 33 hour ensemble forecast"},
               {"model": "VNXZ32", "description": "Cosmo-2e 5 day ensemble forecast"}]
     for model in models:
+
         files = os.listdir(os.path.join(filesystem, "media/meteoswiss/cosmo", model["model"]))
         files.sort()
         combined = '_'.join(files)

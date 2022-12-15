@@ -2,3 +2,4 @@ app/test.py
 .idea
 app/__pycache__
 .env
+notebooks
