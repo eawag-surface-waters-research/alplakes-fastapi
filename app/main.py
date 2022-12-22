@@ -182,7 +182,7 @@ async def simulations_layer(model: simulations.Models, lake: simulations.Lakes, 
     Simulations results for a given lake simulation at a specific depth and time:
     - **model**: model name
     - **lake**: lake name
-    - **time**: YYYYMMDDHH (%Y%m%d%h)
+    - **time**: YYYYmmddHHMM (UTC) e.g. 9am 6th December 2022 > 202212060900
     - **depth**: depth of layer in meters
     """
     simulations.verify_simulations_layer(model, lake, time, depth)

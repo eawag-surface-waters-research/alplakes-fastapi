@@ -40,8 +40,8 @@ def get_cosmo_metadata(filesystem):
 
 
 class CosmoForecast(str, Enum):
-    VNXQ94 = "VNXQ94"
     VNXZ32 = "VNXZ32"
+    VNXQ94 = "VNXQ94"
 
 
 def verify_cosmo_area_forecast(model, variables, forecast_date, ll_lat, ll_lng, ur_lat, ur_lng):

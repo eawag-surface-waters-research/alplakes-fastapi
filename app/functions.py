@@ -2,7 +2,43 @@ import os
 import shutil
 import requests
 import numpy as np
-from datetime import timedelta
+from fastapi import HTTPException
+from datetime import datetime, timedelta
+
+
+def convert_to_unit(time, units):
+    if units == "seconds since 2008-03-01 00:00:00":
+        return (time - datetime(2008, 3, 1)).total_seconds()
+    elif units == "seconds since 1970-01-01 00:00:00":
+        return time.timestamp()
+    else:
+        raise HTTPException(status_code=400,
+                            detail="Apologies unable to read NetCDF with time unit: {}".format(units))
+
+
+def convert_from_unit(time, units):
+    if units == "seconds since 2008-03-01 00:00:00":
+        return datetime.utcfromtimestamp(time + (datetime(2008, 3, 1) - datetime(1970, 1, 1)).total_seconds())
+    elif units == "seconds since 1970-01-01 00:00:00":
+        return datetime.utcfromtimestamp(time)
+    else:
+        raise HTTPException(status_code=400,
+                            detail="Apologies unable to read NetCDF with time unit: {}".format(units))
+
+
+def get_closest_index(value, array):
+    array = np.sort(np.asarray(array))
+    if len(array) == 0:
+        raise ValueError("Array must be longer than len(0) to find index of value")
+    elif len(array) == 1:
+        return 0
+    if value > (2 * array[-1] - array[-2]):
+        raise HTTPException(status_code=400,
+                            detail="Value {} greater than max available ({})".format(value, array[-1]))
+    elif value < (2 * array[0] - array[-1]):
+        raise HTTPException(status_code=400,
+                            detail="Value {} less than min available ({})".format(value, array[0]))
+    return (np.abs(array - value)).argmin()
 
 
 def daterange(start_date, end_date):
