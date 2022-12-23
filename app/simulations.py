@@ -96,9 +96,8 @@ def notify(filesystem, notification):
 
 
 def notify_new(filesystem, model, value):
-    models = ["delft3d-flow"]
     accepted_buckets = ["https://alplakes-eawag.s3"]
-    if value[:25] in accepted_buckets and model in models:
+    if value[:25] in accepted_buckets:
         if model == "delft3d-flow":
             lake = value.split("_")[-2]
             file = value.split("/")[-1]
@@ -107,6 +106,9 @@ def notify_new(filesystem, model, value):
             functions.download_file(value, local)
             transform_delft3d_output(local, folder)
             os.remove(local)
+        else:
+            raise HTTPException(status_code=400,
+                                detail="Notification system not configured for model: {}".format(model))
         return "Successfully downloaded {} to API storage.".format(file)
     else:
         raise HTTPException(status_code=500,
