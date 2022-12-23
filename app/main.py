@@ -1,10 +1,12 @@
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, BackgroundTasks, HTTPException
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.gzip import GZipMiddleware
 
 from app import simulations
 from app import meteoswiss
 from app import bafu
+
+import os
 
 app = FastAPI(
     title="Alplakes API",
@@ -190,8 +192,23 @@ async def simulations_layer(model: simulations.Models, lake: simulations.Lakes, 
 
 
 @app.post("/simulations/notify", tags=["Simulations"])
-async def simulations_notify(notification: simulations.Notification):
+async def simulations_notify(notification: simulations.Notification, background_tasks: BackgroundTasks):
     """
     Endpoint for notifying Alplakes API about new simulation results
     """
-    return simulations.notify(filesystem, notification)
+    n = notification.dict()
+    if n["type"] == "new":
+        accepted_buckets = ["https://alplakes-eawag.s3"]
+        if n["value"][:25] in accepted_buckets:
+            if n["model"] == "delft3d-flow":
+                background_tasks.add_task(simulations.notify_new_delft3dflow, filesystem, n["model"], n["value"])
+            else:
+                raise HTTPException(status_code=400,
+                                    detail="Notification system not configured for model: {}".format(n["model"]))
+        else:
+            raise HTTPException(status_code=500,
+                                detail="Only new simulation in the Alplakes S3 Bucket are accepted.")
+    else:
+        raise HTTPException(status_code=400,
+                            detail="The following notification type is not recognised: {}".format(n["type"]))
+    return {"message": "Notification sent in the background"}

@@ -86,37 +86,15 @@ class Notification(BaseModel):
     value: str
 
 
-def notify(filesystem, notification):
-    n = notification.dict()
-    if n["type"] == "new":
-        return notify_new(filesystem, n["model"], n["value"])
-    else:
-        raise HTTPException(status_code=400,
-                            detail="The following notification type is not recognised: {}".format(n["type"]))
+def notify_new_delft3dflow(filesystem, model, value):
+    lake = value.split("_")[-2]
+    file = value.split("/")[-1]
+    folder = os.path.join(filesystem, "media/simulations", model, "results", lake)
+    local = os.path.join(folder, file)
 
+    functions.download_file(value, local)
 
-def notify_new(filesystem, model, value):
-    accepted_buckets = ["https://alplakes-eawag.s3"]
-    if value[:25] in accepted_buckets:
-        if model == "delft3d-flow":
-            lake = value.split("_")[-2]
-            file = value.split("/")[-1]
-            folder = os.path.join(filesystem, "media/simulations", model, "results", lake)
-            local = os.path.join(folder, file)
-            functions.download_file(value, local)
-            transform_delft3d_output(local, folder)
-            os.remove(local)
-        else:
-            raise HTTPException(status_code=400,
-                                detail="Notification system not configured for model: {}".format(model))
-        return "Successfully downloaded {} to API storage.".format(file)
-    else:
-        raise HTTPException(status_code=500,
-                            detail="Only new simulation in the Alplakes S3 Bucket are accepted.")
-
-
-def transform_delft3d_output(file, folder):
-    with netCDF4.Dataset(file, "r") as nc:
+    with netCDF4.Dataset(local, "r") as nc:
         time = np.array(nc.variables["time"][:])
         time_unit = nc.variables["time"].units
         min_time = functions.convert_from_unit(np.min(time), time_unit)
@@ -159,3 +137,5 @@ def transform_delft3d_output(file, folder):
             shutil.move(temp_file_name, final_file_name)
             start_time = start_time + timedelta(days=7)
             end_time = end_time + timedelta(days=7)
+
+    os.remove(local)
