@@ -41,9 +41,9 @@ def get_closest_index(value, array):
     return (np.abs(array - value)).argmin()
 
 
-def daterange(start_date, end_date):
-    for n in range(int((end_date - start_date).days)):
-        yield start_date + timedelta(n)
+def daterange(start_date, end_date, days=1):
+    for n in range(int((end_date - start_date).days / days)):
+        yield start_date + timedelta(n * days)
 
 
 def array_to_list(arr):

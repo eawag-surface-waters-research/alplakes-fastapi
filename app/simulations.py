@@ -11,6 +11,36 @@ from dateutil.relativedelta import relativedelta, SU
 from app import functions
 
 
+def get_metadata(filesystem):
+    metadata = []
+    models = os.listdir(os.path.join(filesystem, "media/simulations"))
+
+    for model in models:
+        lakes = os.listdir(os.path.join(filesystem, "media/simulations", model, "results"))
+        m = {"model": model, "lakes": []}
+
+        for lake in lakes:
+            files = os.listdir(os.path.join(os.path.join(filesystem, "media/simulations", model, "results", lake)))
+            files.sort()
+            combined = '_'.join(files)
+            missing_dates = []
+
+            start_date = datetime.strptime(files[0].split(".")[0], '%Y%m%d')
+            end_date = datetime.strptime(files[-1].split(".")[0], '%Y%m%d') + timedelta(days=7)
+
+            for d in functions.daterange(start_date, end_date, days=7):
+                print(d)
+                if d.strftime('%Y%m%d') not in combined:
+                    missing_dates.append(d.strftime("%Y-%m-%d"))
+
+            m["lakes"].append({"name": lake,
+                               "start_date": start_date.strftime("%Y-%m-%d"),
+                               "end_date": end_date.strftime("%Y-%m-%d"),
+                               "missing_dates": missing_dates})
+        metadata.append(m)
+    return metadata
+
+
 class Models(str, Enum):
     delft3dflow = "delft3d-flow"
 
@@ -28,7 +58,7 @@ def verify_simulations_layer(model, lake, datetime, depth):
 
 def get_simulations_layer(filesystem, model, lake, time, depth):
     if model == "delft3d-flow":
-        get_simulations_layer_delft3dflow(filesystem, lake, time, depth)
+        return get_simulations_layer_delft3dflow(filesystem, lake, time, depth)
     else:
         raise HTTPException(status_code=400,
                             detail="Apologies data is not available for {}".format(model))
@@ -54,30 +84,24 @@ def get_simulations_layer_delft3dflow(filesystem, lake, time, depth):
     with netCDF4.Dataset(file) as nc:
         converted_time = functions.convert_to_unit(origin, nc.variables["time"].units)
         time_index = functions.get_closest_index(converted_time, np.array(nc.variables["time"][:]))
-        depth_index = functions.get_closest_index(depth, np.array(nc.variables["depth"][:]) * -1)
+        depth_index = functions.get_closest_index(depth, np.array(nc.variables["ZK_LYR"][:]) * -1)
 
-        return {"time": {"name": nc.variables["time"].long_name,
-                         "units": nc.variables["time"].units,
-                         "data": nc.variables["time"][time_index]},
-                "depth": {"name": nc.variables["depth"].long_name,
-                          "units": nc.variables["depth"].units,
-                          "data": nc.variables["depth"][depth_index]},
-                "x": {"name": nc.variables["x"].long_name,
-                      "units": nc.variables["x"].units,
-                      "data": nc.variables["x"][:]},
-                "y": {"name": nc.variables["y"].long_name,
-                      "units": nc.variables["y"].units,
-                      "data": nc.variables["y"][:]},
-                "t": {"name": nc.variables["t"].long_name,
-                      "units": nc.variables["t"].units,
-                      "data": nc.variables["t"][time_index, depth_index, :]},
-                "u": {"name": nc.variables["u"].long_name,
-                      "units": nc.variables["u"].units,
-                      "data": nc.variables["u"][time_index, depth_index, :]},
-                "v": {"name": nc.variables["v"].long_name,
-                      "units": nc.variables["v"].units,
-                      "data": nc.variables["v"][time_index, depth_index, :]},
-                }
+        out = {"time": {"name": nc.variables["time"].long_name,
+                        "units": nc.variables["time"].units,
+                        "data": nc.variables["time"][time_index].tolist()},
+               "depth": {"name": nc.variables["ZK_LYR"].long_name,
+                         "units": nc.variables["ZK_LYR"].units,
+                         "data": nc.variables["ZK_LYR"][depth_index].tolist()},
+               "x": {"name": nc.variables["XZ"].long_name,
+                     "units": nc.variables["XZ"].units,
+                     "data": nc.variables["XZ"][:].tolist()},
+               "y": {"name": nc.variables["YZ"].long_name,
+                     "units": nc.variables["YZ"].units,
+                     "data": nc.variables["YZ"][:].tolist()},
+               "t": {"name": "Water temperature",
+                     "units": "degC",
+                     "data": nc.variables["R1"][time_index, 0, depth_index, :].tolist()}}
+    return out
 
 
 class Notification(BaseModel):

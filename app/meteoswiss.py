@@ -12,30 +12,34 @@ def get_cosmo_metadata(filesystem):
               {"model": "VNJK21", "description": "Cosmo-1e 1 day ensemble forecast"},
               {"model": "VNXQ94", "description": "Cosmo-1e 33 hour ensemble forecast"},
               {"model": "VNXZ32", "description": "Cosmo-2e 5 day ensemble forecast"}]
+
     for model in models:
-
         files = os.listdir(os.path.join(filesystem, "media/meteoswiss/cosmo", model["model"]))
-        files.sort()
-        combined = '_'.join(files)
-        missing_dates = []
+        if len(files) > 0:
+            files.sort()
+            combined = '_'.join(files)
+            missing_dates = []
 
-        start_date = datetime.strptime(files[0].split(".")[1], '%Y%m%d%H%M')
-        end_date = datetime.strptime(files[-1].split(".")[1], '%Y%m%d%H%M')
+            start_date = datetime.strptime(files[0].split(".")[1], '%Y%m%d%H%M')
+            end_date = datetime.strptime(files[-1].split(".")[1], '%Y%m%d%H%M')
 
-        for d in daterange(start_date, end_date):
-            if d.strftime('%Y%m%d%H%M') not in combined:
-                if model["model"] == "VNXQ34":
-                    missing_dates.append((d - timedelta(days=1)).strftime("%Y-%m-%d"))
-                else:
-                    missing_dates.append(d.strftime("%Y-%m-%d"))
+            for d in daterange(start_date, end_date):
+                if d.strftime('%Y%m%d%H%M') not in combined:
+                    if model["model"] == "VNXQ34":
+                        missing_dates.append((d - timedelta(days=1)).strftime("%Y-%m-%d"))
+                    else:
+                        missing_dates.append(d.strftime("%Y-%m-%d"))
 
-        if model["model"] == "VNXQ34":
-            start_date = start_date - timedelta(days=1)
-            end_date = end_date - timedelta(days=1)
+            if model["model"] == "VNXQ34":
+                start_date = start_date - timedelta(days=1)
+                end_date = end_date - timedelta(days=1)
 
-        model["start_date"] = start_date.strftime("%Y-%m-%d")
-        model["end_date"] = end_date.strftime("%Y-%m-%d")
-        model["missing_dates"] = missing_dates
+            model["start_date"] = start_date.strftime("%Y-%m-%d")
+            model["end_date"] = end_date.strftime("%Y-%m-%d")
+            model["missing_dates"] = missing_dates
+        else:
+            model["start_date"] = "NA"
+            model["end_date"] = "NA"
     return models
 
 

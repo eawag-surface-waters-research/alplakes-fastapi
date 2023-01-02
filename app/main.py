@@ -2,11 +2,18 @@ from fastapi import FastAPI, Query, BackgroundTasks, HTTPException
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.gzip import GZipMiddleware
 
+import sentry_sdk
+
 from app import simulations
 from app import meteoswiss
 from app import bafu
 
 import os
+
+sentry_sdk.init(
+    dsn="https://9b346d9bd9aa4309a18f5a47746b0a54@o1106970.ingest.sentry.io/4504402334777344",
+    traces_sample_rate=1.0,
+)
 
 app = FastAPI(
     title="Alplakes API",
@@ -176,6 +183,14 @@ async def bafu_hydrodata_total_lake_inflow(lake, parameter: str, start_date: str
     """
     bafu.verify_hydrodata_total_lake_inflow(lake, parameter, start_date, end_date)
     return bafu.get_hydrodata_total_lake_inflow(filesystem, lake, parameter, start_date, end_date)
+
+
+@app.get("/simulations/metadata", tags=["Simulations"])
+async def simulations_metadata():
+    """
+    JSON of all the available Simulation data.
+    """
+    return simulations.get_metadata(filesystem)
 
 
 @app.get("/simulations/layer/{model}/{lake}/{time}/{depth}", tags=["Simulations"])
