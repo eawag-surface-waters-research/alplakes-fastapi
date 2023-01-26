@@ -1,11 +1,12 @@
 import os
+import json
 import shutil
 import netCDF4
 import numpy as np
 from enum import Enum
 from pydantic import BaseModel
 from fastapi import HTTPException
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dateutil.relativedelta import relativedelta, SU
 
 from app import functions
@@ -66,7 +67,7 @@ def get_simulations_layer(filesystem, model, lake, time, depth):
 
 def get_simulations_layer_delft3dflow(filesystem, lake, time, depth):
     model = "delft3d-flow"
-    origin = datetime.strptime(time, "%Y%m%d%H%M")
+    origin = datetime.strptime(time, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
     last_sunday = origin + relativedelta(weekday=SU(-1))
     previous_sunday = last_sunday - timedelta(days=7)
     lakes = os.path.join(filesystem, "media/simulations", model, "results")
@@ -85,22 +86,38 @@ def get_simulations_layer_delft3dflow(filesystem, lake, time, depth):
         converted_time = functions.convert_to_unit(origin, nc.variables["time"].units)
         time_index = functions.get_closest_index(converted_time, np.array(nc.variables["time"][:]))
         depth_index = functions.get_closest_index(depth, np.array(nc.variables["ZK_LYR"][:]) * -1)
+        time = nc.variables["time"][time_index].tolist()
+        depth = nc.variables["ZK_LYR"][depth_index].tolist() * -1
+        x = functions.filter_coordinate(nc.variables["XZ"][:])
+        y = functions.filter_coordinate(nc.variables["YZ"][:])
+        t = functions.filter_parameter(nc.variables["R1"][time_index, 0, depth_index, :])
+        u, v, = functions.rotate_velocity(nc.variables["U1"][time_index, depth_index, :],
+                                          nc.variables["V1"][time_index, depth_index, :],
+                                          nc.variables["ALFAS"][:])
 
         out = {"time": {"name": nc.variables["time"].long_name,
                         "units": nc.variables["time"].units,
-                        "data": nc.variables["time"][time_index].tolist()},
+                        "string": functions.convert_from_unit(time, nc.variables["time"].units).strftime("%Y-%m-%d %H:%M:%S"),
+                        "data": time},
                "depth": {"name": nc.variables["ZK_LYR"].long_name,
                          "units": nc.variables["ZK_LYR"].units,
-                         "data": nc.variables["ZK_LYR"][depth_index].tolist()},
+                         "data": depth},
                "x": {"name": nc.variables["XZ"].long_name,
                      "units": nc.variables["XZ"].units,
-                     "data": nc.variables["XZ"][:].tolist()},
+                     "data": x},
                "y": {"name": nc.variables["YZ"].long_name,
                      "units": nc.variables["YZ"].units,
-                     "data": nc.variables["YZ"][:].tolist()},
+                     "data": y},
                "t": {"name": "Water temperature",
                      "units": "degC",
-                     "data": nc.variables["R1"][time_index, 0, depth_index, :].tolist()}}
+                     "data": t},
+               "u": {"name": "Water velocity (North)",
+                     "units": "m/s",
+                     "data": u},
+               "v": {"name": "Water velocity (East)",
+                     "units": "m/s",
+                     "data": v}
+               }
     return out
 
 
