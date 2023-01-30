@@ -185,6 +185,7 @@ def notify_new_delft3dflow(filesystem, model, value):
                 start_time = start_time + timedelta(days=7)
                 end_time = end_time + timedelta(days=7)
                 print("Succeeded in transforming simulation file.")
+        os.remove(local)
     except:
         logging.warning("Failed to transform simulation file.")
         os.remove(local)
