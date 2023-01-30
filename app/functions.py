@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 
 def convert_to_unit(time, units):
     if units == "seconds since 2008-03-01 00:00:00":
-        return (time - datetime(2008, 3, 1).replace(tzinfo=timezone.utc)).total_seconds()
+        return (time.replace(tzinfo=timezone.utc) - datetime(2008, 3, 1).replace(tzinfo=timezone.utc)).total_seconds()
     elif units == "seconds since 1970-01-01 00:00:00":
         return time.timestamp()
     else:

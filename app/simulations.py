@@ -2,6 +2,7 @@ import os
 import json
 import shutil
 import netCDF4
+import logging
 import numpy as np
 from enum import Enum
 from pydantic import BaseModel
@@ -22,6 +23,7 @@ def get_metadata(filesystem):
 
         for lake in lakes:
             files = os.listdir(os.path.join(os.path.join(filesystem, "media/simulations", model, "results", lake)))
+            files = [file for file in files if len(file.split(".")[0]) == 8 and file.split(".")[1] == "nc"]
             files.sort()
             combined = '_'.join(files)
             missing_dates = []
@@ -128,55 +130,62 @@ class Notification(BaseModel):
 
 
 def notify_new_delft3dflow(filesystem, model, value):
+    print("Notifying new delft3dflow model available.")
     lake = value.split("_")[-2]
     file = value.split("/")[-1]
     folder = os.path.join(filesystem, "media/simulations", model, "results", lake)
     local = os.path.join(folder, file)
-
+    print("Downloading file: {}".format(file))
     functions.download_file(value, local)
+    print("Successfully downloaded.")
 
-    with netCDF4.Dataset(local, "r") as nc:
-        time = np.array(nc.variables["time"][:])
-        time_unit = nc.variables["time"].units
-        min_time = functions.convert_from_unit(np.min(time), time_unit)
-        max_time = functions.convert_from_unit(np.max(time), time_unit)
-        start_time = min_time + relativedelta(weekday=SU(-1))
-        end_time = start_time + timedelta(days=7)
-        while start_time < max_time:
-            idx = np.where(np.logical_and(time >= functions.convert_to_unit(start_time, time_unit),
-                                          time < functions.convert_to_unit(end_time, time_unit)))
-            s = np.min(idx)
-            e = np.max(idx) + 1
-            temp_file_name = os.path.join(folder, "temp_{}.nc".format(start_time.strftime('%Y%m%d')))
-            final_file_name = os.path.join(folder, "{}.nc".format(start_time.strftime('%Y%m%d')))
-            if start_time != min_time + relativedelta(weekday=SU(-1)) and os.path.isfile(final_file_name):
-                with netCDF4.Dataset(final_file_name, "r") as temp:
-                    if len(temp.variables["time"][:]) >= len(idx):
-                        start_time = start_time + timedelta(days=7)
-                        end_time = end_time + timedelta(days=7)
-                        continue
+    try:
+        print("Transforming input simulation file.")
+        with netCDF4.Dataset(local, "r") as nc:
+            time = np.array(nc.variables["time"][:])
+            time_unit = nc.variables["time"].units
+            min_time = functions.convert_from_unit(np.min(time), time_unit)
+            max_time = functions.convert_from_unit(np.max(time), time_unit)
+            start_time = min_time + relativedelta(weekday=SU(-1))
+            end_time = start_time + timedelta(days=7)
+            while start_time < max_time:
+                idx = np.where(np.logical_and(time >= functions.convert_to_unit(start_time, time_unit),
+                                              time < functions.convert_to_unit(end_time, time_unit)))
+                s = np.min(idx)
+                e = np.max(idx) + 1
+                temp_file_name = os.path.join(folder, "temp_{}.nc".format(start_time.strftime('%Y%m%d')))
+                final_file_name = os.path.join(folder, "{}.nc".format(start_time.strftime('%Y%m%d')))
+                if start_time != min_time + relativedelta(weekday=SU(-1)) and os.path.isfile(final_file_name):
+                    with netCDF4.Dataset(final_file_name, "r") as temp:
+                        if len(temp.variables["time"][:]) >= len(idx):
+                            start_time = start_time + timedelta(days=7)
+                            end_time = end_time + timedelta(days=7)
+                            continue
 
-            with netCDF4.Dataset(temp_file_name, "w") as dst:
-                # Copy Attributes
-                dst.setncatts(nc.__dict__)
-                # Copy Dimensions
-                for name, dimension in nc.dimensions.items():
-                    dst.createDimension(name, (len(dimension) if not dimension.isunlimited() else None))
-                # Copy Variables
-                for name, variable in nc.variables.items():
-                    x = dst.createVariable(name, variable.datatype, variable.dimensions)
-                    if "time" in list(variable.dimensions):
-                        if list(variable.dimensions)[0] != "time":
-                            raise ValueError("Code only works with time as first dimension.")
-                        if len(variable.dimensions) > 1:
-                            dst[name][:] = nc[name][s:e, :]
+                with netCDF4.Dataset(temp_file_name, "w") as dst:
+                    # Copy Attributes
+                    dst.setncatts(nc.__dict__)
+                    # Copy Dimensions
+                    for name, dimension in nc.dimensions.items():
+                        dst.createDimension(name, (len(dimension) if not dimension.isunlimited() else None))
+                    # Copy Variables
+                    for name, variable in nc.variables.items():
+                        x = dst.createVariable(name, variable.datatype, variable.dimensions)
+                        if "time" in list(variable.dimensions):
+                            if list(variable.dimensions)[0] != "time":
+                                raise ValueError("Code only works with time as first dimension.")
+                            if len(variable.dimensions) > 1:
+                                dst[name][:] = nc[name][s:e, :]
+                            else:
+                                dst[name][:] = nc[name][s:e]
                         else:
-                            dst[name][:] = nc[name][s:e]
-                    else:
-                        dst[name][:] = nc[name][:]
-                    dst[name].setncatts(nc[name].__dict__)
-            shutil.move(temp_file_name, final_file_name)
-            start_time = start_time + timedelta(days=7)
-            end_time = end_time + timedelta(days=7)
-
-    os.remove(local)
+                            dst[name][:] = nc[name][:]
+                        dst[name].setncatts(nc[name].__dict__)
+                shutil.move(temp_file_name, final_file_name)
+                start_time = start_time + timedelta(days=7)
+                end_time = end_time + timedelta(days=7)
+                print("Succeeded in transforming simulation file.")
+    except:
+        logging.warning("Failed to transform simulation file.")
+        os.remove(local)
+        raise
