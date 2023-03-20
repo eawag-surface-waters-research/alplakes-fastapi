@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from fastapi import HTTPException
 from datetime import datetime, timedelta, timezone
 from dateutil.relativedelta import relativedelta, SU
+import matplotlib.pyplot as plt
 
 from app import functions
 
@@ -55,13 +56,31 @@ class Lakes(str, Enum):
     biel = "biel"
 
 
+class Parameters(str, Enum):
+    geometry = "geometry"
+    temperature = "temperature"
+    velocity = "velocity"
+
+
 def verify_simulations_layer(model, lake, datetime, depth):
+    return True
+
+
+def verify_simulations_layer_alplakes(model, lake, parameter, start, end, depth):
     return True
 
 
 def get_simulations_layer(filesystem, model, lake, time, depth):
     if model == "delft3d-flow":
         return get_simulations_layer_delft3dflow(filesystem, lake, time, depth)
+    else:
+        raise HTTPException(status_code=400,
+                            detail="Apologies data is not available for {}".format(model))
+
+
+def get_simulations_layer_alplakes(filesystem, model, lake, parameter, start, end, depth):
+    if model == "delft3d-flow":
+        return get_simulations_layer_alplakes_delft3dflow(filesystem, lake, parameter, start, end, depth)
     else:
         raise HTTPException(status_code=400,
                             detail="Apologies data is not available for {}".format(model))
@@ -99,7 +118,8 @@ def get_simulations_layer_delft3dflow(filesystem, lake, time, depth):
 
         out = {"time": {"name": nc.variables["time"].long_name,
                         "units": nc.variables["time"].units,
-                        "string": functions.convert_from_unit(time, nc.variables["time"].units).strftime("%Y-%m-%d %H:%M:%S"),
+                        "string": functions.convert_from_unit(time, nc.variables["time"].units).strftime(
+                            "%Y-%m-%d %H:%M:%S"),
                         "data": time},
                "depth": {"name": nc.variables["ZK_LYR"].long_name,
                          "units": nc.variables["ZK_LYR"].units,
@@ -121,6 +141,70 @@ def get_simulations_layer_delft3dflow(filesystem, lake, time, depth):
                      "data": v}
                }
     return out
+
+
+def get_simulations_layer_alplakes_delft3dflow(filesystem, lake, parameter, start, end, depth):
+    model = "delft3d-flow"
+    lakes = os.path.join(filesystem, "media/simulations", model, "results")
+    if not os.path.isdir(os.path.join(lakes, lake)):
+        raise HTTPException(status_code=400,
+                            detail="{} simulation results are not available for {} please select from: [{}]"
+                            .format(model, lake, ", ".join(os.listdir(lakes))))
+    weeks = functions.sundays_between_dates(datetime.strptime(start[0:8], "%Y%m%d").replace(tzinfo=timezone.utc),
+                                            datetime.strptime(end[0:8], "%Y%m%d").replace(tzinfo=timezone.utc))
+    for week in weeks:
+        if not os.path.isfile(os.path.join(lakes, lake, "{}.nc".format(week.strftime("%Y%m%d")))):
+            raise HTTPException(status_code=400,
+                                detail="Apologies data is not available for {} week starting {}".format(lake, week))
+
+    start_datetime = datetime.strptime(start, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
+    end_datetime = datetime.strptime(end, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
+    out = None
+    for week in weeks:
+        with netCDF4.Dataset(os.path.join(lakes, lake, "{}.nc".format(week.strftime("%Y%m%d")))) as nc:
+            if parameter == "geometry":
+                x = functions.filter_coordinate(nc.variables["XZ"][:])
+                y = functions.filter_coordinate(nc.variables["YZ"][:])
+                return
+            time = np.array(nc.variables["time"][:])
+            min_time = np.min(time)
+            max_time = np.max(time)
+            start_time = functions.convert_to_unit(start_datetime, nc.variables["time"].units)
+            end_time = functions.convert_to_unit(end_datetime, nc.variables["time"].units)
+            if min_time <= start_time <= max_time:
+                time_index_start = functions.get_closest_index(start_time, time)
+            else:
+                time_index_start = len(time) - 1
+            if min_time <= end_time <= max_time:
+                time_index_end = functions.get_closest_index(end_time, time)
+            else:
+                time_index_end = len(time) - 1
+
+            depth_index = functions.get_closest_index(depth, np.array(nc.variables["ZK_LYR"][:]) * -1)
+
+            if parameter == "temperature":
+                p = functions.alplakes_temperature(
+                    nc.variables["R1"][time_index_start:time_index_end, 0, depth_index, :])
+
+            elif parameter == "velocity":
+                p = functions.alplakes_velocity(
+                    nc.variables["U1"][time_index_start:time_index_end, depth_index, :],
+                    nc.variables["V1"][time_index_start:time_index_end, depth_index, :],
+                    nc.variables["ALFAS"][:])
+            else:
+                raise HTTPException(status_code=400,
+                                    detail="Parameter {} not recognised, please select from: [geometry, temperature, veloctiy]".format(
+                                        parameter))
+            if out is None:
+                out = p
+            else:
+                out = np.concatenate((out, p), axis=0)
+
+    shape = out.shape
+    out = out.flatten().reshape(shape[0] * shape[1], shape[2])
+    plt.imshow(out)
+    plt.show()
+    return '\n'.join(','.join('%0.2f' % x for x in y) for y in out).replace("nan", "")
 
 
 class Notification(BaseModel):

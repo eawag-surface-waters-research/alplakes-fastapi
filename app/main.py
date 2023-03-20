@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Query, BackgroundTasks, HTTPException
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, PlainTextResponse
 from fastapi.middleware.gzip import GZipMiddleware
 
 import sentry_sdk
@@ -30,7 +30,8 @@ app = FastAPI(
 )
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-filesystem = "../filesystem"
+filesystem = "/media/jamesrunnalls/JamesSSD/Eawag/Alplakes/filesystem"
+# filesystem = "../filesystem"
 
 
 @app.get("/")
@@ -204,6 +205,21 @@ async def simulations_layer(model: simulations.Models, lake: simulations.Lakes, 
     """
     simulations.verify_simulations_layer(model, lake, time, depth)
     return simulations.get_simulations_layer(filesystem, model, lake, time, depth)
+
+
+@app.get("/simulations/layer_alplakes/{model}/{lake}/{parameter}/{start}/{end}/{depth}", tags=["Simulations"], response_class=PlainTextResponse)
+async def simulations_layer_alplakes(model: simulations.Models, lake: simulations.Lakes, parameter: simulations.Parameters, start: str, end: str, depth: float):
+    """
+    Parameters for a given lake simulation at a depth for period of time, formatted for the Alplakes website:
+    - **model**: model name
+    - **lake**: lake name
+    - **parameter**: parameter name
+    - **start**: YYYYmmddHHMM (UTC) e.g. 9am 6th December 2022 > 202212060900
+    - **end**: YYYYmmddHHMM (UTC) e.g. 9am 6th December 2022 > 202212060900
+    - **depth**: depth of layer in meters
+    """
+    simulations.verify_simulations_layer_alplakes(model, lake, parameter, start, end, depth)
+    return simulations.get_simulations_layer_alplakes(filesystem, model, lake, parameter, start, end, depth)
 
 
 @app.post("/simulations/notify", tags=["Simulations"])

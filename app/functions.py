@@ -5,6 +5,7 @@ import requests
 import numpy as np
 from fastapi import HTTPException
 from datetime import datetime, timedelta, timezone
+from dateutil.relativedelta import relativedelta, SU
 
 
 def convert_to_unit(time, units):
@@ -97,6 +98,12 @@ def filter_parameter(x):
     return json.dumps(np.around(x, decimals=2).tolist())
 
 
+def alplakes_temperature(x):
+    x = np.asarray(x).astype(np.float64)
+    x[x == -999.0] = np.nan
+    return x
+
+
 def rotate_velocity(u, v, alpha):
     u = np.asarray(u).astype(np.float64)
     v = np.asarray(v).astype(np.float64)
@@ -111,4 +118,31 @@ def rotate_velocity(u, v, alpha):
     v_e = v * np.cos(alpha) + u * np.sin(alpha)
 
     return json.dumps(np.around(u_n, decimals=5).tolist()), json.dumps(np.around(v_e, decimals=5).tolist())
+
+
+def alplakes_velocity(u, v, alpha):
+    u = np.asarray(u).astype(np.float64)
+    v = np.asarray(v).astype(np.float64)
+    alpha = np.asarray(alpha).astype(np.float64)
+
+    u[u == -999.0] = np.nan
+    v[v == -999.0] = np.nan
+    alpha[alpha == 0.0] = np.nan
+
+    alpha = np.radians(alpha)
+    u_n = u * np.cos(alpha) - v * np.sin(alpha)
+    v_e = v * np.cos(alpha) + u * np.sin(alpha)
+
+    return json.dumps(np.around(u_n, decimals=5).tolist()), json.dumps(np.around(v_e, decimals=5).tolist())
     
+
+def sundays_between_dates(start, end, max_weeks=10):
+    sunday_start = start + relativedelta(weekday=SU(-1))
+    sunday_end = end + relativedelta(weekday=SU(-1))
+    weeks = []
+    current = sunday_start
+    while current <= sunday_end and max_weeks > 0:
+        weeks.append(current)
+        current = current + timedelta(days=7)
+        max_weeks = max_weeks - 1
+    return weeks
