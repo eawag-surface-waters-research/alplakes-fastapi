@@ -226,8 +226,6 @@ def get_simulations_layer_alplakes_delft3dflow(filesystem, lake, parameter, star
 
     shape = out.shape
     out = out.flatten().reshape(shape[0] * shape[1], shape[2])
-    plt.imshow(out)
-    plt.show()
     return '\n'.join(','.join(f % x for x in y) for y in out).replace("nan", "")
 
 
