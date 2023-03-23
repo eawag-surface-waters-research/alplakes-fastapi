@@ -193,6 +193,15 @@ async def simulations_metadata():
     return simulations.get_metadata(filesystem)
 
 
+@app.get("/simulations/metadata/{model}/{lake}", tags=["Simulations"])
+async def simulations_metadata_lake(model: simulations.Models, lake: simulations.Lakes):
+    """
+    JSON of the available Simulation data.
+    """
+    simulations.verify_metadata_lake(model, lake)
+    return simulations.get_metadata_lake(filesystem, model, lake)
+
+
 @app.get("/simulations/layer/{model}/{lake}/{time}/{depth}", tags=["Simulations"])
 async def simulations_layer(model: simulations.Models, lake: simulations.Lakes, time: str, depth: float):
     """

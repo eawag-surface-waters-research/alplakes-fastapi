@@ -44,6 +44,30 @@ def get_metadata(filesystem):
     return metadata
 
 
+def verify_metadata_lake(model, lake):
+    return True
+
+
+def get_metadata_lake(filesystem, model, lake):
+    files = os.listdir(os.path.join(os.path.join(filesystem, "media/simulations", model, "results", lake)))
+    files = [file for file in files if len(file.split(".")[0]) == 8 and file.split(".")[1] == "nc"]
+    files.sort()
+    combined = '_'.join(files)
+    missing_dates = []
+
+    start_date = datetime.strptime(files[0].split(".")[0], '%Y%m%d')
+    end_date = datetime.strptime(files[-1].split(".")[0], '%Y%m%d') + timedelta(days=7)
+
+    for d in functions.daterange(start_date, end_date, days=7):
+        if d.strftime('%Y%m%d') not in combined:
+            missing_dates.append(d.strftime("%Y-%m-%d"))
+
+    return {"name": lake,
+            "start_date": start_date.strftime("%Y-%m-%d"),
+            "end_date": end_date.strftime("%Y-%m-%d"),
+            "missing_dates": missing_dates}
+
+
 class Models(str, Enum):
     delft3dflow = "delft3d-flow"
 
