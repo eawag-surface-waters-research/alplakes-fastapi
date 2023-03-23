@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Query, BackgroundTasks, HTTPException
 from fastapi.responses import RedirectResponse, PlainTextResponse
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.middleware.cors import CORSMiddleware
 
 import sentry_sdk
 
@@ -14,6 +15,9 @@ sentry_sdk.init(
     dsn="https://9b346d9bd9aa4309a18f5a47746b0a54@o1106970.ingest.sentry.io/4504402334777344",
     traces_sample_rate=1.0,
 )
+origins = [
+    "http://localhost:3000",
+]
 
 app = FastAPI(
     title="Alplakes API",
@@ -27,6 +31,14 @@ app = FastAPI(
         "name": "Apache 2.0",
         "url": "https://www.apache.org/licenses/LICENSE-2.0.html",
     },
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
