@@ -9,7 +9,6 @@ from pydantic import BaseModel
 from fastapi import HTTPException
 from datetime import datetime, timedelta, timezone
 from dateutil.relativedelta import relativedelta, SU
-import matplotlib.pyplot as plt
 
 from app import functions
 
