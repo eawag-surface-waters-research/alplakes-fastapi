@@ -22,23 +22,26 @@ def get_metadata(filesystem):
         m = {"model": model, "lakes": []}
 
         for lake in lakes:
-            files = os.listdir(os.path.join(os.path.join(filesystem, "media/simulations", model, "results", lake)))
+            path = os.path.join(os.path.join(filesystem, "media/simulations", model, "results", lake))
+            files = os.listdir(path)
             files = [file for file in files if len(file.split(".")[0]) == 8 and file.split(".")[1] == "nc"]
             files.sort()
             combined = '_'.join(files)
             missing_dates = []
 
-            start_date = datetime.strptime(files[0].split(".")[0], '%Y%m%d')
-            end_date = datetime.strptime(files[-1].split(".")[0], '%Y%m%d') + timedelta(days=7)
+            with netCDF4.Dataset(os.path.join(path, files[0])) as nc:
+                start_date = functions.convert_from_unit(nc.variables["time"][0], nc.variables["time"].units)
+
+            with netCDF4.Dataset(os.path.join(path, files[-1])) as nc:
+                end_date = functions.convert_from_unit(nc.variables["time"][-1], nc.variables["time"].units)
 
             for d in functions.daterange(start_date, end_date, days=7):
-                print(d)
                 if d.strftime('%Y%m%d') not in combined:
                     missing_dates.append(d.strftime("%Y-%m-%d"))
 
             m["lakes"].append({"name": lake,
-                               "start_date": start_date.strftime("%Y-%m-%d"),
-                               "end_date": end_date.strftime("%Y-%m-%d"),
+                               "start_date": start_date.strftime("%Y-%m-%d %H:%M"),
+                               "end_date": end_date.strftime("%Y-%m-%d %H:%M"),
                                "missing_dates": missing_dates})
         metadata.append(m)
     return metadata
@@ -49,23 +52,27 @@ def verify_metadata_lake(model, lake):
 
 
 def get_metadata_lake(filesystem, model, lake):
-    files = os.listdir(os.path.join(os.path.join(filesystem, "media/simulations", model, "results", lake)))
+    path = os.path.join(os.path.join(filesystem, "media/simulations", model, "results", lake))
+    files = os.listdir(path)
     files = [file for file in files if len(file.split(".")[0]) == 8 and file.split(".")[1] == "nc"]
     files.sort()
     combined = '_'.join(files)
     missing_dates = []
 
-    start_date = datetime.strptime(files[0].split(".")[0], '%Y%m%d')
-    end_date = datetime.strptime(files[-1].split(".")[0], '%Y%m%d') + timedelta(days=7)
+    with netCDF4.Dataset(os.path.join(path, files[0])) as nc:
+        start_date = functions.convert_from_unit(nc.variables["time"][0], nc.variables["time"].units)
+
+    with netCDF4.Dataset(os.path.join(path, files[-1])) as nc:
+        end_date = functions.convert_from_unit(nc.variables["time"][-1], nc.variables["time"].units)
 
     for d in functions.daterange(start_date, end_date, days=7):
         if d.strftime('%Y%m%d') not in combined:
-            missing_dates.append(d.strftime("%Y-%m-%d"))
+            missing_dates.append([d.strftime("%Y-%m-%d"), (d + timedelta(days=7)).strftime("%Y-%m-%d")])
 
     return {"name": lake,
-            "start_date": start_date.strftime("%Y-%m-%d"),
-            "end_date": end_date.strftime("%Y-%m-%d"),
-            "missing_dates": missing_dates}
+            "start_date": start_date.strftime("%Y-%m-%d %H:%M"),
+            "end_date": end_date.strftime("%Y-%m-%d %H:%M"),
+            "missing_weeks": missing_dates}
 
 
 class Models(str, Enum):
