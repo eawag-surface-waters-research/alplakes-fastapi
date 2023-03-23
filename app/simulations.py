@@ -163,9 +163,8 @@ def get_simulations_layer_alplakes_delft3dflow(filesystem, lake, parameter, star
     for week in weeks:
         with netCDF4.Dataset(os.path.join(lakes, lake, "{}.nc".format(week.strftime("%Y%m%d")))) as nc:
             if parameter == "geometry":
-                x = functions.filter_coordinate(nc.variables["XZ"][:])
-                y = functions.filter_coordinate(nc.variables["YZ"][:])
-                return
+                geometry = functions.alplakes_coordinates(nc.variables["XZ"][:], nc.variables["YZ"][:])
+                return '\n'.join(','.join('%0.8f' % x for x in y) for y in geometry).replace("nan", "")
             time = np.array(nc.variables["time"][:])
             min_time = np.min(time)
             max_time = np.max(time)
@@ -183,10 +182,12 @@ def get_simulations_layer_alplakes_delft3dflow(filesystem, lake, parameter, star
             depth_index = functions.get_closest_index(depth, np.array(nc.variables["ZK_LYR"][:]) * -1)
 
             if parameter == "temperature":
+                f = '%0.2f'
                 p = functions.alplakes_temperature(
                     nc.variables["R1"][time_index_start:time_index_end, 0, depth_index, :])
 
             elif parameter == "velocity":
+                f = '%0.5f'
                 p = functions.alplakes_velocity(
                     nc.variables["U1"][time_index_start:time_index_end, depth_index, :],
                     nc.variables["V1"][time_index_start:time_index_end, depth_index, :],
@@ -204,7 +205,7 @@ def get_simulations_layer_alplakes_delft3dflow(filesystem, lake, parameter, star
     out = out.flatten().reshape(shape[0] * shape[1], shape[2])
     plt.imshow(out)
     plt.show()
-    return '\n'.join(','.join('%0.2f' % x for x in y) for y in out).replace("nan", "")
+    return '\n'.join(','.join(f % x for x in y) for y in out).replace("nan", "")
 
 
 class Notification(BaseModel):

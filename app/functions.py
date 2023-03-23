@@ -98,12 +98,6 @@ def filter_parameter(x):
     return json.dumps(np.around(x, decimals=2).tolist())
 
 
-def alplakes_temperature(x):
-    x = np.asarray(x).astype(np.float64)
-    x[x == -999.0] = np.nan
-    return x
-
-
 def rotate_velocity(u, v, alpha):
     u = np.asarray(u).astype(np.float64)
     v = np.asarray(v).astype(np.float64)
@@ -120,6 +114,21 @@ def rotate_velocity(u, v, alpha):
     return json.dumps(np.around(u_n, decimals=5).tolist()), json.dumps(np.around(v_e, decimals=5).tolist())
 
 
+def alplakes_coordinates(x, y):
+    x = np.asarray(x).astype(np.float64)
+    y = np.asarray(y).astype(np.float64)
+    x[x == 0.] = np.nan
+    y[y == 0.] = np.nan
+    lat, lng = ch1903_to_latlng(x, y)
+    return np.concatenate((lat, lng), axis=1)
+
+
+def alplakes_temperature(x):
+    x = np.asarray(x).astype(np.float64)
+    x[x == -999.0] = np.nan
+    return x
+
+
 def alplakes_velocity(u, v, alpha):
     u = np.asarray(u).astype(np.float64)
     v = np.asarray(v).astype(np.float64)
@@ -133,8 +142,8 @@ def alplakes_velocity(u, v, alpha):
     u_n = u * np.cos(alpha) - v * np.sin(alpha)
     v_e = v * np.cos(alpha) + u * np.sin(alpha)
 
-    return json.dumps(np.around(u_n, decimals=5).tolist()), json.dumps(np.around(v_e, decimals=5).tolist())
-    
+    return np.concatenate((u_n, v_e), axis=2)
+
 
 def sundays_between_dates(start, end, max_weeks=10):
     sunday_start = start + relativedelta(weekday=SU(-1))
@@ -146,3 +155,23 @@ def sundays_between_dates(start, end, max_weeks=10):
         current = current + timedelta(days=7)
         max_weeks = max_weeks - 1
     return weeks
+
+
+def latlng_to_ch1903(lat, lng):
+    lat = lat * 3600
+    lng = lng * 3600
+    lat_aux = (lat - 169028.66) / 10000
+    lng_aux = (lng - 26782.5) / 10000
+    x = 2600072.37 + 211455.93 * lng_aux - 10938.51 * lng_aux * lat_aux - 0.36 * lng_aux * lat_aux ** 2 - 44.54 * lng_aux ** 3 - 2000000
+    y = 1200147.07 + 308807.95 * lat_aux + 3745.25 * lng_aux ** 2 + 76.63 * lat_aux ** 2 - 194.56 * lng_aux ** 2 * lat_aux + 119.79 * lat_aux ** 3 - 1000000
+    return x, y
+
+
+def ch1903_to_latlng(x, y):
+    x_aux = (x - 600000) / 1000000
+    y_aux = (y - 200000) / 1000000
+    lat = 16.9023892 + 3.238272 * y_aux - 0.270978 * x_aux ** 2 - 0.002528 * y_aux ** 2 - 0.0447 * x_aux ** 2 * y_aux - 0.014 * y_aux ** 3
+    lng = 2.6779094 + 4.728982 * x_aux + 0.791484 * x_aux * y_aux + 0.1306 * x_aux * y_aux ** 2 - 0.0436 * x_aux ** 3
+    lat = (lat * 100) / 36
+    lng = (lng * 100) / 36
+    return lat, lng
