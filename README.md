@@ -39,34 +39,17 @@ docker compose up --build -d
 
 ## Local Development
 
-### 1. Install Pyenv
-Install dependencies 
-```console
-sudo apt-get install -y make build-essential libssl-dev zlib1g-dev libbz2-dev \
-libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev libncursesw5-dev \
-xz-utils tk-dev libffi-dev liblzma-dev
-```
-Download installer
-```console
-curl -L https://raw.githubusercontent.com/pyenv/pyenv-installer/master/bin/pyenv-installer | bash
-```
-Check properly installed
-```console
-pyenv -v
-```
-
-### 2. Install virtual environment
+### 1. Install virtual environment
 
 ```console
-pyenv install 3.9.14
-pyenv virtualenv 3.9.14 fastapi
-pyenv activate fastapi
-pip install -r requirements.txt
+conda create --name fastapi python=3.9.14
+conda activate fastapi
+conda install --file requirements.txt
 ```
 
-### 3. Run API
+### 2. Run API
 ```console
-pyenv activate fastapi
+conda activate fastapi
 uvicorn app.main:app --host 0.0.0.0 --reload
 ```
 

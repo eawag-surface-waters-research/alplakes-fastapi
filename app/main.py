@@ -30,8 +30,7 @@ app = FastAPI(
 )
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-filesystem = "/media/jamesrunnalls/JamesSSD/Eawag/Alplakes/filesystem"
-# filesystem = "../filesystem"
+filesystem = "../filesystem"
 
 
 @app.get("/")
