@@ -145,6 +145,10 @@ def alplakes_velocity(u, v, alpha):
     return np.concatenate((u_n, v_e), axis=2)
 
 
+def alplakes_time(t, units):
+    return np.array([convert_from_unit(x, units).strftime("%Y%m%d%H%M") for x in t])
+
+
 def sundays_between_dates(start, end, max_weeks=10):
     sunday_start = start + relativedelta(weekday=SU(-1))
     sunday_end = end + relativedelta(weekday=SU(-1))

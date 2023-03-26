@@ -182,6 +182,7 @@ def get_simulations_layer_alplakes_delft3dflow(filesystem, lake, parameter, star
                             .format(model, lake, ", ".join(os.listdir(lakes))))
     weeks = functions.sundays_between_dates(datetime.strptime(start[0:8], "%Y%m%d").replace(tzinfo=timezone.utc),
                                             datetime.strptime(end[0:8], "%Y%m%d").replace(tzinfo=timezone.utc))
+
     for week in weeks:
         if not os.path.isfile(os.path.join(lakes, lake, "{}.nc".format(week.strftime("%Y%m%d")))):
             raise HTTPException(status_code=400,
@@ -190,6 +191,7 @@ def get_simulations_layer_alplakes_delft3dflow(filesystem, lake, parameter, star
     start_datetime = datetime.strptime(start, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
     end_datetime = datetime.strptime(end, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
     out = None
+    times = None
     for week in weeks:
         with netCDF4.Dataset(os.path.join(lakes, lake, "{}.nc".format(week.strftime("%Y%m%d")))) as nc:
             if parameter == "geometry":
@@ -203,9 +205,9 @@ def get_simulations_layer_alplakes_delft3dflow(filesystem, lake, parameter, star
             if min_time <= start_time <= max_time:
                 time_index_start = functions.get_closest_index(start_time, time)
             else:
-                time_index_start = len(time) - 1
+                time_index_start = 0
             if min_time <= end_time <= max_time:
-                time_index_end = functions.get_closest_index(end_time, time)
+                time_index_end = functions.get_closest_index(end_time, time) + 1
             else:
                 time_index_end = len(time) - 1
 
@@ -215,7 +217,6 @@ def get_simulations_layer_alplakes_delft3dflow(filesystem, lake, parameter, star
                 f = '%0.2f'
                 p = functions.alplakes_temperature(
                     nc.variables["R1"][time_index_start:time_index_end, 0, depth_index, :])
-
             elif parameter == "velocity":
                 f = '%0.5f'
                 p = functions.alplakes_velocity(
@@ -224,16 +225,23 @@ def get_simulations_layer_alplakes_delft3dflow(filesystem, lake, parameter, star
                     nc.variables["ALFAS"][:])
             else:
                 raise HTTPException(status_code=400,
-                                    detail="Parameter {} not recognised, please select from: [geometry, temperature, veloctiy]".format(
-                                        parameter))
+                                    detail="Parameter {} not recognised, please select from: [geometry, temperature, "
+                                           "velocity]".format(parameter))
+            t = functions.alplakes_time(time[time_index_start:time_index_end], nc.variables["time"].units)
             if out is None:
                 out = p
+                times = t
             else:
                 out = np.concatenate((out, p), axis=0)
+                times = np.concatenate((times, t), axis=0)
 
     shape = out.shape
-    out = out.flatten().reshape(shape[0] * shape[1], shape[2])
-    return '\n'.join(','.join(f % x for x in y) for y in out).replace("nan", "")
+    string_arr = ""
+    for timestep in range(shape[0]):
+        string_arr += ("\n" + times[timestep])
+        string_arr += '\n'.join(','.join(f % x for x in y) for y in out[timestep, :]).replace("nan", "")
+
+    return string_arr
 
 
 class Notification(BaseModel):
