@@ -238,8 +238,7 @@ def get_simulations_layer_alplakes_delft3dflow(filesystem, lake, parameter, star
     shape = out.shape
     string_arr = ""
     for timestep in range(shape[0]):
-        string_arr += (times[timestep] + "\n")
-        string_arr += '\n'.join(','.join(f % x for x in y) for y in out[timestep, :]).replace("nan", "")
+        string_arr += (times[timestep] + "\n" + '\n'.join(','.join(f % x for x in y) for y in out[timestep, :]).replace("nan", "") + "\n")
 
     return string_arr
 
