@@ -209,7 +209,7 @@ def get_simulations_layer_alplakes_delft3dflow(filesystem, lake, parameter, star
             if min_time <= end_time <= max_time:
                 time_index_end = functions.get_closest_index(end_time, time) + 1
             else:
-                time_index_end = len(time) - 1
+                time_index_end = len(time)
 
             depth_index = functions.get_closest_index(depth, np.array(nc.variables["ZK_LYR"][:]) * -1)
 
