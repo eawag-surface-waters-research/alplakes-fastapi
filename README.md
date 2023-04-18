@@ -1,5 +1,7 @@
 # Alplakes FastAPI
 
+[![License: MIT][mit-by-shield]][mit-by] ![Python][python-by-shield]
+
 This is a repository for Eawag SURF fastapi, initially developed for the ALPLAKES project.
 
 Endpoints can be found in `app/main.py`
@@ -8,6 +10,8 @@ The documentation pages are available at the following:
 
 - Swagger [http://localhost:8000/docs](http://localhost:8000/docs)
 - Redoc [http://localhost:8000/redoc](http://localhost:8000/redoc)
+
+![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi)
 
 ## Production Deployment
 
@@ -69,3 +73,6 @@ docker ps
 ```console 
 docker exec -it 'container-id' bash
 ```
+[mit-by]: https://opensource.org/licenses/MIT
+[mit-by-shield]: https://img.shields.io/badge/License-MIT-g.svg
+[python-by-shield]: https://img.shields.io/badge/Python-3.9-g
