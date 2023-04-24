@@ -34,12 +34,17 @@ def get_metadata(filesystem):
 
             with netCDF4.Dataset(os.path.join(path, files[-1])) as nc:
                 end_date = functions.convert_from_unit(nc.variables["time"][-1], nc.variables["time"].units)
+                depths = np.array(nc.variables["ZK_LYR"][:]) * -1
+                depths = depths[depths > 0]
+                depths.sort()
+                depths = [float("%.2f" % d) for d in depths]
 
             for d in functions.daterange(start_date, end_date, days=7):
                 if d.strftime('%Y%m%d') not in combined:
                     missing_dates.append(d.strftime("%Y-%m-%d"))
 
             m["lakes"].append({"name": lake,
+                               "depths": depths,
                                "start_date": start_date.strftime("%Y-%m-%d %H:%M"),
                                "end_date": end_date.strftime("%Y-%m-%d %H:%M"),
                                "missing_dates": missing_dates})
@@ -64,12 +69,17 @@ def get_metadata_lake(filesystem, model, lake):
 
     with netCDF4.Dataset(os.path.join(path, files[-1])) as nc:
         end_date = functions.convert_from_unit(nc.variables["time"][-1], nc.variables["time"].units)
+        depths = np.array(nc.variables["ZK_LYR"][:]) * -1
+        depths = depths[depths > 0]
+        depths.sort()
+        depths = [float("%.2f" % d) for d in depths]
 
     for d in functions.daterange(start_date, end_date, days=7):
         if d.strftime('%Y%m%d') not in combined:
             missing_dates.append([d.strftime("%Y-%m-%d"), (d + timedelta(days=7)).strftime("%Y-%m-%d")])
 
     return {"name": lake,
+            "depths": depths,
             "start_date": start_date.strftime("%Y-%m-%d %H:%M"),
             "end_date": end_date.strftime("%Y-%m-%d %H:%M"),
             "missing_weeks": missing_dates}
