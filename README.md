@@ -28,14 +28,23 @@ git clone https://github.com/eawag-surface-waters-research/alplakes-fastapi.git
 mkdir -p filesystem
 ```
 
-### 3. Launch service
+### 3. Create .env file
+Replace example filesystem path with correct path.
+```console
+cd alplakes-fastapi
+cp env.example .env
+nano .env
+```
+
+### 4. Launch service
 ```console
 cd alplakes-fastapi
 docker compose up --build -d
 ```
 
-### 3. Restart service
+### Restart service
 When there are changes to the API the service needs to be rebuilt to reflect those changes.
+
 ```console
 docker compose down
 docker compose up --build -d

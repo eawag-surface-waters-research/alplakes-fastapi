@@ -1,7 +1,9 @@
 version: "3.9"
 services:
-  fastapi:
+  fastapi-internal:
     build: .
+    container_name:
+      alplakes-fastapi-internal
     healthcheck:
       test: [ "CMD", "curl", "--fail", "http://localhost:8000" ]
       interval: 10s
@@ -12,3 +14,19 @@ services:
       - "${FILESYSTEM}:/filesystem"
     ports:
       - "8000:8000"
+  fastapi-external:
+    build: .
+    environment:
+      - EXTERNAL=true
+    container_name:
+      alplakes-fastapi-external
+    healthcheck:
+      test: [ "CMD", "curl", "--fail", "http://localhost:8000" ]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+    volumes:
+      - "${FILESYSTEM}:/filesystem"
+    ports:
+      - "8001:8000"
