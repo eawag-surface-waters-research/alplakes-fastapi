@@ -94,6 +94,13 @@ class Lakes(str, Enum):
     greifensee = "greifensee"
     zurich = "zurich"
     biel = "biel"
+    joux = "joux"
+    garda = "garda"
+    lugano = "lugano"
+    murten = "murten"
+    caldonazzo = "caldonazzo"
+    ageri = "ageri"
+    stmoritz = "stmoritz"
 
 
 class Parameters(str, Enum):
