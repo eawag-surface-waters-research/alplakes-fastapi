@@ -17,6 +17,7 @@ sentry_sdk.init(
 )
 origins = [
     "http://localhost:3000",
+    "https://www.alplakes.eawag.ch"
 ]
 
 app = FastAPI(
