@@ -20,6 +20,13 @@ origins = [
     "https://www.alplakes.eawag.ch"
 ]
 
+tags_metadata = [
+    {
+        "name": "meteoswiss",
+        "description": "Geographical coverage [45.04116, 4.155702] to [47.98, 11.314313]",
+    }
+]
+
 app = FastAPI(
     title="Alplakes API",
     description="API for the Alplakes project.",

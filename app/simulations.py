@@ -98,6 +98,7 @@ class Lakes(str, Enum):
     garda = "garda"
     lugano = "lugano"
     murten = "murten"
+    hallwil = "hallwil"
     caldonazzo = "caldonazzo"
     ageri = "ageri"
     stmoritz = "stmoritz"

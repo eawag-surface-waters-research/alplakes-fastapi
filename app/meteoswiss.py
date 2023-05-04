@@ -191,7 +191,7 @@ def get_cosmo_area_reanalysis(filesystem, model, variables, start_date, end_date
 
         if len(x) == 0:
             raise HTTPException(status_code=400,
-                                detail="Data not available for COSMO {} for the requsted area.".format(model))
+                                detail="Data not available for COSMO {} for the requested area.".format(model))
 
         x_min, x_max, y_min, y_max = min(x), max(x), min(y), max(y)
         output["lat"] = ds.variables["lat_1"][x_min:x_max, y_min:y_max].values.tolist()
