@@ -131,8 +131,16 @@ def alplakes_coordinates(x, y):
         return np.concatenate((lat, lng), axis=1)
     else:
         # UTM - Default
-        lat, lng = utm_to_latlng(x, y, 32, "T")
-        return np.concatenate((lat, lng), axis=1)
+        x_nan = x[~np.isnan(x)]
+        y_nan = y[~np.isnan(x)]
+        lat_out = np.zeros((x, y))
+        lng_out = np.zeros((x, y))
+        lat_out[:] = np.nan
+        lng_out[:] = np.nan
+        lat, lng = utm_to_latlng(x_nan, y_nan, 32, "T")
+        lat_out[~np.isnan(x)] = lat
+        lng_out[~np.isnan(x)] = lng
+        return np.concatenate((lat_out, lng_out), axis=1)
 
 
 def alplakes_temperature(x):
