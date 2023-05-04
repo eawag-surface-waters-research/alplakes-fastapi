@@ -133,8 +133,8 @@ def alplakes_coordinates(x, y):
         # UTM - Default
         x_nan = x[~np.isnan(x)]
         y_nan = y[~np.isnan(x)]
-        lat_out = np.zeros((x, y))
-        lng_out = np.zeros((x, y))
+        lat_out = np.zeros(x.shape)
+        lng_out = np.zeros(x.shape)
         lat_out[:] = np.nan
         lng_out[:] = np.nan
         lat, lng = utm_to_latlng(x_nan, y_nan, 32, "T")
