@@ -224,9 +224,9 @@ def utm_to_latlng(easting, northing, zone_number, zone_letter=None, northern=Non
 
     if strict:
         if not in_bounds(easting, 100000, 1000000, upper_strict=True):
-            raise ValueError('easting out of range (must be between 100,000 m and 999,999 m)')
+            raise ValueError('easting {} out of range (must be between 100,000 m and 999,999 m)'.format(easting))
         if not in_bounds(northing, 0, 10000000):
-            raise ValueError('northing out of range (must be between 0 m and 10,000,000 m)')
+            raise ValueError('northing {} out of range (must be between 0 m and 10,000,000 m)'.format(northing))
 
     check_valid_zone(zone_number, zone_letter)
 
