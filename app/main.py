@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 import sentry_sdk
 
+from app import remotesensing
 from app import simulations
 from app import meteoswiss
 from app import bafu
@@ -258,3 +259,44 @@ async def simulations_layer_alplakes(model: simulations.Models, lake: simulation
     simulations.verify_simulations_layer_alplakes(model, lake, parameter, start, end, depth)
     return simulations.get_simulations_layer_alplakes(filesystem, model, lake, parameter, start, end, depth)
 
+
+@app.get("/remotesensing/products/{satellite}/{parameter}", tags=["Remote Sensing"])
+async def remote_sensing_products(satellite: remotesensing.Satellites, parameter: remotesensing.Parameters):
+    """
+    Remote sensing products for a given satellite:
+    - **satellite**: satellite name
+    - **parameter**: parameter name
+    """
+    remotesensing.verify_remotesensing_products(satellite, parameter)
+    return remotesensing.remotesensing_products(filesystem, satellite, parameter)
+
+
+@app.get("/remotesensing/products/{satellite}/{lake}/{parameter}", tags=["Remote Sensing"])
+async def remote_sensing_products_lake(satellite: remotesensing.Satellites, lake: simulations.Lakes,
+                                      parameter: remotesensing.Parameters):
+    """
+    Remote sensing products for a given lake and satellite:
+    - **satellite**: satellite name
+    - **lake**: lake name
+    - **parameter**: parameter name
+    """
+    remotesensing.verify_remotesensing_products_lake(satellite, lake, parameter)
+    return remotesensing.remotesensing_products_lake(filesystem, satellite, lake, parameter)
+
+
+if internal:
+    @app.get("/remotesensing/list_products", tags=["Remote Sensing"])
+    async def remote_sensing_list_products():
+        """
+        Create full list of remote sensing products
+        """
+        return remotesensing.remotesensing_list_products(filesystem)
+
+if internal:
+    @app.get("/remotesensing/update_products", tags=["Remote Sensing"])
+    async def remote_sensing_update_products(date: str):
+        """
+        Update list of remote sensing products for a given date:
+        - **date**: date "YYYYMMDD"
+        """
+        return remotesensing.remotesensing_update_products(filesystem, date)
