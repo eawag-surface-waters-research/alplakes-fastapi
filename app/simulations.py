@@ -118,6 +118,18 @@ def verify_simulations_layer_alplakes(model, lake, parameter, start, end, depth)
     return True
 
 
+def verify_simulations_profile(model, lake, parameter, datetime, latitude, longitude):
+    return True
+
+
+def verify_simulations_transect(model, lake, parameter, datetime, latitude_list, longitude_list):
+    return True
+
+
+def verify_simulations_depthtime(model, lake, parameter, start, end, latitude, longitude):
+    return True
+
+
 def get_simulations_layer(filesystem, model, lake, time, depth):
     if model == "delft3d-flow":
         return get_simulations_layer_delft3dflow(filesystem, lake, time, depth)
@@ -259,3 +271,42 @@ def get_simulations_layer_alplakes_delft3dflow(filesystem, lake, parameter, star
         string_arr += (times[timestep] + "\n" + '\n'.join(','.join(f % x for x in y) for y in out[timestep, :]).replace("nan", "") + "\n")
 
     return string_arr
+
+
+def get_simulations_profile(filesystem, model, lake, parameter, datetime, latitude, longitude):
+    if model == "delft3d-flow":
+        return get_simulations_profile_delft3dflow(filesystem, lake, parameter, datetime, latitude, longitude)
+    else:
+        raise HTTPException(status_code=400,
+                            detail="Apologies profile extraction not available for {}".format(model))
+
+
+def get_simulations_profile_delft3dflow(filesystem, lake, parameter, datetime, latitude, longitude):
+    output = {lake, parameter, datetime, latitude, longitude}
+    return output
+
+
+def get_simulations_transect(filesystem, model, lake, parameter, datetime, latitude_list, longitude_list):
+    if model == "delft3d-flow":
+        return get_simulations_transect_delft3dflow(filesystem, lake, parameter, datetime, latitude_list, longitude_list)
+    else:
+        raise HTTPException(status_code=400,
+                            detail="Apologies profile extraction not available for {}".format(model))
+
+
+def get_simulations_transect_delft3dflow(filesystem, lake, parameter, datetime, latitude_list, longitude_list):
+    output = {lake, parameter, datetime, latitude_list, longitude_list}
+    return output
+
+
+def get_simulations_depthtime(filesystem, model, lake, parameter, start, end, latitude, longitude):
+    if model == "delft3d-flow":
+        return get_simulations_depthtime_delft3dflow(filesystem, lake, parameter, start, end, latitude, longitude)
+    else:
+        raise HTTPException(status_code=400,
+                            detail="Apologies profile extraction not available for {}".format(model))
+
+
+def get_simulations_depthtime_delft3dflow(filesystem, lake, parameter, start, end, latitude, longitude):
+    output = {lake, parameter, start, end, latitude, longitude}
+    return output
