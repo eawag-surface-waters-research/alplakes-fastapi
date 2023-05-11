@@ -3,6 +3,7 @@ import json
 import shutil
 import requests
 import numpy as np
+import pandas as pd
 from fastapi import HTTPException
 from datetime import datetime, timedelta, timezone
 from dateutil.relativedelta import relativedelta, SU
@@ -42,6 +43,17 @@ def get_closest_index(value, array):
         raise HTTPException(status_code=400,
                             detail="Value {} less than min available ({})".format(value, sorted_array[0]))
     return (np.abs(array - value)).argmin()
+
+
+def get_closest_location(latitude, longitude, lat_grid, lon_grid):
+    lon1, lat1, lon2, lat2 = map(np.radians, [longitude, latitude, lon_grid, lat_grid])
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    a = np.sin(dlat / 2) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2) ** 2
+    c = 2 * np.arcsin(np.sqrt(a))
+    distance = 6371000 * c
+    x_index, y_index = np.unravel_index(np.nanargmin(distance), distance.shape)
+    return x_index, y_index, np.nanmin(distance)
 
 
 def daterange(start_date, end_date, days=1):
@@ -86,16 +98,15 @@ def download_file(url, local):
         shutil.move(local, old)
 
 
-def filter_coordinate(x):
-    x = np.asarray(x).astype(np.float64)
-    x[x == 0.] = np.nan
-    return json.dumps(np.around(x, decimals=2).tolist())
-
-
-def filter_parameter(x):
-    x = np.asarray(x).astype(np.float64)
-    x[x == -999.0] = np.nan
-    return json.dumps(np.around(x, decimals=2).tolist())
+def filter_parameter(x, decimals=3, string=False, nodata=-999.0):
+    x = np.asarray(x).astype(float)
+    x[x == nodata] = None
+    out = np.around(x, decimals=decimals)
+    out = np.where(np.isnan(out), None, out)
+    if string:
+        return json.dumps(out.tolist())
+    else:
+        return out.tolist()
 
 
 def rotate_velocity(u, v, alpha):
@@ -111,36 +122,7 @@ def rotate_velocity(u, v, alpha):
     u_n = u * np.cos(alpha) - v * np.sin(alpha)
     v_e = v * np.cos(alpha) + u * np.sin(alpha)
 
-    return json.dumps(np.around(u_n, decimals=5).tolist()), json.dumps(np.around(v_e, decimals=5).tolist())
-
-
-def alplakes_coordinates(x, y):
-    x = np.asarray(x).astype(np.float64)
-    y = np.asarray(y).astype(np.float64)
-    x[x == 0.] = np.nan
-    y[y == 0.] = np.nan
-    # Detect coordinate system from values
-    x_example = x[~np.isnan(x)][0]
-    y_example = y[~np.isnan(y)][0]
-    if -180 <= x_example <= 180 and -180 <= y_example <= 180:
-        # WGS84
-        return np.concatenate((x, y), axis=1)
-    elif 420000 <= x_example <= 900000 and 30000 <= y_example <= 350000:
-        # CH1903
-        lat, lng = ch1903_to_latlng(x, y)
-        return np.concatenate((lat, lng), axis=1)
-    else:
-        # UTM - Default
-        x_nan = x[~np.isnan(x)]
-        y_nan = y[~np.isnan(x)]
-        lat_out = np.zeros(x.shape)
-        lng_out = np.zeros(x.shape)
-        lat_out[:] = np.nan
-        lng_out[:] = np.nan
-        lat, lng = utm_to_latlng(x_nan, y_nan, 32, "T")
-        lat_out[~np.isnan(x)] = lat
-        lng_out[~np.isnan(x)] = lng
-        return np.concatenate((lat_out, lng_out), axis=1)
+    return u_n, v_e
 
 
 def alplakes_temperature(x):
@@ -169,6 +151,52 @@ def alplakes_time(t, units):
     return np.array([convert_from_unit(x, units).strftime("%Y%m%d%H%M") for x in t])
 
 
+def exact_line_segments(lat1, lng1, lat2, lng2, lat_grid, lng_grid, start, n=100):
+    lat1, lng1, lat2, lng2 = np.radians([lat1, lng1, lat2, lng2])
+
+    # calculate distance between the endpoints using the Haversine formula
+    dlat = lat2 - lat1
+    dlng = lng2 - lng1
+    a = np.sin(dlat / 2) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlng / 2) ** 2
+    c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
+    distance = 6371 * c  # Earth's radius in km
+
+    spacing = np.arange(n + 1) * (distance * 1000 / n) + start
+
+    # calculate bearings between the two points
+    bearings = np.arctan2(np.sin(lng2 - lng1) * np.cos(lat2),
+                          np.cos(lat1) * np.sin(lat2) -
+                          np.sin(lat1) * np.cos(lat2) * np.cos(lng2 - lng1))
+
+    # create array of distances between the points
+    distances = np.linspace(0, distance, n + 1)
+
+    # calculate latitudes and longitudes of the points using vectorized calculations
+    lats = np.arcsin(np.sin(lat1) * np.cos(distances / 6371) +
+                     np.cos(lat1) * np.sin(distances / 6371) * np.cos(bearings))
+    lngs = lng1 + np.arctan2(np.sin(bearings) * np.sin(distances / 6371) * np.cos(lat1),
+                             np.cos(distances / 6371) - np.sin(lat1) * np.sin(lats))
+
+    lats, lngs = np.degrees([lats, lngs])
+
+    x_indexs, y_indexs, dists = [], [], []
+    for i in range(n + 1):
+        x_index, y_index, dist = get_closest_location(lats[i], lngs[i], lat_grid, lng_grid)
+        x_indexs.append(x_index)
+        y_indexs.append(y_index)
+        dists.append(dist)
+
+    df = pd.DataFrame(list(zip(x_indexs, y_indexs, dists, spacing)), columns=['xi', 'yi', 'dist', 'spacing'])
+    df = df.sort_values(['xi', 'yi', 'dist'])
+    df = df.drop_duplicates(['xi', 'yi'], keep='first')
+    df = df.sort_index()
+    mean = df['dist'].mean()
+    std = df['dist'].std()
+    df = df[(df['dist'] >= mean - 2 * std) & (df['dist'] <= mean + 2 * std)]
+
+    return np.array(df["xi"]), np.array(df["yi"]), np.array(df["spacing"]), distance * 1000
+
+
 def sundays_between_dates(start, end, max_weeks=10):
     sunday_start = start + relativedelta(weekday=SU(-1))
     sunday_end = end + relativedelta(weekday=SU(-1))
@@ -179,6 +207,35 @@ def sundays_between_dates(start, end, max_weeks=10):
         current = current + timedelta(days=7)
         max_weeks = max_weeks - 1
     return weeks
+
+
+def coordinates_to_latlng(x, y):
+    x = np.asarray(x).astype(np.float64)
+    y = np.asarray(y).astype(np.float64)
+    x[x == 0.] = np.nan
+    y[y == 0.] = np.nan
+    # Detect coordinate system from values
+    x_example = x[~np.isnan(x)][0]
+    y_example = y[~np.isnan(y)][0]
+    if -180 <= x_example <= 180 and -180 <= y_example <= 180:
+        # WGS84
+        return x, y
+    elif 420000 <= x_example <= 900000 and 30000 <= y_example <= 350000:
+        # CH1903
+        lat, lng = ch1903_to_latlng(x, y)
+        return lat, lng
+    else:
+        # UTM - Default
+        x_nan = x[~np.isnan(x)]
+        y_nan = y[~np.isnan(x)]
+        lat_out = np.zeros(x.shape)
+        lng_out = np.zeros(x.shape)
+        lat_out[:] = np.nan
+        lng_out[:] = np.nan
+        lat, lng = utm_to_latlng(x_nan, y_nan, 32, "T")
+        lat_out[~np.isnan(x)] = lat
+        lng_out[~np.isnan(x)] = lng
+        return lat_out, lng_out
 
 
 def latlng_to_ch1903(lat, lng):
