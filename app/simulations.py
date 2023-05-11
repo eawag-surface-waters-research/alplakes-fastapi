@@ -22,32 +22,39 @@ def get_metadata(filesystem):
         m = {"model": model, "lakes": []}
 
         for lake in lakes:
-            path = os.path.join(os.path.join(filesystem, "media/simulations", model, "results", lake))
-            files = os.listdir(path)
-            files = [file for file in files if len(file.split(".")[0]) == 8 and file.split(".")[1] == "nc"]
-            files.sort()
-            combined = '_'.join(files)
-            missing_dates = []
+            try:
+                path = os.path.join(os.path.join(filesystem, "media/simulations", model, "results", lake))
+                files = os.listdir(path)
+                files = [file for file in files if len(file.split(".")[0]) == 8 and file.split(".")[1] == "nc"]
+                files.sort()
+                combined = '_'.join(files)
+                missing_dates = []
 
-            with netCDF4.Dataset(os.path.join(path, files[0])) as nc:
-                start_date = functions.convert_from_unit(nc.variables["time"][0], nc.variables["time"].units)
+                with netCDF4.Dataset(os.path.join(path, files[0])) as nc:
+                    start_date = functions.convert_from_unit(nc.variables["time"][0], nc.variables["time"].units)
 
-            with netCDF4.Dataset(os.path.join(path, files[-1])) as nc:
-                end_date = functions.convert_from_unit(nc.variables["time"][-1], nc.variables["time"].units)
-                depths = np.array(nc.variables["ZK_LYR"][:]) * -1
-                depths = depths[depths > 0]
-                depths.sort()
-                depths = [float("%.2f" % d) for d in depths]
+                with netCDF4.Dataset(os.path.join(path, files[-1])) as nc:
+                    end_date = functions.convert_from_unit(nc.variables["time"][-1], nc.variables["time"].units)
+                    depths = np.array(nc.variables["ZK_LYR"][:]) * -1
+                    depths = depths[depths > 0]
+                    depths.sort()
+                    depths = [float("%.2f" % d) for d in depths]
 
-            for d in functions.daterange(start_date, end_date, days=7):
-                if d.strftime('%Y%m%d') not in combined:
-                    missing_dates.append(d.strftime("%Y-%m-%d"))
+                for d in functions.daterange(start_date, end_date, days=7):
+                    if d.strftime('%Y%m%d') not in combined:
+                        missing_dates.append(d.strftime("%Y-%m-%d"))
 
-            m["lakes"].append({"name": lake,
-                               "depths": depths,
-                               "start_date": start_date.strftime("%Y-%m-%d %H:%M"),
-                               "end_date": end_date.strftime("%Y-%m-%d %H:%M"),
-                               "missing_dates": missing_dates})
+                m["lakes"].append({"name": lake,
+                                   "depths": depths,
+                                   "start_date": start_date.strftime("%Y-%m-%d %H:%M"),
+                                   "end_date": end_date.strftime("%Y-%m-%d %H:%M"),
+                                   "missing_dates": missing_dates})
+            except:
+                m["lakes"].append({"name": lake,
+                                   "depths": [],
+                                   "start_date": "NA",
+                                   "end_date": "NA",
+                                   "missing_dates": []})
         metadata.append(m)
     return metadata
 
