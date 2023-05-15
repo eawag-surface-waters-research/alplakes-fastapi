@@ -17,7 +17,8 @@ sentry_sdk.init(
 )
 origins = [
     "http://localhost:3000",
-    "https://www.alplakes.eawag.ch"
+    "https://www.alplakes.eawag.ch",
+    "https://*.amplifyapp.com"
 ]
 
 tags_metadata = [
