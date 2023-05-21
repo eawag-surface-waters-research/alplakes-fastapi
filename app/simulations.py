@@ -403,11 +403,11 @@ def get_simulations_transect_delft3dflow(filesystem, lake, dt, latitude_str, lon
         lng_arr = lng_grid[xi_arr, yi_arr]
 
         t_arr = []
-        for i in range(len(xi)):
-            t = np.array(nc.variables["R1"][time_index, 0, :, xi[i], yi[i]])
-            u, v, = functions.rotate_velocity(nc.variables["U1"][time_index, :, xi[i], yi[i]],
-                                              nc.variables["V1"][time_index, :, xi[i], yi[i]],
-                                              nc.variables["ALFAS"][xi[i], yi[i]])
+        for i in range(len(xi_arr)):
+            t = np.array(nc.variables["R1"][time_index, 0, :, xi_arr[i], yi_arr[i]])
+            u, v, = functions.rotate_velocity(nc.variables["U1"][time_index, :, xi_arr[i], yi_arr[i]],
+                                              nc.variables["V1"][time_index, :, xi_arr[i], yi_arr[i]],
+                                              nc.variables["ALFAS"][xi_arr[i], yi_arr[i]])
             if len(t_arr) == 0:
                 t_arr, u_arr, v_arr = t.reshape(-1, 1), u.reshape(-1, 1), v.reshape(-1, 1)
             else:
