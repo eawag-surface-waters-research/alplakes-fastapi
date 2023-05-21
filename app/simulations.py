@@ -321,6 +321,17 @@ def get_simulations_profile_delft3dflow(filesystem, lake, dt, latitude, longitud
                                           nc.variables["V1"][time_index, :, x_index, y_index],
                                           nc.variables["ALFAS"][x_index, y_index])
 
+        index = 0
+        for i in range(len(t)):
+            if not t[i] is None:
+                index = i
+                break
+
+        depth = depth[index:]
+        t = t[index:]
+        u = u[index:]
+        v = v[index:]
+
         output = {"lake": lake,
                   "datetime": functions.convert_from_unit(time[time_index], nc.variables["time"].units),
                   "latitude": lat_grid[x_index, y_index],
@@ -341,7 +352,7 @@ def get_simulations_transect(filesystem, model, lake, dt, latitude_list, longitu
                             detail="Apologies profile extraction not available for {}".format(model))
 
 
-def get_simulations_transect_delft3dflow(filesystem, lake, dt, latitude_str, longitude_str):
+def get_simulations_transect_delft3dflow(filesystem, lake, dt, latitude_str, longitude_str, nodata=-999.0):
     model = "delft3d-flow"
 
     latitude_list = [float(x) for x in latitude_str.replace(" ", "").split(",")]
@@ -404,6 +415,17 @@ def get_simulations_transect_delft3dflow(filesystem, lake, dt, latitude_str, lon
                 u_arr = np.concatenate((u_arr, u.reshape(-1, 1)), axis=1)
                 v_arr = np.concatenate((v_arr, v.reshape(-1, 1)), axis=1)
 
+        index = 0
+        for i in range(t_arr.shape[0]):
+            if not np.all(t_arr[i] == nodata):
+                index = i
+                break
+
+        depth = depth[index:]
+        t_arr = t_arr[index:, :]
+        u_arr = u_arr[index:, :]
+        v_arr = v_arr[index:, :]
+
         output = {"lake": lake,
                   "datetime": functions.convert_from_unit(time[time_index], nc.variables["time"].units),
                   "distance": functions.filter_parameter(sp_arr),
@@ -424,7 +446,7 @@ def get_simulations_depthtime(filesystem, model, lake, start, end, latitude, lon
                             detail="Apologies profile extraction not available for {}".format(model))
 
 
-def get_simulations_depthtime_delft3dflow(filesystem, lake, start, end, latitude, longitude):
+def get_simulations_depthtime_delft3dflow(filesystem, lake, start, end, latitude, longitude, nodata=-999.0):
     model = "delft3d-flow"
     lakes = os.path.join(filesystem, "media/simulations", model, "results")
     if not os.path.isdir(os.path.join(lakes, lake)):
@@ -470,13 +492,27 @@ def get_simulations_depthtime_delft3dflow(filesystem, lake, start, end, latitude
             at = functions.alplakes_time(time[time_index_start:time_index_end], nc.variables["time"].units)
 
             if len(t_out) == 0:
-
                 t_out, u_out, v_out, at_out = t, u, v, at
             else:
                 t_out = np.concatenate((t_out, t), axis=0)
                 u_out = np.concatenate((u_out, u), axis=0)
                 v_out = np.concatenate((v_out, v), axis=0)
                 at_out = np.concatenate((at_out, at), axis=0)
+
+    t_out = t_out.T
+    u_out = u_out.T
+    v_out = v_out.T
+
+    index = 0
+    for i in range(t_out.shape[0]):
+        if not np.all(t_out[i] == nodata):
+            index = i
+            break
+
+    depth = depth[index:]
+    t_out = t_out[index:, :]
+    u_out = u_out[index:, :]
+    v_out = v_out[index:, :]
 
     output = {"lake": lake,
               "time": at_out.tolist(),
