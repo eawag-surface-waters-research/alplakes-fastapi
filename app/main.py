@@ -52,7 +52,6 @@ app.add_middleware(
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 filesystem = "../filesystem"
-filesystem = "/media/runnalja/JamesSSD/Eawag/Alplakes/filesystem"
 internal = True
 
 if os.getenv('EXTERNAL') is not None:
