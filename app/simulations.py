@@ -7,6 +7,7 @@ import numpy as np
 from enum import Enum
 from pydantic import BaseModel
 from fastapi import HTTPException
+from fastapi.responses import FileResponse
 from datetime import datetime, timedelta, timezone
 from dateutil.relativedelta import relativedelta, SU
 
@@ -135,6 +136,19 @@ def verify_simulations_transect(model, lake, dt, latitude_list, longitude_list):
 
 def verify_simulations_depthtime(model, lake, start, end, latitude, longitude):
     return True
+
+
+def verify_simulations_file(model, lake, sunday):
+    return True
+
+
+def get_simulations_file(filesystem, model, lake, sunday):
+    path = os.path.join(filesystem, "media/simulations", model, "results", lake, "{}.nc".format(sunday))
+    if os.path.isfile(path):
+        return FileResponse(path, media_type="application/nc", filename="{}_{}_{}.nc".format(model, lake, sunday))
+    else:
+        raise HTTPException(status_code=400,
+                            detail="Apologies data is not available for {} on {}".format(model, sunday))
 
 
 def get_simulations_layer(filesystem, model, lake, time, depth):

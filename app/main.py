@@ -52,6 +52,7 @@ app.add_middleware(
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 filesystem = "../filesystem"
+filesystem = "/media/runnalja/JamesSSD/Eawag/Alplakes/filesystem"
 internal = True
 
 if os.getenv('EXTERNAL') is not None:
@@ -228,6 +229,18 @@ async def simulations_metadata_lake(model: simulations.Models, lake: simulations
     """
     simulations.verify_metadata_lake(model, lake)
     return simulations.get_metadata_lake(filesystem, model, lake)
+
+
+@app.get("/simulations/file/{model}/{lake}/{sunday}", tags=["Simulations"])
+async def simulations_file(model: simulations.Models, lake: simulations.Lakes, sunday: str):
+    """
+    Simulation file for a given lake simulation for the selected week:
+    - **model**: model name
+    - **lake**: lake name
+    - **sunday**: YYYYmmdd (UTC) always a sunday.
+    """
+    simulations.verify_simulations_file(model, lake, sunday)
+    return simulations.get_simulations_file(filesystem, model, lake, sunday)
 
 
 @app.get("/simulations/layer/{model}/{lake}/{time}/{depth}", tags=["Simulations"])
