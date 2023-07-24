@@ -239,8 +239,8 @@ def get_simulations_layer_alplakes_delft3dflow(filesystem, lake, parameter, star
             raise HTTPException(status_code=400,
                                 detail="Apologies data is not available for {} week starting {}".format(lake, week))
 
-    start_datetime = datetime.strptime(start, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
-    end_datetime = datetime.strptime(end, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
+    start_datetime = datetime.strptime(start, "%Y%m%d%H").replace(tzinfo=timezone.utc)
+    end_datetime = datetime.strptime(end, "%Y%m%d%H").replace(tzinfo=timezone.utc)
     out = None
     times = None
     for week in weeks:

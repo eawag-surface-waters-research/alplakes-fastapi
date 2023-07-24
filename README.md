@@ -61,6 +61,9 @@ conda install --file requirements.txt
 ```
 
 ### 2. Run API
+
+Manually set filesystem path in main.py
+
 ```console
 conda activate fastapi
 uvicorn app.main:app --host 0.0.0.0 --reload
