@@ -187,14 +187,22 @@ def exact_line_segments(lat1, lng1, lat2, lng2, lat_grid, lng_grid, start, n=100
         dists.append(dist)
 
     df = pd.DataFrame(list(zip(x_indexs, y_indexs, dists, spacing)), columns=['xi', 'yi', 'dist', 'spacing'])
-    df = df.sort_values(['xi', 'yi', 'dist'])
-    df = df.drop_duplicates(['xi', 'yi'], keep='first')
-    df = df.sort_index()
+    df_temp = df.sort_values(['xi', 'yi', 'dist'])
+    df_temp = df_temp.drop_duplicates(['xi', 'yi'], keep='first')
+
+    if not df.iloc[0].equals(df_temp.iloc[0]):
+        df_temp = pd.concat([df.iloc[[0]], df_temp], ignore_index=True)
+
+    if not df.iloc[-1].equals(df_temp.iloc[-1]):
+        df_temp = pd.concat([df.iloc[[-1]], df_temp], ignore_index=True)
+    df = df_temp.sort_values(['spacing'])
     mean = df['dist'].mean()
     std = df['dist'].std()
-    df = df[(df['dist'] >= mean - 2 * std) & (df['dist'] <= mean + 2 * std)]
+    df["zscore"] = (df['dist'] - mean) / std
+    df["valid"] = True
+    df.loc[df['zscore'] >= 0, 'valid'] = False
 
-    return np.array(df["xi"]), np.array(df["yi"]), np.array(df["spacing"]), distance * 1000
+    return np.array(df["xi"]), np.array(df["yi"]), np.array(df["spacing"]), np.array(df["valid"]), distance * 1000
 
 
 def sundays_between_dates(start, end, max_weeks=10):

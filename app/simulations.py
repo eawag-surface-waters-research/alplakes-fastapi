@@ -400,15 +400,16 @@ def get_simulations_transect_delft3dflow(filesystem, lake, dt, latitude_str, lon
         lat_grid, lng_grid = functions.coordinates_to_latlng(nc.variables["XZ"][:], nc.variables["YZ"][:])
 
         start = 0
-        xi_arr, yi_arr, sp_arr = np.array([]), np.array([]), np.array([])
+        xi_arr, yi_arr, sp_arr, vd_arr = np.array([]), np.array([]), np.array([]), np.array([])
         for i in range(len(latitude_list) - 1):
-            xi, yi, sp, distance = functions.exact_line_segments(latitude_list[i], longitude_list[i],
+            xi, yi, sp, vd, distance = functions.exact_line_segments(latitude_list[i], longitude_list[i],
                                                                  latitude_list[i + 1],
                                                                  longitude_list[i + 1], lat_grid, lng_grid, start, 2000)
             start = start + distance
             xi_arr = np.concatenate((xi_arr, xi), axis=0)
             yi_arr = np.concatenate((yi_arr, yi), axis=0)
             sp_arr = np.concatenate((sp_arr, sp), axis=0)
+            vd_arr = np.concatenate((vd_arr, vd), axis=0)
 
         xi_arr = xi_arr.astype(int)
         yi_arr = yi_arr.astype(int)
@@ -422,6 +423,11 @@ def get_simulations_transect_delft3dflow(filesystem, lake, dt, latitude_str, lon
             u, v, = functions.rotate_velocity(nc.variables["U1"][time_index, :, xi_arr[i], yi_arr[i]],
                                               nc.variables["V1"][time_index, :, xi_arr[i], yi_arr[i]],
                                               nc.variables["ALFAS"][xi_arr[i], yi_arr[i]])
+            if not vd_arr[i]:
+                t.fill(-999.)
+                u.fill(-999.)
+                v.fill(-999.)
+
             if len(t_arr) == 0:
                 t_arr, u_arr, v_arr = t.reshape(-1, 1), u.reshape(-1, 1), v.reshape(-1, 1)
             else:
