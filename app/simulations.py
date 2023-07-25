@@ -398,13 +398,14 @@ def get_simulations_transect_delft3dflow(filesystem, lake, dt, latitude_str, lon
 
         depth = (np.array(nc.variables["ZK_LYR"][:]) * -1).tolist()
         lat_grid, lng_grid = functions.coordinates_to_latlng(nc.variables["XZ"][:], nc.variables["YZ"][:])
+        grid_spacing = functions.average_grid_spacing(lat_grid, lng_grid)
 
         start = 0
         xi_arr, yi_arr, sp_arr, vd_arr = np.array([]), np.array([]), np.array([]), np.array([])
         for i in range(len(latitude_list) - 1):
             xi, yi, sp, vd, distance = functions.exact_line_segments(latitude_list[i], longitude_list[i],
-                                                                 latitude_list[i + 1],
-                                                                 longitude_list[i + 1], lat_grid, lng_grid, start, 2000)
+                                                                     latitude_list[i + 1], longitude_list[i + 1],
+                                                                     lat_grid, lng_grid, start, grid_spacing, 2000)
             start = start + distance
             xi_arr = np.concatenate((xi_arr, xi), axis=0)
             yi_arr = np.concatenate((yi_arr, yi), axis=0)

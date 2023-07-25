@@ -151,19 +151,12 @@ def alplakes_time(t, units):
     return np.array([convert_from_unit(x, units).strftime("%Y%m%d%H%M") for x in t])
 
 
-def exact_line_segments(lat1, lng1, lat2, lng2, lat_grid, lng_grid, start, n=100):
-    lat1, lng1, lat2, lng2 = np.radians([lat1, lng1, lat2, lng2])
-
-    # calculate distance between the endpoints using the Haversine formula
-    dlat = lat2 - lat1
-    dlng = lng2 - lng1
-    a = np.sin(dlat / 2) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlng / 2) ** 2
-    c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
-    distance = 6371 * c  # Earth's radius in km
-
+def exact_line_segments(lat1, lng1, lat2, lng2, lat_grid, lng_grid, start, grid, n=100):
+    distance = haversine(lat1, lng1, lat2, lng2)
     spacing = np.arange(n + 1) * (distance * 1000 / n) + start
 
     # calculate bearings between the two points
+    lat1, lng1, lat2, lng2 = np.radians([lat1, lng1, lat2, lng2])
     bearings = np.arctan2(np.sin(lng2 - lng1) * np.cos(lat2),
                           np.cos(lat1) * np.sin(lat2) -
                           np.sin(lat1) * np.cos(lat2) * np.cos(lng2 - lng1))
@@ -196,13 +189,57 @@ def exact_line_segments(lat1, lng1, lat2, lng2, lat_grid, lng_grid, start, n=100
     if not df.iloc[-1].equals(df_temp.iloc[-1]):
         df_temp = pd.concat([df.iloc[[-1]], df_temp], ignore_index=True)
     df = df_temp.sort_values(['spacing'])
-    mean = df['dist'].mean()
-    std = df['dist'].std()
-    df["zscore"] = (df['dist'] - mean) / std
     df["valid"] = True
-    df.loc[df['zscore'] >= 0, 'valid'] = False
+    df.loc[df['dist'] > grid, 'valid'] = False
 
     return np.array(df["xi"]), np.array(df["yi"]), np.array(df["spacing"]), np.array(df["valid"]), distance * 1000
+
+
+def haversine(lat1, lon1, lat2, lon2):
+    """
+    Calculate the great circle distance between two points
+    on the Earth's surface given their latitudes and longitudes.
+    """
+    R = 6371.0  # Earth's radius in kilometers
+    dlat = np.radians(lat2 - lat1)
+    dlon = np.radians(lon2 - lon1)
+    a = np.sin(dlat / 2) ** 2 + np.cos(np.radians(lat1)) * np.cos(np.radians(lat2)) * np.sin(dlon / 2) ** 2
+    c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
+    distance = R * c
+    return distance
+
+
+def average_grid_spacing(latitudes, longitudes):
+    """
+    Calculate the average grid spacing for a 2D grid with non-Cartesian coordinates.
+    """
+    latitudes = np.radians(latitudes)
+    longitudes = np.radians(longitudes)
+
+    # Calculate the number of grid points
+    num_points = latitudes.size
+
+    # Create coordinate pairs from latitude and longitude arrays
+    coordinates = np.column_stack((latitudes.ravel(), longitudes.ravel()))
+
+    # Repeat the coordinate pairs to create arrays of shape (num_points, num_points, 2)
+    coord_pairs1 = np.repeat(coordinates[:, np.newaxis, :], num_points, axis=1)
+    coord_pairs2 = np.repeat(coordinates[np.newaxis, :, :], num_points, axis=0)
+
+    # Compute pairwise distances between grid points using haversine formula
+    distances = haversine(coord_pairs1[:, :, 0], coord_pairs1[:, :, 1],
+                         coord_pairs2[:, :, 0], coord_pairs2[:, :, 1])
+
+    # Exclude self-distances by setting diagonal elements to a large value
+    np.fill_diagonal(distances, np.inf)
+
+    # Filter out infinite values (distances from a point to itself) before calculating the average
+    distances = distances[np.isfinite(distances)]
+
+    # Calculate the average grid spacing
+    avg_spacing = np.nanmean(distances)
+
+    return avg_spacing * 1000
 
 
 def sundays_between_dates(start, end, max_weeks=10):
