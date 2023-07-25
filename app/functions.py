@@ -211,35 +211,31 @@ def haversine(lat1, lon1, lat2, lon2):
 
 def average_grid_spacing(latitudes, longitudes):
     """
-    Calculate the average grid spacing for a 2D grid with non-Cartesian coordinates.
+    Calculate the average grid spacing for a 2D grid with non-Cartesian coordinates
+    by considering a single cell at the center of the grid.
     """
     latitudes = np.radians(latitudes)
     longitudes = np.radians(longitudes)
 
-    # Calculate the number of grid points
-    num_points = latitudes.size
+    # Find the center cell index
+    center_row, center_col = latitudes.shape[0] // 2, latitudes.shape[1] // 2
 
-    # Create coordinate pairs from latitude and longitude arrays
-    coordinates = np.column_stack((latitudes.ravel(), longitudes.ravel()))
+    if np.isnan(latitudes[center_row, center_col]):
+        return 500
 
-    # Repeat the coordinate pairs to create arrays of shape (num_points, num_points, 2)
-    coord_pairs1 = np.repeat(coordinates[:, np.newaxis, :], num_points, axis=1)
-    coord_pairs2 = np.repeat(coordinates[np.newaxis, :, :], num_points, axis=0)
+    # Get the latitude and longitude of the center cell
+    center_lat, center_lon = latitudes[center_row, center_col], longitudes[center_row, center_col]
 
-    # Compute pairwise distances between grid points using haversine formula
-    distances = haversine(coord_pairs1[:, :, 0], coord_pairs1[:, :, 1],
-                         coord_pairs2[:, :, 0], coord_pairs2[:, :, 1])
+    # Calculate the distance from the center cell to its surrounding neighboring cells
+    distances = haversine(center_lat, center_lon, latitudes, longitudes)
 
-    # Exclude self-distances by setting diagonal elements to a large value
-    np.fill_diagonal(distances, np.inf)
-
-    # Filter out infinite values (distances from a point to itself) before calculating the average
-    distances = distances[np.isfinite(distances)]
+    # Exclude the center cell distance to itself
+    distances[center_row, center_col] = np.inf
 
     # Calculate the average grid spacing
-    avg_spacing = np.nanmean(distances)
+    avg_spacing = np.nanmean(distances[~np.isinf(distances)])
 
-    return avg_spacing * 1000
+    return avg_spacing * 1.5 * 1000
 
 
 def sundays_between_dates(start, end, max_weeks=10):
