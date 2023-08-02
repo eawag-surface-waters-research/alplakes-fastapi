@@ -554,7 +554,6 @@ def get_simulations_transect_period_delft3dflow(filesystem, lake, start, end, la
             time_a = np.concatenate((time_a, time[time_index_start:time_index_end]), axis=0)
             t_arr = []
 
-
             for i in range(len(xi_arr)):
                 t = np.array(nc.variables["R1"][time_index_start:time_index_end, 0, :, xi_arr[i], yi_arr[i]])
                 u, v, = functions.rotate_velocity(nc.variables["U1"][time_index_start:time_index_end, :, xi_arr[i], yi_arr[i]],
@@ -591,7 +590,7 @@ def get_simulations_transect_period_delft3dflow(filesystem, lake, start, end, la
             break
 
     depth = depth[index:]
-    t_a = t_arr[:, index:, :]
+    t_a = t_a[:, index:, :]
     u_a = u_a[:, index:, :]
     v_a = v_a[:, index:, :]
 
