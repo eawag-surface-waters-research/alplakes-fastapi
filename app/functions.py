@@ -151,6 +151,10 @@ def alplakes_time(t, units):
     return np.array([convert_from_unit(x, units).strftime("%Y%m%d%H%M") for x in t])
 
 
+def unix_time(t, units):
+    return np.array([convert_from_unit(x, units).timestamp() for x in t])
+
+
 def exact_line_segments(lat1, lng1, lat2, lng2, lat_grid, lng_grid, start, grid, n=100):
     distance = haversine(lat1, lng1, lat2, lng2)
     spacing = np.arange(n + 1) * (distance * 1000 / n) + start

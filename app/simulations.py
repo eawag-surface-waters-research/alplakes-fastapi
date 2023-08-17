@@ -690,3 +690,62 @@ def get_simulations_depthtime_delft3dflow(filesystem, lake, start, end, latitude
               "v": {"data": functions.filter_parameter(v_out, decimals=5), "unit": "m/s"}}
 
     return output
+
+
+def get_simulations_layer_average_temperature(filesystem, model, lake, start, end, depth):
+    if model == "delft3d-flow":
+        return get_simulations_layer_average_temperature_delft3dflow(filesystem, lake, start, end, depth)
+    else:
+        raise HTTPException(status_code=400,
+                            detail="Apologies data is not available for {}".format(model))
+
+
+def get_simulations_layer_average_temperature_delft3dflow(filesystem, lake, start, end, depth):
+    model = "delft3d-flow"
+    lakes = os.path.join(filesystem, "media/simulations", model, "results")
+    if not os.path.isdir(os.path.join(lakes, lake)):
+        raise HTTPException(status_code=400,
+                            detail="{} simulation results are not available for {} please select from: [{}]"
+                            .format(model, lake, ", ".join(os.listdir(lakes))))
+    weeks = functions.sundays_between_dates(datetime.strptime(start[0:8], "%Y%m%d").replace(tzinfo=timezone.utc),
+                                            datetime.strptime(end[0:8], "%Y%m%d").replace(tzinfo=timezone.utc))
+
+    for week in weeks:
+        if not os.path.isfile(os.path.join(lakes, lake, "{}.nc".format(week.strftime("%Y%m%d")))):
+            raise HTTPException(status_code=400,
+                                detail="Apologies data is not available for {} week starting {}".format(lake, week))
+
+    start_datetime = datetime.strptime(start[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
+    end_datetime = datetime.strptime(end[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
+    out = None
+    times = None
+    for week in weeks:
+        with netCDF4.Dataset(os.path.join(lakes, lake, "{}.nc".format(week.strftime("%Y%m%d")))) as nc:
+            time = np.array(nc.variables["time"][:])
+            min_time = np.min(time)
+            max_time = np.max(time)
+            start_time = functions.convert_to_unit(start_datetime, nc.variables["time"].units)
+            end_time = functions.convert_to_unit(end_datetime, nc.variables["time"].units)
+            if min_time <= start_time <= max_time:
+                time_index_start = functions.get_closest_index(start_time, time)
+            else:
+                time_index_start = 0
+            if min_time <= end_time <= max_time:
+                time_index_end = functions.get_closest_index(end_time, time) + 1
+            else:
+                time_index_end = len(time)
+
+            depth_index = functions.get_closest_index(depth, np.array(nc.variables["ZK_LYR"][:]) * -1)
+            p = functions.alplakes_temperature(
+                nc.variables["R1"][time_index_start:time_index_end, 0, depth_index, :])
+            p = np.nanmean(p, axis=(1, 2))
+            t = functions.unix_time(time[time_index_start:time_index_end], nc.variables["time"].units)
+            if out is None:
+                out = p
+                times = t
+            else:
+                out = np.concatenate((out, p), axis=0)
+                times = np.concatenate((times, t), axis=0)
+    output = {"date": functions.filter_parameter(times), "temperature": functions.filter_parameter(out)}
+    return output
+

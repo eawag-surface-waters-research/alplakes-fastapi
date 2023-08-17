@@ -52,6 +52,7 @@ app.add_middleware(
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 filesystem = "../filesystem"
+
 internal = True
 
 if os.getenv('EXTERNAL') is not None:
@@ -270,6 +271,20 @@ async def simulations_layer_alplakes(model: simulations.Models, lake: simulation
     """
     simulations.verify_simulations_layer_alplakes(model, lake, parameter, start, end, depth)
     return simulations.get_simulations_layer_alplakes(filesystem, model, lake, parameter, start, end, depth)
+
+
+@app.get("/simulations/layer/average_temperature/{model}/{lake}/{start}/{end}/{depth}", tags=["Simulations"])
+async def simulations_layer_average_temperature(model: simulations.Models, lake: simulations.Lakes,
+                                                start: str, end: str, depth: float):
+    """
+    Parameters for a given lake simulation at a depth for period of time, formatted for the Alplakes website:
+    - **model**: model name
+    - **lake**: lake name
+    - **start**: YYYYmmddHHMM (UTC) e.g. 9am 6th December 2022 > 202212060900
+    - **end**: YYYYmmddHHMM (UTC) e.g. 9am 6th December 2022 > 202212060900
+    - **depth**: depth of layer in meters
+    """
+    return simulations.get_simulations_layer_average_temperature(filesystem, model, lake, start, end, depth)
 
 
 @app.get("/simulations/profile/{model}/{lake}/{datetime}/{latitude}/{longitude}", tags=["Simulations"])
