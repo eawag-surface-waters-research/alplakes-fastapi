@@ -409,7 +409,7 @@ def get_simulations_transect_delft3dflow(filesystem, lake, dt, latitude_str, lon
         for i in range(len(latitude_list) - 1):
             xi, yi, sp, vd, distance = functions.exact_line_segments(latitude_list[i], longitude_list[i],
                                                                      latitude_list[i + 1], longitude_list[i + 1],
-                                                                     lat_grid, lng_grid, start, grid_spacing, 200)
+                                                                     lat_grid, lng_grid, start, grid_spacing)
             start = start + distance
             xi_arr = np.concatenate((xi_arr, xi), axis=0)
             yi_arr = np.concatenate((yi_arr, yi), axis=0)
@@ -422,34 +422,28 @@ def get_simulations_transect_delft3dflow(filesystem, lake, dt, latitude_str, lon
         lat_arr = lat_grid[xi_arr, yi_arr]
         lng_arr = lng_grid[xi_arr, yi_arr]
 
-        t_arr = []
-        for i in range(len(xi_arr)):
-            t = np.array(nc.variables["R1"][time_index, 0, :, xi_arr[i], yi_arr[i]])
-            u, v, = functions.rotate_velocity(nc.variables["U1"][time_index, :, xi_arr[i], yi_arr[i]],
-                                              nc.variables["V1"][time_index, :, xi_arr[i], yi_arr[i]],
-                                              nc.variables["ALFAS"][xi_arr[i], yi_arr[i]])
-            if not vd_arr[i]:
-                t.fill(-999.)
-                u.fill(-999.)
-                v.fill(-999.)
-
-            if len(t_arr) == 0:
-                t_arr, u_arr, v_arr = t.reshape(-1, 1), u.reshape(-1, 1), v.reshape(-1, 1)
-            else:
-                t_arr = np.concatenate((t_arr, t.reshape(-1, 1)), axis=1)
-                u_arr = np.concatenate((u_arr, u.reshape(-1, 1)), axis=1)
-                v_arr = np.concatenate((v_arr, v.reshape(-1, 1)), axis=1)
+        idx = np.where(vd_arr == 0)[0]
+        t = np.array(nc.variables["R1"][time_index, 0, :, :, :])
+        t = t[:, xi_arr, yi_arr]
+        t[:, idx] = -999.
+        u, v, = functions.rotate_velocity(nc.variables["U1"][time_index, :, :, :],
+                                          nc.variables["V1"][time_index, :, :, :],
+                                          nc.variables["ALFAS"][xi_arr[i], yi_arr[i]])
+        u = u[:, xi_arr, yi_arr]
+        v = v[:, xi_arr, yi_arr]
+        u[:, idx] = -999.
+        v[:, idx] = -999.
 
         index = 0
-        for i in range(t_arr.shape[0]):
-            if not np.all(t_arr[i] == nodata):
+        for i in range(t.shape[0]):
+            if not np.all(t[i] == nodata):
                 index = i
                 break
 
         depth = depth[index:]
-        t_arr = t_arr[index:, :]
-        u_arr = u_arr[index:, :]
-        v_arr = v_arr[index:, :]
+        t = t[index:, :]
+        u = u[index:, :]
+        v = v[index:, :]
 
         output = {"lake": lake,
                   "datetime": functions.convert_from_unit(time[time_index], nc.variables["time"].units),
@@ -457,9 +451,9 @@ def get_simulations_transect_delft3dflow(filesystem, lake, dt, latitude_str, lon
                   "latitude": functions.filter_parameter(lat_arr, decimals=5),
                   "longitude": functions.filter_parameter(lng_arr, decimals=5),
                   "depth": {"data": functions.filter_parameter(depth), "unit": "m"},
-                  "temperature": {"data": functions.filter_parameter(t_arr), "unit": "degC"},
-                  "u": {"data": functions.filter_parameter(u_arr, decimals=5), "unit": nc.variables["U1"].units},
-                  "v": {"data": functions.filter_parameter(v_arr, decimals=5), "unit": nc.variables["V1"].units}}
+                  "temperature": {"data": functions.filter_parameter(t), "unit": "degC"},
+                  "u": {"data": functions.filter_parameter(u, decimals=5), "unit": nc.variables["U1"].units},
+                  "v": {"data": functions.filter_parameter(v, decimals=5), "unit": nc.variables["V1"].units}}
     return output
 
 
@@ -528,7 +522,7 @@ def get_simulations_transect_period_delft3dflow(filesystem, lake, start, end, la
                 for i in range(len(latitude_list) - 1):
                     xi, yi, sp, vd, distance = functions.exact_line_segments(latitude_list[i], longitude_list[i],
                                                                              latitude_list[i + 1], longitude_list[i + 1],
-                                                                             lat_grid, lng_grid, start, grid_spacing, 2000)
+                                                                             lat_grid, lng_grid, start, grid_spacing)
                     start = start + distance
                     xi_arr = np.concatenate((xi_arr, xi), axis=0)
                     yi_arr = np.concatenate((yi_arr, yi), axis=0)
@@ -552,36 +546,27 @@ def get_simulations_transect_period_delft3dflow(filesystem, lake, start, end, la
                           }
 
             time_a = np.concatenate((time_a, time[time_index_start:time_index_end]), axis=0)
-            t_arr = []
 
-            for i in range(len(xi_arr)):
-                t = np.array(nc.variables["R1"][time_index_start:time_index_end, 0, :, xi_arr[i], yi_arr[i]])
-                u, v, = functions.rotate_velocity(nc.variables["U1"][time_index_start:time_index_end, :, xi_arr[i], yi_arr[i]],
-                                                  nc.variables["V1"][time_index_start:time_index_end, :, xi_arr[i], yi_arr[i]],
-                                                  nc.variables["ALFAS"][xi_arr[i], yi_arr[i]])
-
-                if not vd_arr[i]:
-                    t.fill(-999.)
-                    u.fill(-999.)
-                    v.fill(-999.)
-
-                if len(t_arr) == 0:
-                    t_arr = t.reshape((t.shape[0], t.shape[1], 1))
-                    u_arr = u.reshape((u.shape[0], u.shape[1], 1))
-                    v_arr = v.reshape((v.shape[0], v.shape[1], 1))
-                else:
-                    t_arr = np.concatenate((t_arr, t.reshape((t.shape[0], t.shape[1], 1))), axis=2)
-                    u_arr = np.concatenate((u_arr, u.reshape((u.shape[0], u.shape[1], 1))), axis=2)
-                    v_arr = np.concatenate((v_arr, v.reshape((v.shape[0], v.shape[1], 1))), axis=2)
+            idx = np.where(vd_arr == 0)[0]
+            t = np.array(nc.variables["R1"][time_index_start:time_index_end, 0, :, :, :])
+            t = t[:, :, xi_arr, yi_arr]
+            t[:, :, idx] = -999.
+            u, v, = functions.rotate_velocity(nc.variables["U1"][time_index_start:time_index_end, :, :, :],
+                                              nc.variables["V1"][time_index_start:time_index_end, :, :, :],
+                                              nc.variables["ALFAS"][xi_arr[i], yi_arr[i]])
+            u = u[:, :, xi_arr, yi_arr]
+            v = v[:, :, xi_arr, yi_arr]
+            u[:, :, idx] = -999.
+            v[:, :, idx] = -999.
 
             if len(t_a) == 0:
-                t_a = t_arr
-                u_a = u_arr
-                v_a = v_arr
+                t_a = t
+                u_a = u
+                v_a = v
             else:
-                t_a = np.concatenate((t_a, t_arr), axis=0)
-                u_a = np.concatenate((u_a, u_arr), axis=0)
-                v_a = np.concatenate((v_a, v_arr), axis=0)
+                t_a = np.concatenate((t_a, t), axis=0)
+                u_a = np.concatenate((u_a, u), axis=0)
+                v_a = np.concatenate((v_a, v), axis=0)
 
     index = 0
     for i in range(t_a.shape[1]):

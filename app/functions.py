@@ -1,5 +1,6 @@
 import os
 import json
+import math
 import shutil
 import requests
 import numpy as np
@@ -155,8 +156,9 @@ def unix_time(t, units):
     return np.array([convert_from_unit(x, units).timestamp() for x in t])
 
 
-def exact_line_segments(lat1, lng1, lat2, lng2, lat_grid, lng_grid, start, grid, n=100):
+def exact_line_segments(lat1, lng1, lat2, lng2, lat_grid, lng_grid, start, grid):
     distance = haversine(lat1, lng1, lat2, lng2)
+    n = math.ceil((distance * 1000) / (grid / 2))
     spacing = np.arange(n + 1) * (distance * 1000 / n) + start
 
     # calculate bearings between the two points
