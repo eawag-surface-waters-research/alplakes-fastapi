@@ -409,7 +409,7 @@ def get_simulations_transect_delft3dflow(filesystem, lake, dt, latitude_str, lon
         for i in range(len(latitude_list) - 1):
             xi, yi, sp, vd, distance = functions.exact_line_segments(latitude_list[i], longitude_list[i],
                                                                      latitude_list[i + 1], longitude_list[i + 1],
-                                                                     lat_grid, lng_grid, start, grid_spacing, 2000)
+                                                                     lat_grid, lng_grid, start, grid_spacing, 200)
             start = start + distance
             xi_arr = np.concatenate((xi_arr, xi), axis=0)
             yi_arr = np.concatenate((yi_arr, yi), axis=0)
