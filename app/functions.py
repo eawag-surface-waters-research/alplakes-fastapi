@@ -126,7 +126,7 @@ def rotate_velocity(u, v, alpha):
     return u_n, v_e
 
 
-def alplakes_temperature(x):
+def alplakes_parameter(x):
     x = np.asarray(x).astype(np.float64)
     x[x == -999.0] = np.nan
     return x

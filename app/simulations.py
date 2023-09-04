@@ -116,6 +116,7 @@ class Parameters(str, Enum):
     geometry = "geometry"
     temperature = "temperature"
     velocity = "velocity"
+    thermocline = "thermocline"
 
 
 def verify_simulations_layer(model, lake, datetime, depth):
@@ -271,7 +272,7 @@ def get_simulations_layer_alplakes_delft3dflow(filesystem, lake, parameter, star
 
             if parameter == "temperature":
                 f = '%0.2f'
-                p = functions.alplakes_temperature(
+                p = functions.alplakes_parameter(
                     nc.variables["R1"][time_index_start:time_index_end, 0, depth_index, :])
             elif parameter == "velocity":
                 f = '%0.5f'
@@ -279,10 +280,18 @@ def get_simulations_layer_alplakes_delft3dflow(filesystem, lake, parameter, star
                     nc.variables["U1"][time_index_start:time_index_end, depth_index, :],
                     nc.variables["V1"][time_index_start:time_index_end, depth_index, :],
                     nc.variables["ALFAS"][:])
+            elif parameter == "thermocline":
+                if "THERMOCLINE" in nc.variables.keys():
+                    f = '%0.2f'
+                    p = functions.alplakes_parameter(
+                        nc.variables["THERMOCLINE"][time_index_start:time_index_end, :])
+                else:
+                    raise HTTPException(status_code=400,
+                                        detail="Thermocline not available for this dataset. Please try another parameter.")
             else:
                 raise HTTPException(status_code=400,
                                     detail="Parameter {} not recognised, please select from: [geometry, temperature, "
-                                           "velocity]".format(parameter))
+                                           "velocity, thermocline]".format(parameter))
             t = functions.alplakes_time(time[time_index_start:time_index_end], nc.variables["time"].units)
             if out is None:
                 out = p
@@ -721,7 +730,7 @@ def get_simulations_layer_average_temperature_delft3dflow(filesystem, lake, star
                 time_index_end = len(time)
 
             depth_index = functions.get_closest_index(depth, np.array(nc.variables["ZK_LYR"][:]) * -1)
-            p = functions.alplakes_temperature(
+            p = functions.alplakes_parameter(
                 nc.variables["R1"][time_index_start:time_index_end, 0, depth_index, :])
             p = np.nanmean(p, axis=(1, 2))
             t = functions.unix_time(time[time_index_start:time_index_end], nc.variables["time"].units)
