@@ -1,8 +1,9 @@
 import os
 import numpy as np
+import pandas as pd
 import xarray as xr
 from enum import Enum
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException
 from app.functions import daterange
 
@@ -260,3 +261,48 @@ def get_cosmo_point_reanalysis(filesystem, model, variables, start_date, end_dat
             else:
                 output[var] = []
     return output
+
+
+class MeteodataParameters(str, Enum):
+    pva200h0 = "pva200h0"
+    gre000h0 = "gre000h0"
+    tre200h0 = "tre200h0"
+    rre150h0 = "rre150h0"
+    fkl010h0 = "fkl010h0"
+    dkl010h0 = "dkl010h0"
+    nto000d0 = "nto000d0"
+
+
+def verify_meteodata_measured(station_id, parameter, start_date, end_date):
+    return True
+
+
+def get_meteodata_measured(filesystem, station_id, parameter, start_date, end_date):
+    station_id = station_id[:3].upper()
+    station_dir = os.path.join(filesystem, "media/meteoswiss/meteodata", station_id)
+    if not os.path.exists(station_dir):
+        raise HTTPException(status_code=400, detail="Data not available for {}".format(station_id))
+
+    files = os.listdir(station_dir)
+    files.sort()
+    files = [f for f in files if int(start_date[:4]) <= int(f.split(".")[1]) <= int(end_date[:4])]
+    dfs = []
+    for file in files:
+        if file.endswith(".csv"):
+            df = pd.read_csv(os.path.join(station_dir, file))
+            dfs.append(df)
+    if len(dfs) == 0:
+        raise HTTPException(status_code=400,
+                            detail="No data available between {} and {}".format(start_date, end_date))
+    df = pd.concat(dfs, ignore_index=True)
+    if parameter not in df.columns:
+        raise HTTPException(status_code=400, detail="Parameter {} not available at station {}".format(parameter, station_id))
+    df["time"] = pd.to_datetime(df['Date'], format='%Y%m%d%H', utc=True)
+    start = datetime.strptime(start_date, '%Y%m%d').replace(tzinfo=timezone.utc)
+    end = datetime.strptime(end_date, '%Y%m%d').replace(tzinfo=timezone.utc) + timedelta(days=1)
+    selected = df[(df['time'] >= start) & (df['time'] <= end)]
+    if len(selected) == 0:
+        raise HTTPException(status_code=400,
+                            detail="Not data available between {} and {}".format(start_date, end_date))
+    out = {"Time": list(selected["time"]), parameter: list(selected[parameter])}
+    return out

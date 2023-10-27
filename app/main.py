@@ -73,7 +73,6 @@ if internal:
         """
         return meteoswiss.get_cosmo_metadata(filesystem)
 
-if internal:
     @app.get("/meteoswiss/cosmo/area/reanalysis/{model}/{start_date}/{end_date}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}",
              tags=["Meteoswiss"])
     async def meteoswiss_cosmo_area_reanalysis(model: meteoswiss.CosmoReanalysis, start_date: str, end_date: str,
@@ -98,7 +97,6 @@ if internal:
                                                     ur_lat,
                                                     ur_lng)
 
-if internal:
     @app.get("/meteoswiss/cosmo/area/forecast/{model}/{forecast_date}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}",
              tags=["Meteoswiss"])
     async def meteoswiss_cosmo_area_forecast(model: meteoswiss.CosmoForecast, forecast_date: str,
@@ -121,7 +119,6 @@ if internal:
         return meteoswiss.get_cosmo_area_forecast(filesystem, model, variables, forecast_date, ll_lat, ll_lng, ur_lat,
                                                   ur_lng)
 
-if internal:
     @app.get("/meteoswiss/cosmo/point/reanalysis/{model}/{start_date}/{end_date}/{lat}/{lng}", tags=["Meteoswiss"])
     async def meteoswiss_cosmo_point_reanalysis(model: meteoswiss.CosmoReanalysis, start_date: str, end_date: str,
                                                 lat: float, lng: float,
@@ -140,7 +137,6 @@ if internal:
         meteoswiss.verify_cosmo_point_reanalysis(model, variables, start_date, end_date, lat, lng)
         return meteoswiss.get_cosmo_point_reanalysis(filesystem, model, variables, start_date, end_date, lat, lng)
 
-if internal:
     @app.get("/meteoswiss/cosmo/point/forecast/{model}/{forecast_date}/{lat}/{lng}", tags=["Meteoswiss"])
     async def meteoswiss_cosmo_point_forecast(model: meteoswiss.CosmoForecast, forecast_date: str,
                                               lat: float, lng: float,
@@ -159,6 +155,32 @@ if internal:
         meteoswiss.verify_cosmo_point_forecast(model, variables, forecast_date, lat, lng)
         return meteoswiss.get_cosmo_point_forecast(filesystem, model, variables, forecast_date, lat, lng)
 
+    @app.get("/meteoswiss/meteodata/metadata", tags=["Meteoswiss"])
+    async def meteoswiss_meteodata_metadata():
+        """
+        GEOJSON of all Meteoswiss stations. Accessed from https://www.geocat.ch/geonetwork/srv/ger/catalog.search#/metadata/d9ea83de-b8d7-44e1-a7e3-3065699eb571
+        """
+        return RedirectResponse("https://alplakes-eawag.s3.eu-central-1.amazonaws.com/static/meteoswiss/meteoswiss_meteodata.json")
+
+    @app.get("/meteoswiss/meteodata/measured/{station_id}/{parameter}/{start_date}/{end_date}", tags=["Meteoswiss"])
+    async def meteoswiss_meteodata_measured(station_id: str, parameter: meteoswiss.MeteodataParameters, start_date: str, end_date: str):
+        """
+        Measured meteodata from Meteoswiss:
+        - **station_id**: 3 digit station identification code
+        - **parameter**: parameter to retrieve
+            - pva200h0 (hPa): Vapour pressure 2 m above ground; hourly mean
+            - gre000h0 (W/m²): Global radiation; hourly mean
+            - tre200h0 (°C): Air temperature 2 m above ground; hourly mean
+            - rre150h0 (mm): Precipitation; hourly total
+            - fkl010h0 (m/s): Wind speed scalar; hourly mean
+            - dkl010h0 (°): Wind direction; hourly mean
+            - nto000d0 (%): Cloud cover; daily mean
+        - **start_date**: start date "YYYYMMDD"
+        - **end_date**: end date "YYYYMMDD"
+        """
+        meteoswiss.verify_meteodata_measured(station_id, parameter, start_date, end_date)
+        return meteoswiss.get_meteodata_measured(filesystem, station_id, parameter, start_date, end_date)
+
 if internal:
     @app.get("/bafu/hydrodata/metadata", tags=["Bafu"])
     async def bafu_hydrodata_metadata():
@@ -166,7 +188,6 @@ if internal:
         GEOJSON of all the available BAFU hydrodata.
         """
         return RedirectResponse("https://alplakes-eawag.s3.eu-central-1.amazonaws.com/static/bafu/bafu_hydrodata.json")
-
 
     @app.get("/bafu/hydrodata/measured/{station_id}/{parameter}/{start_date}/{end_date}", tags=["Bafu"])
     async def bafu_hydrodata_measured(station_id: int, parameter: str, start_date: str, end_date: str):
@@ -180,7 +201,6 @@ if internal:
         bafu.verify_hydrodata_measured(station_id, parameter, start_date, end_date)
         return bafu.get_hydrodata_measured(filesystem, station_id, parameter, start_date, end_date)
 
-if internal:
     @app.get("/bafu/hydrodata/predicted/{status}/{station_id}/{model}", tags=["Bafu"])
     async def bafu_hydrodata_predicted(status: bafu.HydrodataPredicted, station_id: int, model: str):
         """
@@ -194,7 +214,6 @@ if internal:
         bafu.verify_hydrodata_predicted(status, station_id, model)
         return bafu.get_hydrodata_predicted(filesystem, status, station_id, model)
 
-if internal:
     @app.get("/bafu/hydrodata/total_lake_inflow/metadata", tags=["Bafu"])
     async def bafu_hydrodata_total_lake_inflow_metadata():
         """
@@ -202,7 +221,6 @@ if internal:
         """
         return bafu.metadata_hydrodata_total_lake_inflow(filesystem)
 
-if internal:
     @app.get("/bafu/hydrodata/total_lake_inflow/{lake}/{parameter}/{start_date}/{end_date}", tags=["Bafu"])
     async def bafu_hydrodata_total_lake_inflow(lake, parameter: str, start_date: str, end_date: str):
         """
