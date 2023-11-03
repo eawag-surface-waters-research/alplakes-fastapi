@@ -261,6 +261,23 @@ async def simulations_file(model: simulations.Models, lake: simulations.Lakes, s
     return simulations.get_simulations_file(filesystem, model, lake, sunday)
 
 
+@app.get("/simulations/point/{model}/{lake}/{start}/{end}/{depth}/{latitude}/{longitude}", tags=["Simulations"])
+async def simulations_point(model: simulations.Models, lake: simulations.Lakes, start: str, end: str, depth: float,
+                            latitude: float, longitude: float):
+    """
+    Data for a given lake simulation at a specific time and location:
+    - **model**: model name
+    - **lake**: lake name
+    - **start**: YYYYmmddHHMM (UTC) e.g. 9am 6th December 2022 > 202212060900
+    - **end**: YYYYmmddHHMM (UTC) e.g. 9am 6th December 2022 > 202212060900
+    - **depth**: depth of layer in meters
+    - **latitude**: Latitude (WGS84)
+    - **longitude**: Longitude (WGS84)
+    """
+    simulations.verify_simulations_point(model, lake, start, end, depth, latitude, longitude)
+    return simulations.get_simulations_point(filesystem, model, lake, start, end, depth, latitude, longitude)
+
+
 @app.get("/simulations/layer/{model}/{lake}/{time}/{depth}", tags=["Simulations"])
 async def simulations_layer(model: simulations.Models, lake: simulations.Lakes, time: str, depth: float):
     """
@@ -327,7 +344,6 @@ async def simulations_transect(model: simulations.Models, lake: simulations.Lake
     Transect for a given lake simulation at a specific time:
     - **model**: model name
     - **lake**: lake name
-    - **parameter**: parameter name
     - **datetime**: YYYYmmddHHMM (UTC) e.g. 9am 6th December 2022 > 202212060900
     - **latitude_list**: Comma separated list of latitude (WGS84) values (minimum 2) e.g. /46.37,46.54/
     - **longitude_list**: Comma separated list of longitude (WGS84) values (minimum 2) e.g. /6.56,6.54/
@@ -340,10 +356,9 @@ async def simulations_transect(model: simulations.Models, lake: simulations.Lake
 async def simulations_transect_period(model: simulations.Models, lake: simulations.Lakes, start: str, end: str,
                                       latitude_list: str, longitude_list: str):
     """
-    Transect for a given lake simulation at a specific time:
+    Transect for a given lake simulation over a given period:
     - **model**: model name
     - **lake**: lake name
-    - **parameter**: parameter name
     - **start**: YYYYmmddHHMM (UTC) e.g. 9am 6th December 2022 > 202212060900
     - **end**: YYYYmmddHHMM (UTC) e.g. 9am 6th December 2022 > 202212060900
     - **latitude_list**: Comma separated list of latitude (WGS84) values (minimum 2) e.g. /46.37,46.54/
@@ -357,10 +372,9 @@ async def simulations_transect_period(model: simulations.Models, lake: simulatio
 async def simulations_depth_time(model: simulations.Models, lake: simulations.Lakes, start: str, end: str,
                                  latitude: float, longitude: float):
     """
-    Depth time data for a given lake simulation at a specific time and location:
+    Depth time data for a specific location over a given time period:
     - **model**: model name
     - **lake**: lake name
-    - **parameter**: parameter name
     - **start**: YYYYmmddHHMM (UTC) e.g. 9am 6th December 2022 > 202212060900
     - **end**: YYYYmmddHHMM (UTC) e.g. 9am 6th December 2022 > 202212060900
     - **latitude**: Latitude (WGS84)
