@@ -25,6 +25,8 @@ def convert_from_unit(time, units):
         return datetime.utcfromtimestamp(time + (datetime(2008, 3, 1).replace(tzinfo=timezone.utc) - datetime(1970, 1, 1).replace(tzinfo=timezone.utc)).total_seconds())
     elif units == "seconds since 1970-01-01 00:00:00":
         return datetime.utcfromtimestamp(time)
+    elif units == "nano":
+        return datetime.utcfromtimestamp(time / 1000000000)
     else:
         raise HTTPException(status_code=400,
                             detail="Apologies unable to read NetCDF with time unit: {}".format(units))
