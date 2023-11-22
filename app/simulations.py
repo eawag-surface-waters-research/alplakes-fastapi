@@ -721,15 +721,23 @@ def get_simulations_point_delft3dflow(filesystem, lake, start, end, depth, latit
     df = xr.open_mfdataset(files)
     df['time'] = pd.to_datetime(df['time'].values).tz_localize("UTC")
     df = df.sel(time=slice(start_datetime, end_datetime))
-    depth_index = functions.get_closest_index(depth, df["ZK_LYR"][0, :].values * -1)
-    depth = df["ZK_LYR"][0, depth_index].values * -1
+    if len(files) > 1:
+        depths = df["ZK_LYR"][0, :].values * -1
+    else:
+        depths = df["ZK_LYR"].values * -1
+    depth_index = functions.get_closest_index(depth, depths)
+    depth = depths[depth_index]
     lat_grid, lng_grid = functions.coordinates_to_latlng(df["XZ"].values, df["YZ"].values)
     x_index, y_index, distance = functions.get_closest_location(latitude, longitude, lat_grid, lng_grid)
     t = np.array(df["R1"][:, 0, depth_index, x_index, y_index].values)
+    if len(files) > 1:
+        ALFAS = df["ALFAS"][:, x_index, y_index].values
+    else:
+        ALFAS = df["ALFAS"][x_index, y_index].values
     u, v, = functions.rotate_velocity(
         df["U1"][:, depth_index, x_index, y_index].values,
         df["V1"][:, depth_index, x_index, y_index].values,
-        df["ALFAS"][:, x_index, y_index].values)
+        ALFAS)
     at = functions.alplakes_time(df["time"].values, "nano")
     output = {"lake": lake,
               "time": at.tolist(),
