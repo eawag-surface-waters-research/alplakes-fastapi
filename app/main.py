@@ -385,7 +385,7 @@ async def simulations_depth_time(model: simulations.Models, lake: simulations.La
 @app.get("/remotesensing/metadata", tags=["Remote Sensing"])
 async def remote_sensing_metadata():
     """
-    Directory of remote sensing product types, organised by satellite, lake and parameter.
+    Directory of remote sensing product types, organised by lake, satellite and parameter.
     """
     return remotesensing.get_metadata()
 
