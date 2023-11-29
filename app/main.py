@@ -1,13 +1,11 @@
 from fastapi import FastAPI, Query, BackgroundTasks, HTTPException
-from fastapi.responses import RedirectResponse, PlainTextResponse
+from fastapi.responses import RedirectResponse, PlainTextResponse, StreamingResponse
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 
 import sentry_sdk
 
-from app import simulations
-from app import meteoswiss
-from app import bafu
+from app import simulations, meteoswiss, bafu, remotesensing
 
 import os
 
@@ -382,3 +380,20 @@ async def simulations_depth_time(model: simulations.Models, lake: simulations.La
     """
     simulations.verify_simulations_depthtime(model, lake, start, end, latitude, longitude)
     return simulations.get_simulations_depthtime(filesystem, model, lake, start, end, latitude, longitude)
+
+
+@app.get("/remotesensing/metadata", tags=["Remote Sensing"])
+async def remote_sensing_metadata():
+    """
+    Directory of remote sensing product types, organised by satellite, lake and parameter.
+    """
+    return remotesensing.get_metadata()
+
+
+@app.get("/remotesensing/products/{lake}/{satellite}/{parameter}", tags=["Remote Sensing"])
+async def remote_sensing_products(lake: str, satellite: str, parameter: str):
+    """
+    Metadata for full time series of remote sensing products for a given lake, satellite and parameter.
+    See /remotesensing/metadata for input options.
+    """
+    return remotesensing.get_lake_products(lake, satellite, parameter)
