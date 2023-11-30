@@ -1,7 +1,12 @@
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
-
+from enum import Enum
 import requests
+
+
+class Satellites(str, Enum):
+    sentinel3 = "sentinel3"
+    sentinel2 = "sentinel2"
 
 
 def get_metadata():

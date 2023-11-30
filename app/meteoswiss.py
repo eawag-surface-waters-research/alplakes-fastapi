@@ -49,14 +49,6 @@ class CosmoForecast(str, Enum):
     VNXQ94 = "VNXQ94"
 
 
-def verify_cosmo_area_forecast(model, variables, forecast_date, ll_lat, ll_lng, ur_lat, ur_lng):
-    return True
-
-
-def verify_cosmo_point_forecast(model, variables, forecast_date, lat, lng):
-    return True
-
-
 def get_cosmo_area_forecast(filesystem, model, variables, forecast_date, ll_lat, ll_lng, ur_lat, ur_lng):
     file = os.path.join(filesystem, "media/meteoswiss/cosmo", model, "{}.{}0000.nc".format(model, forecast_date))
     if not os.path.isfile(file):
@@ -82,7 +74,7 @@ def get_cosmo_area_forecast(filesystem, model, variables, forecast_date, ll_lat,
             raise HTTPException(status_code=400,
                                 detail="Data not available for COSMO {} for the requsted area.".format(model))
 
-        x_min, x_max, y_min, y_max = min(x), max(x), min(y), max(y)
+        x_min, x_max, y_min, y_max = min(x), max(x) + 1, min(y), max(y) + 1
         output["lat"] = ds.variables["lat_1"][x_min:x_max, y_min:y_max].values.tolist()
         output["lng"] = ds.variables["lon_1"][x_min:x_max, y_min:y_max].values.tolist()
         for var in variables:
@@ -147,16 +139,8 @@ def get_cosmo_point_forecast(filesystem, model, variables, forecast_date, lat, l
 
 
 class CosmoReanalysis(str, Enum):
-    VNJK21 = "VNJK21"
     VNXQ34 = "VNXQ34"
-
-
-def verify_cosmo_area_reanalysis(model, variables, start_time, end_time, ll_lat, ll_lng, ur_lat, ur_lng):
-    return True
-
-
-def verify_cosmo_point_reanalysis(model, variables, start_time, end_time, lat, lng):
-    return True
+    VNJK21 = "VNJK21"
 
 
 def get_cosmo_area_reanalysis(filesystem, model, variables, start_date, end_date, ll_lat, ll_lng, ur_lat, ur_lng):
@@ -177,48 +161,54 @@ def get_cosmo_area_reanalysis(filesystem, model, variables, start_date, end_date
                                                                                                         ", ".join(
                                                                                                             bad_files)))
     output = {}
-    with xr.open_mfdataset(files) as ds:
-        bad_variables = []
-        for var in variables:
-            if var not in ds.variables.keys():
-                bad_variables.append(var)
-        if len(bad_variables) > 0:
-            raise HTTPException(status_code=400,
-                                detail="{} are bad variables for COSMO {}. Please select from: {}".format(
-                                    ", ".join(bad_variables), model, ", ".join(ds.keys())))
-        output["time"] = np.array(ds.variables["time"].values, dtype=str).tolist()
-        if len(ds.variables["lat_1"].shape) == 3:
-            x, y = np.where(((ds.variables["lat_1"][0] >= ll_lat) & (ds.variables["lat_1"][0] <= ur_lat) & (
-                ds.variables["lon_1"][0] >= ll_lng) & (ds.variables["lon_1"][0] <= ur_lng)))
-        else:
-            x, y = np.where(((ds.variables["lat_1"] >= ll_lat) & (ds.variables["lat_1"] <= ur_lat) & (
-                ds.variables["lon_1"] >= ll_lng) & (ds.variables["lon_1"] <= ur_lng)))
-
-        if len(x) == 0:
-            raise HTTPException(status_code=400,
-                                detail="Data not available for COSMO {} for the requested area.".format(model))
-
-        x_min, x_max, y_min, y_max = min(x), max(x), min(y), max(y)
-        if len(ds.variables["lat_1"].shape) == 3:
-            output["lat"] = ds.variables["lat_1"][0, x_min:x_max, y_min:y_max].values.tolist()
-            output["lng"] = ds.variables["lon_1"][0, x_min:x_max, y_min:y_max].values.tolist()
-        else:
-            output["lat"] = ds.variables["lat_1"][x_min:x_max, y_min:y_max].values.tolist()
-            output["lng"] = ds.variables["lon_1"][x_min:x_max, y_min:y_max].values.tolist()
-        for var in variables:
-            if var in ds.variables.keys():
-                if len(ds.variables[var].dims) == 3:
-                    data = ds.variables[var][:, x_min:x_max, y_min:y_max].values
-                elif len(ds.variables[var].dims) == 4:
-                    data = ds.variables[var][:, 0, x_min:x_max, y_min:y_max].values
-                else:
-                    data = []
-                output[var] = {"name": ds.variables[var].attrs["long_name"],
-                               "unit": ds.variables[var].attrs["units"],
-                               "data": np.where(np.isnan(data), None, data).tolist()}
+    try:
+        with xr.open_mfdataset(files) as ds:
+            bad_variables = []
+            for var in variables:
+                if var not in ds.variables.keys():
+                    bad_variables.append(var)
+            if len(bad_variables) > 0:
+                raise HTTPException(status_code=400,
+                                    detail="{} are bad variables for COSMO {}. Please select from: {}".format(
+                                        ", ".join(bad_variables), model, ", ".join(ds.keys())))
+            output["time"] = np.array(ds.variables["time"].values, dtype=str).tolist()
+            if len(ds.variables["lat_1"].shape) == 3:
+                x, y = np.where(((ds.variables["lat_1"][0] >= ll_lat) & (ds.variables["lat_1"][0] <= ur_lat) & (
+                    ds.variables["lon_1"][0] >= ll_lng) & (ds.variables["lon_1"][0] <= ur_lng)))
             else:
-                output[var] = []
-    return output
+                x, y = np.where(((ds.variables["lat_1"] >= ll_lat) & (ds.variables["lat_1"] <= ur_lat) & (
+                    ds.variables["lon_1"] >= ll_lng) & (ds.variables["lon_1"] <= ur_lng)))
+
+            if len(x) == 0:
+                raise HTTPException(status_code=400,
+                                    detail="Requested area is outside of the COSMO coverage area, or is too small.".format(model))
+
+            x_min, x_max, y_min, y_max = min(x), max(x) + 1, min(y), max(y) + 1
+            if len(ds.variables["lat_1"].dims) == 3:
+                output["lat"] = ds.variables["lat_1"][0, x_min:x_max, y_min:y_max].values.tolist()
+                output["lng"] = ds.variables["lon_1"][0, x_min:x_max, y_min:y_max].values.tolist()
+            else:
+                output["lat"] = ds.variables["lat_1"][x_min:x_max, y_min:y_max].values.tolist()
+                output["lng"] = ds.variables["lon_1"][x_min:x_max, y_min:y_max].values.tolist()
+            for var in variables:
+                if var in ds.variables.keys():
+                    if len(ds.variables[var].dims) == 3:
+                        data = ds.variables[var][:, x_min:x_max, y_min:y_max].values
+                    elif len(ds.variables[var].dims) == 4:
+                        data = ds.variables[var][:, 0, x_min:x_max, y_min:y_max].values
+                    else:
+                        data = []
+                    output[var] = {"name": ds.variables[var].attrs["long_name"],
+                                   "unit": ds.variables[var].attrs["units"],
+                                   "data": np.where(np.isnan(data), None, data).tolist()}
+                else:
+                    output[var] = []
+        return output
+    except xr.MergeError as e:
+        raise HTTPException(status_code=400,
+                            detail="COSMO grid is not consistent between {} and {}, please access individual days.".format(start_date, end_date))
+    except Exception as e:
+        raise
 
 
 def get_cosmo_point_reanalysis(filesystem, model, variables, start_date, end_date, lat, lng):
@@ -231,47 +221,54 @@ def get_cosmo_point_reanalysis(filesystem, model, variables, start_date, end_dat
     bad_files = []
     for file in files:
         if not os.path.isfile(file):
-            bad_files.append(file.split("/")[-1].split(".")[1][:8])
+            actual_date = datetime.strptime(file.split("/")[-1].split(".")[1][:8], '%Y%m%d') - timedelta(days=1)
+            bad_files.append(actual_date.strftime("%Y-%m-%d"))
     if len(bad_files) > 0:
         raise HTTPException(status_code=400,
                             detail="Data not available for COSMO {} for the following dates: {}".format(model,
                                                                                                         ", ".join(
                                                                                                             bad_files)))
     output = {}
-    with xr.open_mfdataset(files) as ds:
-        bad_variables = []
-        for var in variables:
-            if var not in ds.variables.keys():
-                bad_variables.append(var)
-        if len(bad_variables) > 0:
-            raise HTTPException(status_code=400,
-                                detail="{} are bad variables for COSMO {}. Please select from: {}".format(
-                                    ", ".join(bad_variables), model, ", ".join(ds.keys())))
-        output["time"] = np.array(ds.variables["time"].values, dtype=str).tolist()
+    try:
+        with xr.open_mfdataset(files) as ds:
+            bad_variables = []
+            for var in variables:
+                if var not in ds.variables.keys():
+                    bad_variables.append(var)
+            if len(bad_variables) > 0:
+                raise HTTPException(status_code=400,
+                                    detail="{} are bad variables for COSMO {}. Please select from: {}".format(
+                                        ", ".join(bad_variables), model, ", ".join(ds.keys())))
+            output["time"] = np.array(ds.variables["time"].values, dtype=str).tolist()
 
-        dist = ((ds.variables["lat_1"] - lat) ** 2 + (ds.variables["lon_1"] - lng) ** 2) ** 0.5
-        xy = np.unravel_index(dist.argmin(), dist.shape)
-        x, y = xy[0], xy[1]
-        if len(ds.variables["lat_1"].shape) == 3:
-            output["lat"] = float(ds.variables["lat_1"][0, x, y].values)
-            output["lng"] = float(ds.variables["lon_1"][0, x, y].values)
-        else:
-            output["lat"] = float(ds.variables["lat_1"][x, y].values)
-            output["lng"] = float(ds.variables["lon_1"][x, y].values)
-        for var in variables:
-            if var in ds.variables.keys():
-                if len(ds.variables[var].dims) == 3:
-                    data = ds.variables[var][:, x, y].values
-                elif len(ds.variables[var].dims) == 4:
-                    data = ds.variables[var][:, 0, x, y].values
-                else:
-                    data = []
-                output[var] = {"name": ds.variables[var].attrs["long_name"],
-                               "unit": ds.variables[var].attrs["units"],
-                               "data": np.where(np.isnan(data), None, data).tolist()}
+            dist = ((ds.variables["lat_1"] - lat) ** 2 + (ds.variables["lon_1"] - lng) ** 2) ** 0.5
+            xy = np.unravel_index(dist.argmin(), dist.shape)
+            x, y = xy[0], xy[1]
+            if len(ds.variables["lat_1"].shape) == 3:
+                output["lat"] = float(ds.variables["lat_1"][0, x, y].values)
+                output["lng"] = float(ds.variables["lon_1"][0, x, y].values)
             else:
-                output[var] = []
-    return output
+                output["lat"] = float(ds.variables["lat_1"][x, y].values)
+                output["lng"] = float(ds.variables["lon_1"][x, y].values)
+            for var in variables:
+                if var in ds.variables.keys():
+                    if len(ds.variables[var].dims) == 3:
+                        data = ds.variables[var][:, x, y].values
+                    elif len(ds.variables[var].dims) == 4:
+                        data = ds.variables[var][:, 0, x, y].values
+                    else:
+                        data = []
+                    output[var] = {"name": ds.variables[var].attrs["long_name"],
+                                   "unit": ds.variables[var].attrs["units"],
+                                   "data": np.where(np.isnan(data), None, data).tolist()}
+                else:
+                    output[var] = []
+        return output
+    except xr.MergeError as e:
+        raise HTTPException(status_code=400,
+                            detail="COSMO grid is not consistent between {} and {}, please access individual days.".format(start_date, end_date))
+    except Exception as e:
+        raise
 
 
 class MeteodataParameters(str, Enum):
@@ -282,10 +279,6 @@ class MeteodataParameters(str, Enum):
     fkl010h0 = "fkl010h0"
     dkl010h0 = "dkl010h0"
     nto000d0 = "nto000d0"
-
-
-def verify_meteodata_measured(station_id, parameter, start_date, end_date):
-    return True
 
 
 def get_meteodata_measured(filesystem, station_id, parameter, start_date, end_date):

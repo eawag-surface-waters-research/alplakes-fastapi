@@ -7,10 +7,6 @@ from fastapi import HTTPException
 from fastapi.responses import FileResponse
 
 
-def verify_hydrodata_measured(station_id, parameter, start_date, end_date):
-    return True
-
-
 def get_hydrodata_measured(filesystem, station_id, parameter, start_date, end_date):
     station_dir = os.path.join(filesystem, "media/bafu/hydrodata/CSV", str(station_id))
     if not os.path.exists(station_dir):
@@ -37,12 +33,8 @@ def get_hydrodata_measured(filesystem, station_id, parameter, start_date, end_da
 
 
 class HydrodataPredicted(str, Enum):
-    official = "official"
     unofficial = "unofficial"
-
-
-def verify_hydrodata_predicted(status, station_id, parameter):
-    return True
+    official = "official"
 
 
 def get_hydrodata_predicted(filesystem, status, station_id, model):
@@ -60,10 +52,6 @@ def metadata_hydrodata_total_lake_inflow(filesystem):
     for lake in lakes:
         output.append({"lake": lake, "parameters": os.listdir(os.path.join(folder, lake))})
     return output
-
-
-def verify_hydrodata_total_lake_inflow(lake, parameter, start_date, end_date):
-    return True
 
 
 def get_hydrodata_total_lake_inflow(filesystem, lake, parameter, start_date, end_date):

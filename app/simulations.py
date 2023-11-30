@@ -60,10 +60,6 @@ def get_metadata(filesystem):
     return metadata
 
 
-def verify_metadata_lake(model, lake):
-    return True
-
-
 def get_metadata_lake(filesystem, model, lake):
     path = os.path.join(os.path.join(filesystem, "media/simulations", model, "results", lake))
     files = os.listdir(path)
@@ -113,40 +109,10 @@ class Lakes(str, Enum):
 
 
 class Parameters(str, Enum):
-    geometry = "geometry"
     temperature = "temperature"
     velocity = "velocity"
+    geometry = "geometry"
     thermocline = "thermocline"
-
-
-def verify_simulations_layer(model, lake, datetime, depth):
-    return True
-
-
-def verify_simulations_layer_alplakes(model, lake, parameter, start, end, depth):
-    return True
-
-def verify_simulations_point(model, lake, start, end, depth, latitude, longitude):
-    return True
-
-def verify_simulations_profile(model, lake, dt, latitude, longitude):
-    return True
-
-
-def verify_simulations_transect(model, lake, dt, latitude_list, longitude_list):
-    return True
-
-
-def verify_simulations_transect_period(model, lake, start, end, latitude_list, longitude_list):
-    return True
-
-
-def verify_simulations_depthtime(model, lake, start, end, latitude, longitude):
-    return True
-
-
-def verify_simulations_file(model, lake, sunday):
-    return True
 
 
 def get_simulations_file(filesystem, model, lake, sunday):
@@ -155,7 +121,7 @@ def get_simulations_file(filesystem, model, lake, sunday):
         return FileResponse(path, media_type="application/nc", filename="{}_{}_{}.nc".format(model, lake, sunday))
     else:
         raise HTTPException(status_code=400,
-                            detail="Apologies data is not available for {} on {}".format(model, sunday))
+                            detail="Apologies data is not available for {} on the week beginning {}".format(model, sunday))
 
 
 def get_simulations_layer(filesystem, model, lake, time, depth):
@@ -387,9 +353,9 @@ def get_simulations_transect_delft3dflow(filesystem, lake, dt, latitude_str, lon
     latitude_list = [float(x) for x in latitude_str.replace(" ", "").split(",")]
     longitude_list = [float(x) for x in longitude_str.replace(" ", "").split(",")]
 
-    if len(latitude_list) < 2 or len(latitude_list) != len(longitude_list):
+    if len(latitude_list) != len(longitude_list):
         raise HTTPException(status_code=400,
-                            detail="At least two valid points should be provided.")
+                            detail="Latitude list and longitude list are not the same length.")
 
     lakes = os.path.join(filesystem, "media/simulations", model, "results")
     if not os.path.isdir(os.path.join(lakes, lake)):

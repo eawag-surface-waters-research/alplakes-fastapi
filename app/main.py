@@ -1,11 +1,11 @@
-from fastapi import FastAPI, Query, BackgroundTasks, HTTPException
-from fastapi.responses import RedirectResponse, PlainTextResponse, StreamingResponse
+from fastapi import FastAPI, Query, Request, Depends, Path
+from fastapi.responses import RedirectResponse, PlainTextResponse, JSONResponse
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 
 import sentry_sdk
 
-from app import simulations, meteoswiss, bafu, remotesensing
+from app import simulations, meteoswiss, bafu, remotesensing, validate
 
 import os
 
@@ -19,17 +19,13 @@ origins = [
     "https://master.d1x767yafo35xy.amplifyapp.com"
 ]
 
-tags_metadata = [
-    {
-        "name": "meteoswiss",
-        "description": "Geographical coverage [45.04116, 4.155702] to [47.98, 11.314313]",
-    }
-]
-
 app = FastAPI(
     title="Alplakes API",
-    description="API for the Alplakes project.",
-    version="0.0.1",
+    description="Alplakes API provides researchers and the public programmatic access to "
+                "historical and forecasted simulation data from lakes across the alpine region. The API supports both "
+                "geospatial and temporal queries. It is the backend for the website www.alplakes.eawag.ch. For bug "
+                "reports, collaborations or requests please get in touch.",
+    version="1.0.0",
     contact={
         "name": "James Runnalls",
         "email": "james.runnalls@eawag.ch",
@@ -37,7 +33,7 @@ app = FastAPI(
     license_info={
         "name": "Apache 2.0",
         "url": "https://www.apache.org/licenses/LICENSE-2.0.html",
-    },
+    }
 )
 
 app.add_middleware(
@@ -57,6 +53,14 @@ if os.getenv('EXTERNAL') is not None:
     internal = False
 
 
+@app.exception_handler(ValueError)
+async def value_error_exception_handler(request: Request, exc: ValueError):
+    return JSONResponse(
+        status_code=500,
+        content={"message": "Server processing error - please check your inputs. The developer has been notified, for "
+                            "updates on bug fixes please contact James Runnalls (james.runnall@eawag.ch)"})
+
+
 @app.get("/")
 def welcome():
     return {"Welcome to the Alplakes API from Eawag. Navigate to /docs or /redoc for documentation. For "
@@ -71,86 +75,77 @@ if internal:
         """
         return meteoswiss.get_cosmo_metadata(filesystem)
 
-    @app.get("/meteoswiss/cosmo/area/reanalysis/{model}/{start_date}/{end_date}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}",
-             tags=["Meteoswiss"])
-    async def meteoswiss_cosmo_area_reanalysis(model: meteoswiss.CosmoReanalysis, start_date: str, end_date: str,
-                                               ll_lat: float,
-                                               ll_lng: float, ur_lat: float, ur_lng: float,
-                                               variables: list[str] = Query(
-                                                   default=["T_2M", "U", "V", "GLOB", "RELHUM_2M", "PMSL", "CLCT"])):
+    @app.get("/meteoswiss/cosmo/area/reanalysis/{model}/{start_date}/{end_date}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}", tags=["Meteoswiss"])
+    async def meteoswiss_cosmo_area_reanalysis(model: meteoswiss.CosmoReanalysis,
+                                               start_date: str = validate.path_date(description="The start date in YYYYmmdd format"),
+                                               end_date: str = validate.path_date(description="The end date in YYYYmmdd format"),
+                                               ll_lat: float = validate.path_latitude(example="46.49", description="Latitude of lower left corner of bounding box (WGS 84)"),
+                                               ll_lng: float = validate.path_longitude(example="6.65", description="Longitude of lower left corner of bounding box (WGS 84)"),
+                                               ur_lat: float = validate.path_latitude(example="46.51", description="Latitude of upper right corner of bounding box (WGS 84)"),
+                                               ur_lng: float = validate.path_longitude(example="6.67", description="Longitude of upper right corner of bounding box (WGS 84)"),
+                                               variables: list[str] = Query(default=["T_2M", "U", "V", "GLOB", "RELHUM_2M", "PMSL", "CLCT"])):
         """
-        Weather data from MeteoSwiss COSMO reanalysis for a rectangular area:
-        - **cosmo**: select a COSMO product
-            - VNXQ34 (reanalysis): Cosmo-1e 1 day deterministic
-            - VNJK21 (reanalysis): Cosmo-1e 1 day ensemble forecast
-        - **start_date**: start date "YYYYMMDD"
-        - **end_date**: end date "YYYYMMDD"
-        - **ll_lat**: Latitude of lower left corner of bounding box (WGS 84)
-        - **ll_lng**: Longitude of lower left corner of bounding box (WGS 84)
-        - **ur_lat**: Latitude of upper right corner of bounding box (WGS 84)
-        - **ur_lng**: Longitude of upper right corner of bounding box (WGS 84)
-        """
-        meteoswiss.verify_cosmo_area_reanalysis(model, variables, start_date, end_date, ll_lat, ll_lng, ur_lat, ur_lng)
-        return meteoswiss.get_cosmo_area_reanalysis(filesystem, model, variables, start_date, end_date, ll_lat, ll_lng,
-                                                    ur_lat,
-                                                    ur_lng)
+        Weather data from MeteoSwiss COSMO reanalysis for a rectangular bounding box.
 
-    @app.get("/meteoswiss/cosmo/area/forecast/{model}/{forecast_date}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}",
-             tags=["Meteoswiss"])
-    async def meteoswiss_cosmo_area_forecast(model: meteoswiss.CosmoForecast, forecast_date: str,
-                                             ll_lat: float, ll_lng: float, ur_lat: float, ur_lng: float,
-                                             variables: list[str] = Query(
-                                                 default=["T_2M_MEAN", "U_MEAN", "V_MEAN", "GLOB_MEAN", "RELHUM_2M_MEAN",
-                                                          "PMSL_MEAN", "CLCT_MEAN"])):
+        Available models:
+        - VNXQ34 (reanalysis): Cosmo-1e 1 day deterministic
+        - VNJK21 (reanalysis): Cosmo-1e 1 day ensemble forecast
         """
-        Weather data from MeteoSwiss COSMO forecasts for a rectangular area:
-        - **cosmo**: select a COSMO product
-            - VNXQ94 (forecast): Cosmo-1e 33 hour ensemble forecast
-            - VNXZ32 (forecast): Cosmo-2e 5 day ensemble forecast
-        - **forecast_date**: date of forecast "YYYYMMDD"
-        - **ll_lat**: latitude of lower left corner of bounding box (WGS 84)
-        - **ll_lng**: longitude of lower left corner of bounding box (WGS 84)
-        - **ur_lat**: latitude of upper right corner of bounding box (WGS 84)
-        - **ur_lng**: longitude of upper right corner of bounding box (WGS 84)
+        validate.date_range(start_date, end_date)
+        return meteoswiss.get_cosmo_area_reanalysis(filesystem, model, variables, start_date, end_date, ll_lat, ll_lng, ur_lat, ur_lng)
+
+    @app.get("/meteoswiss/cosmo/area/forecast/{model}/{forecast_date}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}", tags=["Meteoswiss"])
+    async def meteoswiss_cosmo_area_forecast(model: meteoswiss.CosmoForecast,
+                                             forecast_date: str = validate.path_date(description="The forecast date in YYYYmmdd format"),
+                                             ll_lat: float = validate.path_latitude(example="46.49", description="Latitude of lower left corner of bounding box (WGS 84)"),
+                                             ll_lng: float = validate.path_longitude(example="6.65", description="Longitude of lower left corner of bounding box (WGS 84)"),
+                                             ur_lat: float = validate.path_latitude(example="46.51", description="Latitude of upper right corner of bounding box (WGS 84)"),
+                                             ur_lng: float = validate.path_longitude(example="6.67", description="Longitude of upper right corner of bounding box (WGS 84)"),
+                                             variables: list[str] = Query(default=["T_2M_MEAN", "U_MEAN", "V_MEAN", "GLOB_MEAN", "RELHUM_2M_MEAN", "PMSL_MEAN", "CLCT_MEAN"])):
         """
-        meteoswiss.verify_cosmo_area_forecast(model, variables, forecast_date, ll_lat, ll_lng, ur_lat, ur_lng)
-        return meteoswiss.get_cosmo_area_forecast(filesystem, model, variables, forecast_date, ll_lat, ll_lng, ur_lat,
-                                                  ur_lng)
+        Weather data from MeteoSwiss COSMO forecasts for a rectangular bounding box.
+
+        Available models:
+        - VNXZ32 (forecast): Cosmo-2e 5 day ensemble forecast
+        - VNXQ94 (forecast): Cosmo-1e 33 hour ensemble forecast
+        """
+        validate.date(forecast_date)
+        return meteoswiss.get_cosmo_area_forecast(filesystem, model, variables, forecast_date, ll_lat, ll_lng, ur_lat, ur_lng)
 
     @app.get("/meteoswiss/cosmo/point/reanalysis/{model}/{start_date}/{end_date}/{lat}/{lng}", tags=["Meteoswiss"])
-    async def meteoswiss_cosmo_point_reanalysis(model: meteoswiss.CosmoReanalysis, start_date: str, end_date: str,
-                                                lat: float, lng: float,
-                                                variables: list[str] = Query(
-                                                    default=["T_2M", "U", "V", "GLOB", "RELHUM_2M", "PMSL", "CLCT"])):
+    async def meteoswiss_cosmo_point_reanalysis(model: meteoswiss.CosmoReanalysis,
+                                                start_date: str = validate.path_date(description="The start date in YYYYmmdd format"),
+                                                end_date: str = validate.path_date(description="The end date in YYYYmmdd format"),
+                                                lat: float = validate.path_latitude(),
+                                                lng: float = validate.path_longitude(),
+                                                variables: list[str] = Query(default=["T_2M", "U", "V", "GLOB", "RELHUM_2M", "PMSL", "CLCT"])):
         """
-        Weather data from MeteoSwiss COSMO reanalysis for a single point:
-        - **cosmo**: select a COSMO product
-            - VNXQ34 (reanalysis): Cosmo-1e 1 day deterministic
-            - VNJK21 (reanalysis): Cosmo-1e 1 day ensemble forecast
-        - **start_date**: start date "YYYYMMDD"
-        - **end_date**: end date "YYYYMMDD"
-        - **lat**: Latitude of point (WGS 84)
-        - **lng**: Longitude of point (WGS 84)
+        Weather data from MeteoSwiss COSMO reanalysis for a single point.
+
+        Available models:
+        - VNXQ34 (reanalysis): Cosmo-1e 1 day deterministic
+        - VNJK21 (reanalysis): Cosmo-1e 1 day ensemble forecast
+
         """
-        meteoswiss.verify_cosmo_point_reanalysis(model, variables, start_date, end_date, lat, lng)
+        validate.date_range(start_date, end_date)
         return meteoswiss.get_cosmo_point_reanalysis(filesystem, model, variables, start_date, end_date, lat, lng)
 
     @app.get("/meteoswiss/cosmo/point/forecast/{model}/{forecast_date}/{lat}/{lng}", tags=["Meteoswiss"])
-    async def meteoswiss_cosmo_point_forecast(model: meteoswiss.CosmoForecast, forecast_date: str,
-                                              lat: float, lng: float,
+    async def meteoswiss_cosmo_point_forecast(model: meteoswiss.CosmoForecast,
+                                              forecast_date: str = validate.path_date(description="The forecast date in YYYYmmdd format"),
+                                              lat: float = validate.path_latitude(),
+                                              lng: float = validate.path_longitude(),
                                               variables: list[str] = Query(
                                                   default=["T_2M_MEAN", "U_MEAN", "V_MEAN", "GLOB_MEAN", "RELHUM_2M_MEAN",
                                                            "PMSL_MEAN", "CLCT_MEAN"])):
         """
-        Weather data from MeteoSwiss COSMO forecasts for a single point:
-        - **cosmo**: select a COSMO product
-            - VNXQ94 (forecast): Cosmo-1e 33 hour ensemble forecast
-            - VNXZ32 (forecast): Cosmo-2e 5 day ensemble forecast
-        - **forecast_date**: date of forecast "YYYYMMDD"
-        - **lat**: latitude of point (WGS 84)
-        - **lng**: longitude of point (WGS 84)
+        Weather data from MeteoSwiss COSMO forecasts for a single point.
+
+        Available models:
+        - VNXQ94 (forecast): Cosmo-1e 33 hour ensemble forecast
+        - VNXZ32 (forecast): Cosmo-2e 5 day ensemble forecast
         """
-        meteoswiss.verify_cosmo_point_forecast(model, variables, forecast_date, lat, lng)
+        validate.date(forecast_date)
         return meteoswiss.get_cosmo_point_forecast(filesystem, model, variables, forecast_date, lat, lng)
 
     @app.get("/meteoswiss/meteodata/metadata", tags=["Meteoswiss"])
@@ -161,22 +156,23 @@ if internal:
         return RedirectResponse("https://alplakes-eawag.s3.eu-central-1.amazonaws.com/static/meteoswiss/meteoswiss_meteodata.json")
 
     @app.get("/meteoswiss/meteodata/measured/{station_id}/{parameter}/{start_date}/{end_date}", tags=["Meteoswiss"])
-    async def meteoswiss_meteodata_measured(station_id: str, parameter: meteoswiss.MeteodataParameters, start_date: str, end_date: str):
+    async def meteoswiss_meteodata_measured(station_id: str = Path(..., regex=r"^[a-zA-Z]{3}$", title="Station ID", example="ABO", description="3 digit station identification code"),
+                                            parameter: meteoswiss.MeteodataParameters = Path(..., title="Parameter", description="Meteoswiss parameter"),
+                                            start_date: str = validate.path_date(description="The start date in YYYYmmdd format"),
+                                            end_date: str = validate.path_date(description="The end date in YYYYmmdd format")):
         """
-        Measured meteodata from Meteoswiss:
-        - **station_id**: 3 digit station identification code
-        - **parameter**: parameter to retrieve
-            - pva200h0 (hPa): Vapour pressure 2 m above ground; hourly mean
-            - gre000h0 (W/m²): Global radiation; hourly mean
-            - tre200h0 (°C): Air temperature 2 m above ground; hourly mean
-            - rre150h0 (mm): Precipitation; hourly total
-            - fkl010h0 (m/s): Wind speed scalar; hourly mean
-            - dkl010h0 (°): Wind direction; hourly mean
-            - nto000d0 (%): Cloud cover; daily mean
-        - **start_date**: start date "YYYYMMDD"
-        - **end_date**: end date "YYYYMMDD"
+        Meteorological data from the automatic measuring network of MeteoSwiss.
+
+        Available parameters:
+        - pva200h0 (hPa): Vapour pressure 2 m above ground; hourly mean
+        - gre000h0 (W/m²): Global radiation; hourly mean
+        - tre200h0 (°C): Air temperature 2 m above ground; hourly mean
+        - rre150h0 (mm): Precipitation; hourly total
+        - fkl010h0 (m/s): Wind speed scalar; hourly mean
+        - dkl010h0 (°): Wind direction; hourly mean
+        - nto000d0 (%): Cloud cover; daily mean
         """
-        meteoswiss.verify_meteodata_measured(station_id, parameter, start_date, end_date)
+        validate.date_range(start_date, end_date)
         return meteoswiss.get_meteodata_measured(filesystem, station_id, parameter, start_date, end_date)
 
 if internal:
@@ -188,28 +184,31 @@ if internal:
         return RedirectResponse("https://alplakes-eawag.s3.eu-central-1.amazonaws.com/static/bafu/bafu_hydrodata.json")
 
     @app.get("/bafu/hydrodata/measured/{station_id}/{parameter}/{start_date}/{end_date}", tags=["Bafu"])
-    async def bafu_hydrodata_measured(station_id: int, parameter: str, start_date: str, end_date: str):
+    async def bafu_hydrodata_measured(station_id: str = Path(..., regex=r"^\d{4}$", title="Station ID", example=2009, description="4 digit station identification code"),
+                                      parameter: str = Path(..., title="Parameter", example="AbflussPneumatikunten", description="Parameter"),
+                                      start_date: str = validate.path_date(description="The start date in YYYYmmdd format"),
+                                      end_date: str = validate.path_date(description="The end date in YYYYmmdd format")):
         """
-        Measured hydrodata from Bafu:
-        - **station_id**: 4 digit station identification code
-        - **parameter**: parameter to retrieve (get list from /bafu/hydrodata/metadata)
-        - **start_date**: start date "YYYYMMDD"
-        - **end_date**: end date "YYYYMMDD"
+        Hydrological data from the automatic measuring network of Bafu.
+
+        All station id's and the available parameters can be access from the metadata endpoint.
         """
-        bafu.verify_hydrodata_measured(station_id, parameter, start_date, end_date)
+        validate.date_range(start_date, end_date)
         return bafu.get_hydrodata_measured(filesystem, station_id, parameter, start_date, end_date)
 
     @app.get("/bafu/hydrodata/predicted/{status}/{station_id}/{model}", tags=["Bafu"])
-    async def bafu_hydrodata_predicted(status: bafu.HydrodataPredicted, station_id: int, model: str):
+    async def bafu_hydrodata_predicted(status: bafu.HydrodataPredicted = Path(..., title="Status", description="Publication status"),
+                                       station_id: str = Path(..., regex=r"^\d{4}$", title="Station ID", example=2009, description="4 digit station identification code"),
+                                       model: str = Path(..., title="Model", description="Predictive model", example="C1E_Med")):
         """
-        Predicted hydrodata from Bafu:
-        - **status**:
-            - official: pqprevi-official
-            - unofficial: pqprevi-unofficial
-        - **station_id**: 4 digit station identification code
-        - **model**: model to retrieve (get list from /bafu/hydrodata/metadata)
+        Hydrological predictions from the Bafu predictive river models. Data is only available for the most recent prediction.
+
+        All station id's and the available parameters can be access from the metadata endpoint.
+
+        Publication status:
+        - unofficial: pqprevi-unofficial
+        - official: pqprevi-official
         """
-        bafu.verify_hydrodata_predicted(status, station_id, model)
         return bafu.get_hydrodata_predicted(filesystem, status, station_id, model)
 
     @app.get("/bafu/hydrodata/total_lake_inflow/metadata", tags=["Bafu"])
@@ -220,166 +219,159 @@ if internal:
         return bafu.metadata_hydrodata_total_lake_inflow(filesystem)
 
     @app.get("/bafu/hydrodata/total_lake_inflow/{lake}/{parameter}/{start_date}/{end_date}", tags=["Bafu"])
-    async def bafu_hydrodata_total_lake_inflow(lake, parameter: str, start_date: str, end_date: str):
+    async def bafu_hydrodata_total_lake_inflow(lake: str = Path(..., title="Lake", example="Lac_Leman", description="Lake name"),
+                                               parameter: str = Path(..., title="Parameter", example="C1E_Med", description="Parameter"),
+                                               start_date: str = validate.path_date(description="The start date in YYYYmmdd format"),
+                                               end_date: str = validate.path_date(description="The end date in YYYYmmdd format")):
         """
-        Predicted total lake inflow from Bafu:
-        - **lake**: lake name
-        - **parameter**: parameter to retrieve (get list from /bafu/hydrodata/total_lake_inflow)
+        Predicted total lake inflow from Bafu.
         """
-        bafu.verify_hydrodata_total_lake_inflow(lake, parameter, start_date, end_date)
+        validate.date_range(start_date, end_date)
         return bafu.get_hydrodata_total_lake_inflow(filesystem, lake, parameter, start_date, end_date)
 
 
 @app.get("/simulations/metadata", tags=["Simulations"])
 async def simulations_metadata():
     """
-    JSON of all the available Simulation data.
+    JSON of all the available simulation data.
     """
     return simulations.get_metadata(filesystem)
 
 
 @app.get("/simulations/metadata/{model}/{lake}", tags=["Simulations"])
-async def simulations_metadata_lake(model: simulations.Models, lake: simulations.Lakes):
+async def simulations_metadata_lake(model: simulations.Models = Path(..., title="Model", description="Model name"),
+                                    lake: simulations.Lakes = Path(..., title="Lake", description="Lake name")):
     """
-    JSON of the available Simulation data.
+    JSON of the available simulation data for a specific lake and model.
     """
-    simulations.verify_metadata_lake(model, lake)
     return simulations.get_metadata_lake(filesystem, model, lake)
 
 
 @app.get("/simulations/file/{model}/{lake}/{sunday}", tags=["Simulations"])
-async def simulations_file(model: simulations.Models, lake: simulations.Lakes, sunday: str):
+async def simulations_file(model: simulations.Models = Path(..., title="Model", description="Model name"),
+                           lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
+                           sunday: str = validate.path_date(description="The Sunday in YYYYmmdd format")):
     """
-    Simulation file for a given lake simulation for the selected week:
-    - **model**: model name
-    - **lake**: lake name
-    - **sunday**: YYYYmmdd (UTC) always a sunday.
+    NetCDF simulation results for a one-week period.
+
+    Weeks are specified by providing the date (YYYYmmdd) for the Sunday proceeding the desired week.
     """
-    simulations.verify_simulations_file(model, lake, sunday)
+    validate.sunday(sunday)
     return simulations.get_simulations_file(filesystem, model, lake, sunday)
 
 
-@app.get("/simulations/point/{model}/{lake}/{start}/{end}/{depth}/{latitude}/{longitude}", tags=["Simulations"])
-async def simulations_point(model: simulations.Models, lake: simulations.Lakes, start: str, end: str, depth: float,
-                            latitude: float, longitude: float):
+@app.get("/simulations/point/{model}/{lake}/{start_time}/{end_time}/{depth}/{lat}/{lng}", tags=["Simulations"])
+async def simulations_point(model: simulations.Models = Path(..., title="Model", description="Model name"),
+                            lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
+                            start_time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202309050300"),
+                            end_time: str = validate.path_time(description="The end time in YYYYmmddHHMM format (UTC)", example="202309072300"),
+                            depth: float = validate.path_depth(),
+                            lat: float = validate.path_latitude(),
+                            lng: float = validate.path_longitude()):
     """
-    Data for a given lake simulation at a specific time and location:
-    - **model**: model name
-    - **lake**: lake name
-    - **start**: YYYYmmddHHMM (UTC) e.g. 9am 6th December 2022 > 202212060900
-    - **end**: YYYYmmddHHMM (UTC) e.g. 9am 6th December 2022 > 202212060900
-    - **depth**: depth of layer in meters
-    - **latitude**: Latitude (WGS84)
-    - **longitude**: Longitude (WGS84)
+    Simulated timeseries of temperature and velocity for a given location and depth.
     """
-    simulations.verify_simulations_point(model, lake, start, end, depth, latitude, longitude)
-    return simulations.get_simulations_point(filesystem, model, lake, start, end, depth, latitude, longitude)
+    validate.time_range(start_time, end_time)
+    return simulations.get_simulations_point(filesystem, model, lake, start_time, end_time, depth, lat, lng)
 
 
 @app.get("/simulations/layer/{model}/{lake}/{time}/{depth}", tags=["Simulations"])
-async def simulations_layer(model: simulations.Models, lake: simulations.Lakes, time: str, depth: float):
+async def simulations_layer(model: simulations.Models = Path(..., title="Model", description="Model name"),
+                            lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
+                            time: str = validate.path_time(),
+                            depth: float = validate.path_depth()):
     """
-    Simulations results for a given lake simulation at a specific depth and time:
-    - **model**: model name
-    - **lake**: lake name
-    - **time**: YYYYmmddHHMM (UTC) e.g. 9am 6th December 2022 > 202212060900
-    - **depth**: depth of layer in meters
+    Simulated temperature and velocity for a depth layer at a specific time.
     """
-    simulations.verify_simulations_layer(model, lake, time, depth)
+    validate.time(time)
     return simulations.get_simulations_layer(filesystem, model, lake, time, depth)
 
 
-@app.get("/simulations/layer_alplakes/{model}/{lake}/{parameter}/{start}/{end}/{depth}", tags=["Simulations"],
+@app.get("/simulations/layer_alplakes/{model}/{lake}/{parameter}/{start_time}/{end_time}/{depth}", tags=["Simulations"],
          response_class=PlainTextResponse)
-async def simulations_layer_alplakes(model: simulations.Models, lake: simulations.Lakes,
-                                     parameter: simulations.Parameters, start: str, end: str, depth: float):
+async def simulations_layer_alplakes(model: simulations.Models = Path(..., title="Model", description="Model name"),
+                                     lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
+                                     parameter: simulations.Parameters = Path(..., title="Parameter", description="Parameter"),
+                                     start_time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202309050300"),
+                                     end_time: str = validate.path_time(description="The end time in YYYYmmddHHMM format (UTC)", example="202309072300"),
+                                     depth: float = validate.path_depth()):
     """
-    Parameters for a given lake simulation at a depth for period of time, formatted for the Alplakes website:
-    - **model**: model name
-    - **lake**: lake name
-    - **parameter**: parameter name
-    - **start**: YYYYmmddHHMM (UTC) e.g. 9am 6th December 2022 > 202212060900
-    - **end**: YYYYmmddHHMM (UTC) e.g. 9am 6th December 2022 > 202212060900
-    - **depth**: depth of layer in meters
+    Simulated temperature and velocity for a depth layer over a specific time range.
+
+    **Warning:** This endpoint is designed for supplying data to the Alplakes website. The output is **not** self-explanatory.
     """
-    simulations.verify_simulations_layer_alplakes(model, lake, parameter, start, end, depth)
-    return simulations.get_simulations_layer_alplakes(filesystem, model, lake, parameter, start, end, depth)
+    validate.time_range(start_time, end_time)
+    return simulations.get_simulations_layer_alplakes(filesystem, model, lake, parameter, start_time, end_time, depth)
 
 
-@app.get("/simulations/layer/average_temperature/{model}/{lake}/{start}/{end}/{depth}", tags=["Simulations"])
-async def simulations_layer_average_temperature(model: simulations.Models, lake: simulations.Lakes,
-                                                start: str, end: str, depth: float):
+@app.get("/simulations/layer/average_temperature/{model}/{lake}/{start_time}/{end_time}/{depth}", tags=["Simulations"])
+async def simulations_layer_average_temperature(model: simulations.Models = Path(..., title="Model", description="Model name"),
+                                                lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
+                                                start_time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202309050300"),
+                                                end_time: str = validate.path_time(description="The end time in YYYYmmddHHMM format (UTC)", example="202309072300"),
+                                                depth: float = validate.path_depth()):
     """
-    Parameters for a given lake simulation at a depth for period of time, formatted for the Alplakes website:
-    - **model**: model name
-    - **lake**: lake name
-    - **start**: YYYYmmddHHMM (UTC) e.g. 9am 6th December 2022 > 202212060900
-    - **end**: YYYYmmddHHMM (UTC) e.g. 9am 6th December 2022 > 202212060900
-    - **depth**: depth of layer in meters
+    Timeseries of geospatial average temperature at a given depth. Temperature is in °C.
     """
-    return simulations.get_simulations_layer_average_temperature(filesystem, model, lake, start, end, depth)
+    validate.time_range(start_time, end_time)
+    return simulations.get_simulations_layer_average_temperature(filesystem, model, lake, start_time, end_time, depth)
 
 
-@app.get("/simulations/profile/{model}/{lake}/{datetime}/{latitude}/{longitude}", tags=["Simulations"])
-async def simulations_profile(model: simulations.Models, lake: simulations.Lakes, datetime: str, latitude: float,
-                              longitude: float):
+@app.get("/simulations/profile/{model}/{lake}/{time}/{lat}/{lng}", tags=["Simulations"])
+async def simulations_profile(model: simulations.Models = Path(..., title="Model", description="Model name"),
+                              lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
+                              time: str = validate.path_time(),
+                              lat: float = validate.path_latitude(),
+                              lng: float = validate.path_longitude()):
     """
-    Profile for a given lake simulation at a specific time and location:
-    - **model**: model name
-    - **lake**: lake name
-    - **datetime**: YYYYmmddHHMM (UTC) e.g. 9am 6th December 2022 > 202212060900
-    - **latitude**: Latitude (WGS84)
-    - **longitude**: Longitude (WGS84)
+    Vertical profile for a specific time and location.
     """
-    simulations.verify_simulations_profile(model, lake, datetime, latitude, longitude)
-    return simulations.get_simulations_profile(filesystem, model, lake, datetime, latitude, longitude)
+    validate.time(time)
+    return simulations.get_simulations_profile(filesystem, model, lake, time, lat, lng)
 
 
-@app.get("/simulations/transect/{model}/{lake}/{datetime}/{latitude_list}/{longitude_list}", tags=["Simulations"])
-async def simulations_transect(model: simulations.Models, lake: simulations.Lakes, datetime: str, latitude_list: str,
-                               longitude_list: str):
+@app.get("/simulations/transect/{model}/{lake}/{time}/{lats}/{lngs}", tags=["Simulations"])
+async def simulations_transect(model: simulations.Models = Path(..., title="Model", description="Model name"),
+                               lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
+                               time: str = validate.path_time(),
+                               lats: str = Path(..., title="Lats", description="Comma separated list of latitudes (WGS84), minimum 2", example="46.37,46.54"),
+                               lngs: str = Path(..., title="Lngs", description="Comma separated list of longitudes (WGS84), minimum 2", example="6.56,6.54")):
     """
-    Transect for a given lake simulation at a specific time:
-    - **model**: model name
-    - **lake**: lake name
-    - **datetime**: YYYYmmddHHMM (UTC) e.g. 9am 6th December 2022 > 202212060900
-    - **latitude_list**: Comma separated list of latitude (WGS84) values (minimum 2) e.g. /46.37,46.54/
-    - **longitude_list**: Comma separated list of longitude (WGS84) values (minimum 2) e.g. /6.56,6.54/
+    Lake transect at a specific time. Distance is in meters.
     """
-    simulations.verify_simulations_transect(model, lake, datetime, latitude_list, longitude_list)
-    return simulations.get_simulations_transect(filesystem, model, lake, datetime, latitude_list, longitude_list)
+    validate.latitude_list(lats)
+    validate.longitude_list(lngs)
+    return simulations.get_simulations_transect(filesystem, model, lake, time, lats, lngs)
 
 
-@app.get("/simulations/transect/{model}/{lake}/{start}/{end}/{latitude_list}/{longitude_list}", tags=["Simulations"])
-async def simulations_transect_period(model: simulations.Models, lake: simulations.Lakes, start: str, end: str,
-                                      latitude_list: str, longitude_list: str):
+@app.get("/simulations/transect/{model}/{lake}/{start_time}/{end_time}/{lats}/{lngs}", tags=["Simulations"])
+async def simulations_transect_period(model: simulations.Models = Path(..., title="Model", description="Model name"),
+                                      lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
+                                      start_time: str = validate.path_time( description="The start time in YYYYmmddHHMM format (UTC)", example="202309050300"),
+                                      end_time: str = validate.path_time( description="The end time in YYYYmmddHHMM format (UTC)", example="202309072300"),
+                                      lats: str = Path(..., title="Lats", description="Comma separated list of latitudes (WGS84), minimum 2", example="46.37,46.54"),
+                                      lngs: str = Path(..., title="Lngs", description="Comma separated list of longitudes (WGS84), minimum 2", example="6.56,6.54")):
     """
-    Transect for a given lake simulation over a given period:
-    - **model**: model name
-    - **lake**: lake name
-    - **start**: YYYYmmddHHMM (UTC) e.g. 9am 6th December 2022 > 202212060900
-    - **end**: YYYYmmddHHMM (UTC) e.g. 9am 6th December 2022 > 202212060900
-    - **latitude_list**: Comma separated list of latitude (WGS84) values (minimum 2) e.g. /46.37,46.54/
-    - **longitude_list**: Comma separated list of longitude (WGS84) values (minimum 2) e.g. /6.56,6.54/
+    Lake transect over a specific period. Distance is in meters.
     """
-    simulations.verify_simulations_transect_period(model, lake, start, end, latitude_list, longitude_list)
-    return simulations.get_simulations_transect_period(filesystem, model, lake, start, end, latitude_list, longitude_list)
+    validate.latitude_list(lats)
+    validate.longitude_list(lngs)
+    validate.time_range(start_time, end_time)
+    return simulations.get_simulations_transect_period(filesystem, model, lake, start_time, end_time, lats, lngs)
 
 
-@app.get("/simulations/depthtime/{model}/{lake}/{start}/{end}/{latitude}/{longitude}", tags=["Simulations"])
-async def simulations_depth_time(model: simulations.Models, lake: simulations.Lakes, start: str, end: str,
-                                 latitude: float, longitude: float):
+@app.get("/simulations/depthtime/{model}/{lake}/{start_time}/{end_time}/{lat}/{lng}", tags=["Simulations"])
+async def simulations_depth_time(model: simulations.Models = Path(..., title="Model", description="Model name"),
+                                 lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
+                                 start_time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202309050300"),
+                                 end_time: str = validate.path_time(description="The end time in YYYYmmddHHMM format (UTC)", example="202309072300"),
+                                 lat: float = validate.path_latitude(),
+                                 lng: float = validate.path_longitude()):
     """
-    Depth time data for a specific location over a given time period:
-    - **model**: model name
-    - **lake**: lake name
-    - **start**: YYYYmmddHHMM (UTC) e.g. 9am 6th December 2022 > 202212060900
-    - **end**: YYYYmmddHHMM (UTC) e.g. 9am 6th December 2022 > 202212060900
-    - **latitude**: Latitude (WGS84)
-    - **longitude**: Longitude (WGS84)
+    Vertical profile for a specific period and location.
     """
-    simulations.verify_simulations_depthtime(model, lake, start, end, latitude, longitude)
-    return simulations.get_simulations_depthtime(filesystem, model, lake, start, end, latitude, longitude)
+    validate.time_range(start_time, end_time)
+    return simulations.get_simulations_depthtime(filesystem, model, lake, start_time, end_time, lat, lng)
 
 
 @app.get("/remotesensing/metadata", tags=["Remote Sensing"])
@@ -391,7 +383,9 @@ async def remote_sensing_metadata():
 
 
 @app.get("/remotesensing/products/{lake}/{satellite}/{parameter}", tags=["Remote Sensing"])
-async def remote_sensing_products(lake: str, satellite: str, parameter: str):
+async def remote_sensing_products(lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
+                                  satellite: remotesensing.Satellites = Path(..., title="Satellite", description="Satellite name"),
+                                  parameter: str = Path(..., title="Parameter", description="Parameter", example="chla")):
     """
     Metadata for full time series of remote sensing products for a given lake, satellite and parameter.
     See /remotesensing/metadata for input options.
