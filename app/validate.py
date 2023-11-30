@@ -34,10 +34,10 @@ def time(value):
     year = int(value[:4])
     month = int(value[4:6])
     day = int(value[6:8])
-    hour = int(value[6:8])
-    minute = int(value[6:8])
+    hour = int(value[8:10])
+    minute = int(value[10:12])
     if year < 1000 or month < 1 or month > 12 or day < 1 or day > 31 or hour < 0 or hour > 24 or minute < 0 or minute > 59:
-        raise HTTPException(status_code=400, detail="Invalid date format: {}".format(value))
+        raise HTTPException(status_code=400, detail="Invalid time format: {}".format(value))
 
 
 def date_range(start, end):
