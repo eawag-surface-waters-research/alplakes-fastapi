@@ -187,7 +187,11 @@ def get_cosmo_area_reanalysis(filesystem, model, variables, start_date, end_date
                                 detail="{} are bad variables for COSMO {}. Please select from: {}".format(
                                     ", ".join(bad_variables), model, ", ".join(ds.keys())))
         output["time"] = np.array(ds.variables["time"].values, dtype=str).tolist()
-        x, y = np.where(((ds.variables["lat_1"] >= ll_lat) & (ds.variables["lat_1"] <= ur_lat) & (
+        if len(ds.variables["lat_1"].shape) == 3:
+            x, y = np.where(((ds.variables["lat_1"][0] >= ll_lat) & (ds.variables["lat_1"][0] <= ur_lat) & (
+                ds.variables["lon_1"][0] >= ll_lng) & (ds.variables["lon_1"][0] <= ur_lng)))
+        else:
+            x, y = np.where(((ds.variables["lat_1"] >= ll_lat) & (ds.variables["lat_1"] <= ur_lat) & (
                 ds.variables["lon_1"] >= ll_lng) & (ds.variables["lon_1"] <= ur_lng)))
 
         if len(x) == 0:
@@ -195,8 +199,12 @@ def get_cosmo_area_reanalysis(filesystem, model, variables, start_date, end_date
                                 detail="Data not available for COSMO {} for the requested area.".format(model))
 
         x_min, x_max, y_min, y_max = min(x), max(x), min(y), max(y)
-        output["lat"] = ds.variables["lat_1"][x_min:x_max, y_min:y_max].values.tolist()
-        output["lng"] = ds.variables["lon_1"][x_min:x_max, y_min:y_max].values.tolist()
+        if len(ds.variables["lat_1"].shape) == 3:
+            output["lat"] = ds.variables["lat_1"][0, x_min:x_max, y_min:y_max].values.tolist()
+            output["lng"] = ds.variables["lon_1"][0, x_min:x_max, y_min:y_max].values.tolist()
+        else:
+            output["lat"] = ds.variables["lat_1"][x_min:x_max, y_min:y_max].values.tolist()
+            output["lng"] = ds.variables["lon_1"][x_min:x_max, y_min:y_max].values.tolist()
         for var in variables:
             if var in ds.variables.keys():
                 if len(ds.variables[var].dims) == 3:
@@ -244,9 +252,12 @@ def get_cosmo_point_reanalysis(filesystem, model, variables, start_date, end_dat
         dist = ((ds.variables["lat_1"] - lat) ** 2 + (ds.variables["lon_1"] - lng) ** 2) ** 0.5
         xy = np.unravel_index(dist.argmin(), dist.shape)
         x, y = xy[0], xy[1]
-        output["lat"] = float(ds.variables["lat_1"][x, y].values)
-        output["lng"] = float(ds.variables["lon_1"][x, y].values)
-
+        if len(ds.variables["lat_1"].shape) == 3:
+            output["lat"] = float(ds.variables["lat_1"][0, x, y].values)
+            output["lng"] = float(ds.variables["lon_1"][0, x, y].values)
+        else:
+            output["lat"] = float(ds.variables["lat_1"][x, y].values)
+            output["lng"] = float(ds.variables["lon_1"][x, y].values)
         for var in variables:
             if var in ds.variables.keys():
                 if len(ds.variables[var].dims) == 3:
