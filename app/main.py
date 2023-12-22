@@ -16,6 +16,8 @@ sentry_sdk.init(
 origins = [
     "http://localhost:3000",
     "https://www.alplakes.eawag.ch",
+    "https://www.datalakes-eawag.ch",
+    "https://www.datalakes.eawag.ch",
     "https://master.d1x767yafo35xy.amplifyapp.com"
 ]
 
