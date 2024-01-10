@@ -325,6 +325,20 @@ def latlng_to_projection(lat, lng, projection):
     return x, y
 
 
+def projection_to_latlng(x, y, projection):
+    x = np.array(x)
+    y = np.array(y)
+    if projection == "UTM":
+        lat, lng = utm_to_latlng(x, y, 32, zone_letter="T")
+    elif projection == "CH1903":
+        lat, lng = ch1903_to_latlng(x, y)
+    elif projection == "CH1903+":
+        lat, lng = ch1903_plus_to_latlng(x, y)
+    else:
+        raise ValueError('Projection {} unrecognised.'.format(projection))
+    return lat, lng
+
+
 def coordinates_to_latlng(x, y):
     x = np.asarray(x).astype(np.float64)
     y = np.asarray(y).astype(np.float64)

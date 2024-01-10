@@ -441,7 +441,6 @@ def get_simulations_transect_period(filesystem, model, lake, start, end, latitud
 
 def get_simulations_transect_period_delft3dflow(filesystem, lake, start, end, latitude_str, longitude_str, nodata=-999.0):
     model = "delft3d-flow"
-    output = {}
     latitude_list = [float(x) for x in latitude_str.replace(" ", "").split(",")]
     longitude_list = [float(x) for x in longitude_str.replace(" ", "").split(",")]
 
@@ -493,9 +492,18 @@ def get_simulations_transect_period_delft3dflow(filesystem, lake, start, end, la
             sp_arr = np.concatenate((sp_arr, sp), axis=0)
             vd_arr = np.concatenate((vd_arr, vd), axis=0)
 
-        idx = np.where(vd_arr == 0)[0]
         xi_arr = xi_arr.astype(int)
         yi_arr = yi_arr.astype(int)
+
+        lat_arr, lng_arr = functions.projection_to_latlng(x[xi_arr, yi_arr], y[xi_arr, yi_arr], projection)
+
+        output = {"lake": lake,
+                  "distance": functions.filter_parameter(sp_arr),
+                  "latitude": functions.filter_parameter(lat_arr, decimals=5),
+                  "longitude": functions.filter_parameter(lng_arr, decimals=5),
+                  }
+
+        idx = np.where(vd_arr == 0)[0]
 
         t_s = ds.R1.isel(M=xr.DataArray(xi_arr), N=xr.DataArray(yi_arr))
         t = t_s[:, 0, :].values
