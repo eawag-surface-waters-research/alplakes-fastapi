@@ -212,12 +212,12 @@ def line_segments(x1, y1, x2, y2, x, y, indexes, start, grid_spacing):
         t = i / (n - 1)
         xx = x1 + t * (x2 - x1)
         yy = y1 + t * (y2 - y1)
-        distance = np.full(x.shape, np.inf)
-        distance[indexes] = ((x[indexes] - xx)**2 + (y[indexes] - yy)**2)**0.5
-        x_i, y_i = np.unravel_index(np.nanargmin(distance), distance.shape)
+        distances = np.full(x.shape, np.inf)
+        distances[indexes] = ((x[indexes] - xx)**2 + (y[indexes] - yy)**2)**0.5
+        x_i, y_i = np.unravel_index(np.nanargmin(distances), distances.shape)
         x_index.append(x_i)
         y_index.append(y_i)
-        dists.append(distance[x_i, y_i])
+        dists.append(distances[x_i, y_i])
 
     df = pd.DataFrame(list(zip(x_index, y_index, dists, spacing)), columns=['xi', 'yi', 'dist', 'spacing'])
     df_temp = df.sort_values(['xi', 'yi', 'dist'])

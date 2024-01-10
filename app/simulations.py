@@ -439,7 +439,7 @@ def get_simulations_transect_period(filesystem, model, lake, start, end, latitud
                             detail="Apologies profile extraction not available for {}".format(model))
 
 
-def get_simulations_transect_period_delft3dflow(filesystem, lake, start, end, latitude_str, longitude_str, nodata=-999.0):
+def get_simulations_transect_period_delft3dflow(filesystem, lake, start, end, latitude_str, longitude_str, nodata=-999.0, velocity=False):
     model = "delft3d-flow"
     latitude_list = [float(x) for x in latitude_str.replace(" ", "").split(",")]
     longitude_list = [float(x) for x in longitude_str.replace(" ", "").split(",")]
@@ -516,19 +516,20 @@ def get_simulations_transect_period_delft3dflow(filesystem, lake, start, end, la
         t = t[:, index:, :]
         t[:, :, idx] = -999.
 
-        u_s = ds.U1.isel(MC=xr.DataArray(xi_arr), N=xr.DataArray(yi_arr))
-        v_s = ds.V1.isel(M=xr.DataArray(xi_arr), NC=xr.DataArray(yi_arr))
-        a_s = ds.ALFAS.isel(M=xr.DataArray(xi_arr), N=xr.DataArray(yi_arr))
-        a_e = a_s[:].values[:, np.newaxis, :]
-        u, v, = functions.rotate_velocity(u_s[:, index:, :].values, v_s[:, index:, :].values, a_e)
-        u[:, :, idx] = -999.
-        v[:, :, idx] = -999.
+        if velocity:
+            u_s = ds.U1.isel(MC=xr.DataArray(xi_arr), N=xr.DataArray(yi_arr))
+            v_s = ds.V1.isel(M=xr.DataArray(xi_arr), NC=xr.DataArray(yi_arr))
+            a_s = ds.ALFAS.isel(M=xr.DataArray(xi_arr), N=xr.DataArray(yi_arr))
+            a_e = a_s[:].values[:, np.newaxis, :]
+            u, v, = functions.rotate_velocity(u_s[:, index:, :].values, v_s[:, index:, :].values, a_e)
+            u[:, :, idx] = -999.
+            v[:, :, idx] = -999.
+            output["u"] = {"data": functions.filter_parameter(u, decimals=5), "unit": "m/s"}
+            output["v"] = {"data": functions.filter_parameter(u, decimals=5), "unit": "m/s"}
 
     output["time"] = functions.alplakes_time(ds.time[:].values, "nano").tolist()
     output["depth"] = {"data": functions.filter_parameter(depth), "unit": "m"}
     output["temperature"] = {"data": functions.filter_parameter(t), "unit": "degC"}
-    output["u"] = {"data": functions.filter_parameter(u, decimals=5), "unit": "m/s"}
-    output["v"] = {"data": functions.filter_parameter(u, decimals=5), "unit": "m/s"}
 
     return output
 
