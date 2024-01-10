@@ -69,6 +69,34 @@ conda activate fastapi
 uvicorn app.main:app --host 0.0.0.0 --reload
 ```
 
+## Run Tests
+
+Pytest can be directly run with FastAPI. Tests are located in the file `app/test_main.py`. 
+
+### Install pytest
+
+```console
+pip install pytest
+```
+
+### Download test files
+
+Test files need to be downloaded from "URL_TO_FOLLOW" into the `filesystem` folder. The folder structure should look like:
+```bash
+├── media
+│   ├── meteoswiss
+│   └── simulations
+├── .gitkeep               
+```
+### Run tests
+
+```console
+cd app
+pytest
+```
+
+
+
 ## Docker Commands
 
 ### Terminate containers

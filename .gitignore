@@ -1,5 +1,7 @@
-app/test.py
-.idea
-app/__pycache__
 .env
+.idea
+app/test.py
+app/__pycache__
 notebooks
+filesystem/*
+!filesystem/.gitkeep

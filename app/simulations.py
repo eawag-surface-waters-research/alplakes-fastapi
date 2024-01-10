@@ -8,6 +8,7 @@ from fastapi.responses import FileResponse
 from datetime import datetime, timedelta, timezone
 from dateutil.relativedelta import relativedelta, SU
 
+
 from app import functions
 
 
@@ -471,7 +472,10 @@ def get_simulations_transect_period_delft3dflow(filesystem, lake, start, end, la
         ds = ds.sel(time=slice(start_datetime, end_datetime))
         x = ds.XZ[:].values
         y = ds.YZ[:].values
-        z = ds.ZK_LYR[0, :].values * - 1
+        if len(ds.ZK_LYR.shape) == 2:
+            z = ds.ZK_LYR[0, :].values * - 1
+        else:
+            z = ds.ZK_LYR[:].values * - 1
         grid_spacing = functions.center_grid_spacing(x, y)
         projection = functions.identify_projection(np.max(x), np.max(y))
         if projection == "WGS84":

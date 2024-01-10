@@ -278,13 +278,22 @@ def average_grid_spacing(latitudes, longitudes):
     return avg_spacing * 1.5 * 1000
 
 
+def find_index(grid):
+    rows, cols = grid.shape
+    for i in range(rows - 1):
+        for j in range(cols - 1):
+            if (not np.isnan(grid[i, j])
+                    and not np.isnan(grid[i, j + 1])
+                    and not grid[i, j] == 0
+                    and not grid[i + 1, j + 1] == 0):
+                return i, j
+    raise ValueError("No valid grid cell available.")
+
+
 def center_grid_spacing(x, y):
-    center_row, center_col = x.shape[0] // 2, x.shape[1] // 2
-    if (np.isnan(x[center_row, center_col]) or x[center_row, center_col] == 0.0 or
-            np.isnan(x[center_row + 1, center_col + 1]) or x[center_row + 1, center_col + 1] == 0.0):
-        raise ValueError("Center of grid is not a valid cell.")
-    spacing = np.mean([abs(x[center_row + 1, center_col + 1] - x[center_row, center_col]),
-                      abs(y[center_row + 1, center_col + 1] - y[center_row, center_col])]) * 1.5
+    i, j = find_index(x)
+    spacing = np.mean([abs(x[i + 1, j + 1] - x[i, j]),
+                      abs(y[i + 1, j + 1] - y[i, j])]) * 1.5
     return spacing
 
 
