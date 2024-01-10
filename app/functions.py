@@ -203,6 +203,38 @@ def exact_line_segments(lat1, lng1, lat2, lng2, lat_grid, lng_grid, start, grid)
     return np.array(df["xi"]), np.array(df["yi"]), np.array(df["spacing"]), np.array(df["valid"]), distance * 1000
 
 
+def line_segments(x1, y1, x2, y2, x, y, indexes, start, grid_spacing):
+    distance = ((x1 - x2)**2 + (y1 - y2)**2)**0.5
+    n = math.ceil(distance / (grid_spacing / 2))
+    spacing = np.arange(n + 1) * (distance / n) + start
+    x_index, y_index, dists = [], [], []
+    for i in range(n + 1):
+        t = i / (n - 1)
+        xx = x1 + t * (x2 - x1)
+        yy = y1 + t * (y2 - y1)
+        distance = np.full(x.shape, np.inf)
+        distance[indexes] = ((x[indexes] - xx)**2 + (y[indexes] - yy)**2)**0.5
+        x_i, y_i = np.unravel_index(np.nanargmin(distance), distance.shape)
+        x_index.append(x_i)
+        y_index.append(y_i)
+        dists.append(distance[x_i, y_i])
+
+    df = pd.DataFrame(list(zip(x_index, y_index, dists, spacing)), columns=['xi', 'yi', 'dist', 'spacing'])
+    df_temp = df.sort_values(['xi', 'yi', 'dist'])
+    df_temp = df_temp.drop_duplicates(['xi', 'yi'], keep='first')
+
+    if not df.iloc[0].equals(df_temp.iloc[0]):
+        df_temp = pd.concat([df.iloc[[0]], df_temp], ignore_index=True)
+
+    if not df.iloc[-1].equals(df_temp.iloc[-1]):
+        df_temp = pd.concat([df.iloc[[-1]], df_temp], ignore_index=True)
+    df = df_temp.sort_values(['spacing'])
+    df["valid"] = True
+    df.loc[df['dist'] > grid_spacing, 'valid'] = False
+
+    return np.array(df["xi"]), np.array(df["yi"]), np.array(df["spacing"]), np.array(df["valid"]), distance
+
+
 def haversine(lat1, lon1, lat2, lon2):
     """
     Calculate the great circle distance between two points
@@ -246,6 +278,16 @@ def average_grid_spacing(latitudes, longitudes):
     return avg_spacing * 1.5 * 1000
 
 
+def center_grid_spacing(x, y):
+    center_row, center_col = x.shape[0] // 2, x.shape[1] // 2
+    if (np.isnan(x[center_row, center_col]) or x[center_row, center_col] == 0.0 or
+            np.isnan(x[center_row + 1, center_col + 1]) or x[center_row + 1, center_col + 1] == 0.0):
+        raise ValueError("Center of grid is not a valid cell.")
+    spacing = np.mean([abs(x[center_row + 1, center_col + 1] - x[center_row, center_col]),
+                      abs(y[center_row + 1, center_col + 1] - y[center_row, center_col])]) * 1.5
+    return spacing
+
+
 def sundays_between_dates(start, end, max_weeks=10):
     sunday_start = start + relativedelta(weekday=SU(-1))
     sunday_end = end + relativedelta(weekday=SU(-1))
@@ -256,6 +298,31 @@ def sundays_between_dates(start, end, max_weeks=10):
         current = current + timedelta(days=7)
         max_weeks = max_weeks - 1
     return weeks
+
+
+def identify_projection(x, y):
+    if -180 <= x <= 180 and -180 <= y <= 180:
+        return "WGS84"
+    elif 420000 <= x <= 900000 and 30000 <= y <= 350000:
+        return "CH1903"
+    elif 2420000 <= x <= 2900000 and 1030000 <= y <= 1350000:
+        return "CH1903+"
+    else:
+        return "UTM"
+
+
+def latlng_to_projection(lat, lng, projection):
+    lat = np.array(lat)
+    lng = np.array(lng)
+    if projection == "UTM":
+        x, y, zone_number, zone_letter = latlng_to_utm(lat, lng)
+    elif projection == "CH1903":
+        x, y = latlng_to_ch1903(lat, lng)
+    elif projection == "CH1903+":
+        x, y = latlng_to_ch1903_plus(lat, lng)
+    else:
+        raise ValueError('Projection {} unrecognised.'.format(projection))
+    return x, y
 
 
 def coordinates_to_latlng(x, y):
@@ -300,6 +367,26 @@ def latlng_to_ch1903(lat, lng):
 def ch1903_to_latlng(x, y):
     x_aux = (x - 600000) / 1000000
     y_aux = (y - 200000) / 1000000
+    lat = 16.9023892 + 3.238272 * y_aux - 0.270978 * x_aux ** 2 - 0.002528 * y_aux ** 2 - 0.0447 * x_aux ** 2 * y_aux - 0.014 * y_aux ** 3
+    lng = 2.6779094 + 4.728982 * x_aux + 0.791484 * x_aux * y_aux + 0.1306 * x_aux * y_aux ** 2 - 0.0436 * x_aux ** 3
+    lat = (lat * 100) / 36
+    lng = (lng * 100) / 36
+    return lat, lng
+
+
+def latlng_to_ch1903_plus(lat, lng):
+    lat = lat * 3600
+    lng = lng * 3600
+    lat_aux = (lat - 169028.66) / 10000
+    lng_aux = (lng - 26782.5) / 10000
+    x = 2600072.37 + 211455.93 * lng_aux - 10938.51 * lng_aux * lat_aux - 0.36 * lng_aux * lat_aux ** 2 - 44.54 * lng_aux ** 3
+    y = 1200147.07 + 308807.95 * lat_aux + 3745.25 * lng_aux ** 2 + 76.63 * lat_aux ** 2 - 194.56 * lng_aux ** 2 * lat_aux + 119.79 * lat_aux ** 3
+    return x, y
+
+
+def ch1903_plus_to_latlng(x, y):
+    x_aux = (x - 2600000) / 1000000
+    y_aux = (y - 1200000) / 1000000
     lat = 16.9023892 + 3.238272 * y_aux - 0.270978 * x_aux ** 2 - 0.002528 * y_aux ** 2 - 0.0447 * x_aux ** 2 * y_aux - 0.014 * y_aux ** 3
     lng = 2.6779094 + 4.728982 * x_aux + 0.791484 * x_aux * y_aux + 0.1306 * x_aux * y_aux ** 2 - 0.0436 * x_aux ** 3
     lat = (lat * 100) / 36

@@ -1,11 +1,8 @@
 import os
-import json
-import shutil
 import netCDF4
-import logging
 import numpy as np
+import xarray as xr
 from enum import Enum
-from pydantic import BaseModel
 from fastapi import HTTPException
 from fastapi.responses import FileResponse
 from datetime import datetime, timedelta, timezone
@@ -444,7 +441,7 @@ def get_simulations_transect_period(filesystem, model, lake, start, end, latitud
 
 def get_simulations_transect_period_delft3dflow(filesystem, lake, start, end, latitude_str, longitude_str, nodata=-999.0):
     model = "delft3d-flow"
-
+    output = {}
     latitude_list = [float(x) for x in latitude_str.replace(" ", "").split(",")]
     longitude_list = [float(x) for x in longitude_str.replace(" ", "").split(",")]
 
@@ -460,107 +457,70 @@ def get_simulations_transect_period_delft3dflow(filesystem, lake, start, end, la
 
     weeks = functions.sundays_between_dates(datetime.strptime(start[0:8], "%Y%m%d").replace(tzinfo=timezone.utc),
                                             datetime.strptime(end[0:8], "%Y%m%d").replace(tzinfo=timezone.utc))
+    files = [os.path.join(lakes, lake, "{}.nc".format(week.strftime("%Y%m%d"))) for week in weeks]
 
-    for week in weeks:
-        if not os.path.isfile(os.path.join(lakes, lake, "{}.nc".format(week.strftime("%Y%m%d")))):
+    for i, file in enumerate(files):
+        if not os.path.isfile(file):
             raise HTTPException(status_code=400,
-                                detail="Apologies data is not available for {} week starting {}".format(lake, week))
+                                detail="Apologies data is not available for {} week starting {}".format(lake, weeks[i]))
 
     start_datetime = datetime.strptime(start[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
     end_datetime = datetime.strptime(end[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
 
-    time_a = np.array([])
-    t_a = []
-    output = {}
-    for week in weeks:
-        with (netCDF4.Dataset(os.path.join(lakes, lake, "{}.nc".format(week.strftime("%Y%m%d")))) as nc):
-            time = np.array(nc.variables["time"][:])
-            min_time = np.min(time)
-            max_time = np.max(time)
-            start_time = functions.convert_to_unit(start_datetime, nc.variables["time"].units)
-            end_time = functions.convert_to_unit(end_datetime, nc.variables["time"].units)
-            if min_time <= start_time <= max_time:
-                time_index_start = functions.get_closest_index(start_time, time)
-            else:
-                time_index_start = 0
-            if min_time <= end_time <= max_time:
-                time_index_end = functions.get_closest_index(end_time, time) + 1
-            else:
-                time_index_end = len(time)
+    with xr.open_mfdataset(files) as ds:
+        ds['time'] = ds.indexes['time'].tz_localize('UTC')
+        ds = ds.sel(time=slice(start_datetime, end_datetime))
+        x = ds.XZ[:].values
+        y = ds.YZ[:].values
+        z = ds.ZK_LYR[0, :].values * - 1
+        grid_spacing = functions.center_grid_spacing(x, y)
+        projection = functions.identify_projection(np.max(x), np.max(y))
+        if projection == "WGS84":
+            raise HTTPException(status_code=400, detail="Method not implemented for models with projection WGS84")
+        x_list, y_list = functions.latlng_to_projection(latitude_list, longitude_list, projection)
+        indexes = np.where((x >= np.min(x_list) - 2 * grid_spacing) &
+                           (x <= np.max(x_list) + 2 * grid_spacing) &
+                           (y >= np.min(y_list) - 2 * grid_spacing) &
+                           (y <= np.max(y_list) + 2 * grid_spacing))
+        start = 0
+        xi_arr, yi_arr, sp_arr, vd_arr = np.array([]), np.array([]), np.array([]), np.array([])
+        for i in range(len(x_list) - 1):
+            xi, yi, sp, vd, distance = functions.line_segments(x_list[i], y_list[i], x_list[i + 1], y_list[i + 1], x, y,
+                                                               indexes, start, grid_spacing)
+            start = start + distance
+            xi_arr = np.concatenate((xi_arr, xi), axis=0)
+            yi_arr = np.concatenate((yi_arr, yi), axis=0)
+            sp_arr = np.concatenate((sp_arr, sp), axis=0)
+            vd_arr = np.concatenate((vd_arr, vd), axis=0)
 
-            if len(time_a) == 0:
-                depth = (np.array(nc.variables["ZK_LYR"][:]) * -1).tolist()
+        idx = np.where(vd_arr == 0)[0]
+        xi_arr = xi_arr.astype(int)
+        yi_arr = yi_arr.astype(int)
 
-                lat_grid, lng_grid = functions.coordinates_to_latlng(nc.variables["XZ"][:], nc.variables["YZ"][:])
-                grid_spacing = functions.average_grid_spacing(lat_grid, lng_grid)
+        t_s = ds.R1.isel(M=xr.DataArray(xi_arr), N=xr.DataArray(yi_arr))
+        t = t_s[:, 0, :].values
+        index = 0
+        for i in range(t.shape[1]):
+            if not np.all(t[0, i] == nodata):
+                index = i
+                break
+        depth = z[index:]
+        t = t[:, index:, :]
+        t[:, :, idx] = -999.
 
-                start = 0
-                xi_arr, yi_arr, sp_arr, vd_arr = np.array([]), np.array([]), np.array([]), np.array([])
-                for i in range(len(latitude_list) - 1):
-                    xi, yi, sp, vd, distance = functions.exact_line_segments(latitude_list[i], longitude_list[i],
-                                                                             latitude_list[i + 1], longitude_list[i + 1],
-                                                                             lat_grid, lng_grid, start, grid_spacing)
-                    start = start + distance
-                    xi_arr = np.concatenate((xi_arr, xi), axis=0)
-                    yi_arr = np.concatenate((yi_arr, yi), axis=0)
-                    sp_arr = np.concatenate((sp_arr, sp), axis=0)
-                    vd_arr = np.concatenate((vd_arr, vd), axis=0)
+        u_s = ds.U1.isel(MC=xr.DataArray(xi_arr), N=xr.DataArray(yi_arr))
+        v_s = ds.V1.isel(M=xr.DataArray(xi_arr), NC=xr.DataArray(yi_arr))
+        a_s = ds.ALFAS.isel(M=xr.DataArray(xi_arr), N=xr.DataArray(yi_arr))
+        a_e = a_s[:].values[:, np.newaxis, :]
+        u, v, = functions.rotate_velocity(u_s[:, index:, :].values, v_s[:, index:, :].values, a_e)
+        u[:, :, idx] = -999.
+        v[:, :, idx] = -999.
 
-                xi_arr = xi_arr.astype(int)
-                yi_arr = yi_arr.astype(int)
-
-                lat_arr = lat_grid[xi_arr, yi_arr]
-                lng_arr = lng_grid[xi_arr, yi_arr]
-
-                u_unit = nc.variables["U1"].units
-                v_unit = nc.variables["V1"].units
-                time_unit = nc.variables["time"].units
-
-                output = {"lake": lake,
-                          "distance": functions.filter_parameter(sp_arr),
-                          "latitude": functions.filter_parameter(lat_arr, decimals=5),
-                          "longitude": functions.filter_parameter(lng_arr, decimals=5),
-                          }
-
-            time_a = np.concatenate((time_a, time[time_index_start:time_index_end]), axis=0)
-
-            idx = np.where(vd_arr == 0)[0]
-            t = np.array(nc.variables["R1"][time_index_start:time_index_end, 0, :, :, :])
-            t = t[:, :, xi_arr, yi_arr]
-            t[:, :, idx] = -999.
-            u, v, = functions.rotate_velocity(nc.variables["U1"][time_index_start:time_index_end, :, :, :],
-                                              nc.variables["V1"][time_index_start:time_index_end, :, :, :],
-                                              nc.variables["ALFAS"][xi_arr[i], yi_arr[i]])
-            u = u[:, :, xi_arr, yi_arr]
-            v = v[:, :, xi_arr, yi_arr]
-            u[:, :, idx] = -999.
-            v[:, :, idx] = -999.
-
-            if len(t_a) == 0:
-                t_a = t
-                u_a = u
-                v_a = v
-            else:
-                t_a = np.concatenate((t_a, t), axis=0)
-                u_a = np.concatenate((u_a, u), axis=0)
-                v_a = np.concatenate((v_a, v), axis=0)
-
-    index = 0
-    for i in range(t_a.shape[1]):
-        if not np.all(t_a[0, i] == nodata):
-            index = i
-            break
-
-    depth = depth[index:]
-    t_a = t_a[:, index:, :]
-    u_a = u_a[:, index:, :]
-    v_a = v_a[:, index:, :]
-
-    output["time"] = functions.alplakes_time(time_a, time_unit).tolist()
+    output["time"] = functions.alplakes_time(ds.time[:].values, "nano").tolist()
     output["depth"] = {"data": functions.filter_parameter(depth), "unit": "m"}
-    output["temperature"] = {"data": functions.filter_parameter(t_a), "unit": "degC"}
-    output["u"] = {"data": functions.filter_parameter(u_a, decimals=5), "unit": u_unit}
-    output["v"] = {"data": functions.filter_parameter(v_a, decimals=5), "unit": v_unit}
+    output["temperature"] = {"data": functions.filter_parameter(t), "unit": "degC"}
+    output["u"] = {"data": functions.filter_parameter(u, decimals=5), "unit": "m/s"}
+    output["v"] = {"data": functions.filter_parameter(u, decimals=5), "unit": "m/s"}
 
     return output
 
