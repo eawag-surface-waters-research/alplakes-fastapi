@@ -271,7 +271,15 @@ async def simulations_point(model: simulations.Models = Path(..., title="Model",
                             lat: float = validate.path_latitude(),
                             lng: float = validate.path_longitude()):
     """
-    Simulated timeseries of temperature and velocity for a given location and depth.
+    Simulated timeseries of lake water temperature and velocity for a given location and depth.
+
+    Outputs:
+    - time: YYYYmmddHHMM
+    - temperature: Water temperature (degC)
+    - u:  Eastward flow velocity (m/s)
+    - v: Northward flow velocity (m/s)
+    - distance: Distance from requested location to center of closest grid point (m)
+    - depth: Distance from the surface to the closest grid point to requested depth (m)
     """
     validate.time_range(start_time, end_time)
     return simulations.get_simulations_point(filesystem, model, lake, start_time, end_time, depth, lat, lng)
