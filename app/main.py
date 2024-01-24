@@ -199,7 +199,7 @@ if internal:
         return RedirectResponse("https://alplakes-eawag.s3.eu-central-1.amazonaws.com/static/bafu/bafu_hydrodata.json")
 
 
-    @app.get("/bafu/hydrodata/metadata/{station_id}", tags=["Meteoswiss"])
+    @app.get("/bafu/hydrodata/metadata/{station_id}", tags=["Bafu"])
     async def bafu_hydrodata_station_metadata(station_id: str = Path(..., regex=r"^\d{4}$", title="Station ID", example=2009, description="4 digit station identification code")):
         """
         Hydrological data from the automatic measuring network of Bafu.
