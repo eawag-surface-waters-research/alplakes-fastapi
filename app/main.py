@@ -47,7 +47,7 @@ app.add_middleware(
 )
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-filesystem = "../filesystem"
+filesystem = "filesystem"
 
 internal = True
 
@@ -57,6 +57,7 @@ if os.getenv('EXTERNAL') is not None:
 
 @app.exception_handler(ValueError)
 async def value_error_exception_handler(request: Request, exc: ValueError):
+    print(exc)
     return JSONResponse(
         status_code=500,
         content={"message": "Server processing error - please check your inputs. The developer has been notified, for "
@@ -157,8 +158,20 @@ if internal:
         """
         return RedirectResponse("https://alplakes-eawag.s3.eu-central-1.amazonaws.com/static/meteoswiss/meteoswiss_meteodata.json")
 
+
+    @app.get("/meteoswiss/meteodata/metadata/{station_id}", tags=["Meteoswiss"])
+    async def meteoswiss_meteodata_station_metadata(
+            station_id: str = Path(..., regex=r"^[a-zA-Z]{3}$", title="Station ID", example="PUY",
+                                   description="3 digit station identification code")):
+        """
+        Meteorological data from the automatic measuring network of MeteoSwiss.
+
+        Metadata for a specific station.
+        """
+        return meteoswiss.get_meteodata_station_metadata(filesystem, station_id)
+
     @app.get("/meteoswiss/meteodata/measured/{station_id}/{parameter}/{start_date}/{end_date}", tags=["Meteoswiss"])
-    async def meteoswiss_meteodata_measured(station_id: str = Path(..., regex=r"^[a-zA-Z]{3}$", title="Station ID", example="ABO", description="3 digit station identification code"),
+    async def meteoswiss_meteodata_measured(station_id: str = Path(..., regex=r"^[a-zA-Z]{3}$", title="Station ID", example="PUY", description="3 digit station identification code"),
                                             parameter: meteoswiss.MeteodataParameters = Path(..., title="Parameter", description="Meteoswiss parameter"),
                                             start_date: str = validate.path_date(description="The start date in YYYYmmdd format"),
                                             end_date: str = validate.path_date(description="The end date in YYYYmmdd format")):
@@ -184,6 +197,16 @@ if internal:
         GEOJSON of all the available BAFU hydrodata.
         """
         return RedirectResponse("https://alplakes-eawag.s3.eu-central-1.amazonaws.com/static/bafu/bafu_hydrodata.json")
+
+
+    @app.get("/bafu/hydrodata/metadata/{station_id}", tags=["Meteoswiss"])
+    async def bafu_hydrodata_station_metadata(station_id: str = Path(..., regex=r"^\d{4}$", title="Station ID", example=2009, description="4 digit station identification code")):
+        """
+        Hydrological data from the automatic measuring network of Bafu.
+
+        Metadata for a specific station.
+        """
+        return bafu.get_hydrodata_station_metadata(filesystem, station_id)
 
     @app.get("/bafu/hydrodata/measured/{station_id}/{parameter}/{start_date}/{end_date}", tags=["Bafu"])
     async def bafu_hydrodata_measured(station_id: str = Path(..., regex=r"^\d{4}$", title="Station ID", example=2009, description="4 digit station identification code"),
