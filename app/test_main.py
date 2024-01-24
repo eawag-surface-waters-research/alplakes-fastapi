@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+from datetime import datetime
 import pytest
 from .main import app
 
@@ -17,6 +18,58 @@ def test_meteoswiss_cosmo_metadata():
     response = client.get("/meteoswiss/cosmo/metadata")
     assert response.status_code == 200
     assert isinstance(response.json(), list)
+
+
+def test_meteoswiss_meteodata_station_metadata():
+    """
+    Test the meteoswiss_meteodata_station_metadata endpoint to ensure it returns the expected list.
+    """
+    response = client.get("/meteoswiss/meteodata/metadata/PUY")
+    assert response.status_code == 200
+    assert isinstance(response.json(), dict)
+
+
+def test_meteoswiss_meteodata_measured():
+    """
+    Test the meteoswiss_meteodata_measured endpoint
+    """
+    parameter = "pva200h0"
+    response = client.get("/meteoswiss/meteodata/measured/PUY/{}/19810101/20100101".format(parameter))
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, dict)
+    assert parameter in data
+    assert "Time" in data
+    assert isinstance(data[parameter], list)
+    assert isinstance(data["Time"], list)
+    assert isinstance(data[parameter][0], float)
+    assert datetime.strptime(data["Time"][0], "%Y-%m-%dT%H:%M:%S%z")
+
+
+def test_bafu_hydrodata_station_metadata():
+    """
+    Test the bafu_hydrodata_station_metadata endpoint
+    """
+    response = client.get("/bafu/hydrodata/metadata/2009")
+    assert response.status_code == 200
+    assert isinstance(response.json(), dict)
+
+
+def test_bafu_hydrodata_measured():
+    """
+    Test the bafu_hydrodata_measured endpoint
+    """
+    parameter = "AbflussPneumatikunten"
+    response = client.get("/bafu/hydrodata/measured/2009/{}/20210207/20230201".format(parameter))
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, dict)
+    assert parameter in data
+    assert "Time" in data
+    assert isinstance(data[parameter], list)
+    assert isinstance(data["Time"], list)
+    assert isinstance(data[parameter][0], float)
+    assert datetime.strptime(data["Time"][0], "%Y-%m-%dT%H:%M:%S%z")
 
 
 @pytest.mark.parametrize("url", [

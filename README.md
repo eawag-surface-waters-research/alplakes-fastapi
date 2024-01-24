@@ -29,7 +29,8 @@ mkdir -p filesystem
 ```
 
 ### 3. Create .env file
-Replace example filesystem path with correct path.
+Replace example filesystem path with correct path. For local development this is likely to be the `filesystem` folder 
+within the repository. For production environments this may be on another drive.
 ```console
 cd alplakes-fastapi
 cp env.example .env
@@ -62,7 +63,7 @@ conda install --file requirements.txt
 
 ### 2. Run API
 
-Manually set filesystem path in main.py
+Manually set filesystem path in main.py if files are NOT located in the `filesystem` folder within the repository.
 
 ```console
 conda activate fastapi
@@ -84,35 +85,23 @@ pip install pytest
 Test files need to be downloaded from "URL_TO_FOLLOW" into the `filesystem` folder. The folder structure should look like:
 ```bash
 ├── media
+│   ├── bafu
+│   │   └── hydrodata
 │   ├── meteoswiss
+│   │   └── cosmo
+│   │   └── meteodata
 │   └── simulations
+│       └── delft3d-flow
 ├── .gitkeep               
 ```
 ### Run tests
 
+Navigate to the top directory of the repository to run pytest.
+
 ```console
-cd app
 pytest
 ```
 
-
-
-## Docker Commands
-
-### Terminate containers
-```console 
-docker compose down
-```
-
-### List active containers
-```console 
-docker ps
-```
-
-### Go inside the container
-```console 
-docker exec -it 'container-id' bash
-```
 [mit-by]: https://opensource.org/licenses/MIT
 [mit-by-shield]: https://img.shields.io/badge/License-MIT-g.svg
 [python-by-shield]: https://img.shields.io/badge/Python-3.9-g

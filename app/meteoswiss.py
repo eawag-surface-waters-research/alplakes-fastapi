@@ -1,11 +1,13 @@
 import os
+import json
+import requests
 import numpy as np
 import pandas as pd
 import xarray as xr
 from enum import Enum
 from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException
-from app.functions import daterange
+from app.functions import daterange, ch1903_plus_to_latlng
 
 
 def get_cosmo_metadata(filesystem):
@@ -68,7 +70,7 @@ def get_cosmo_area_forecast(filesystem, model, variables, forecast_date, ll_lat,
 
         output["time"] = np.array(ds.variables["time"].values, dtype=str).tolist()
         x, y = np.where(((ds.variables["lat_1"] >= ll_lat) & (ds.variables["lat_1"] <= ur_lat) & (
-                    ds.variables["lon_1"] >= ll_lng) & (ds.variables["lon_1"] <= ur_lng)))
+                ds.variables["lon_1"] >= ll_lng) & (ds.variables["lon_1"] <= ur_lng)))
 
         if len(x) == 0:
             raise HTTPException(status_code=400,
@@ -174,14 +176,15 @@ def get_cosmo_area_reanalysis(filesystem, model, variables, start_date, end_date
             output["time"] = np.array(ds.variables["time"].values, dtype=str).tolist()
             if len(ds.variables["lat_1"].shape) == 3:
                 x, y = np.where(((ds.variables["lat_1"][0] >= ll_lat) & (ds.variables["lat_1"][0] <= ur_lat) & (
-                    ds.variables["lon_1"][0] >= ll_lng) & (ds.variables["lon_1"][0] <= ur_lng)))
+                        ds.variables["lon_1"][0] >= ll_lng) & (ds.variables["lon_1"][0] <= ur_lng)))
             else:
                 x, y = np.where(((ds.variables["lat_1"] >= ll_lat) & (ds.variables["lat_1"] <= ur_lat) & (
-                    ds.variables["lon_1"] >= ll_lng) & (ds.variables["lon_1"] <= ur_lng)))
+                        ds.variables["lon_1"] >= ll_lng) & (ds.variables["lon_1"] <= ur_lng)))
 
             if len(x) == 0:
                 raise HTTPException(status_code=400,
-                                    detail="Requested area is outside of the COSMO coverage area, or is too small.".format(model))
+                                    detail="Requested area is outside of the COSMO coverage area, or is too small.".format(
+                                        model))
 
             x_min, x_max, y_min, y_max = min(x), max(x) + 1, min(y), max(y) + 1
             if len(ds.variables["lat_1"].dims) == 3:
@@ -206,7 +209,8 @@ def get_cosmo_area_reanalysis(filesystem, model, variables, start_date, end_date
         return output
     except xr.MergeError as e:
         raise HTTPException(status_code=400,
-                            detail="COSMO grid is not consistent between {} and {}, please access individual days.".format(start_date, end_date))
+                            detail="COSMO grid is not consistent between {} and {}, please access individual days.".format(
+                                start_date, end_date))
     except Exception as e:
         raise
 
@@ -266,7 +270,8 @@ def get_cosmo_point_reanalysis(filesystem, model, variables, start_date, end_dat
         return output
     except xr.MergeError as e:
         raise HTTPException(status_code=400,
-                            detail="COSMO grid is not consistent between {} and {}, please access individual days.".format(start_date, end_date))
+                            detail="COSMO grid is not consistent between {} and {}, please access individual days.".format(
+                                start_date, end_date))
     except Exception as e:
         raise
 
@@ -281,6 +286,60 @@ class MeteodataParameters(str, Enum):
     nto000d0 = "nto000d0"
 
 
+def get_meteodata_station_metadata(filesystem, station_id):
+    parameters_dict = {
+        "pva200h0": {"unit": "hPa", "description": "Vapour pressure 2 m above ground", "period": "hourly mean"},
+        "gre000h0": {"unit": "W/m²", "description": "Global radiation", "period": "hourly mean"},
+        "tre200h0": {"unit": "°C", "description": "Air temperature 2 m above ground", "period": "hourly mean"},
+        "rre150h0": {"unit": "mm", "description": "Precipitation", "period": "hourly total"},
+        "fkl010h0": {"unit": "m/s", "description": "Wind speed scalar", "period": "hourly mean"},
+        "dkl010h0": {"unit": "°", "description": "Wind direction", "period": "hourly mean"},
+        "nto000d0": {"unit": "%", "description": "Cloud cover", "period": "daily mean"}}
+    out = {"id": station_id}
+    station_id = station_id[:3].upper()
+    station_dir = os.path.join(filesystem, "media/meteoswiss/meteodata", station_id)
+    stations_file = os.path.join(filesystem, "media/meteoswiss/meteodata/stations.json")
+    if not os.path.exists(stations_file):
+        response = requests.get(
+            "https://alplakes-eawag.s3.eu-central-1.amazonaws.com/static/meteoswiss/meteoswiss_meteodata.json")
+        response.raise_for_status()
+        stations_data = response.json()
+        with open(stations_file, 'w') as f:
+            json.dump(stations_data, f)
+    else:
+        with open(stations_file, 'r') as f:
+            stations_data = json.load(f)
+    data = next((s for s in stations_data["features"] if s.get('id') == station_id), None)
+    if data is None:
+        raise HTTPException(status_code=400, detail="Data not available for {}".format(station_id))
+    out["name"] = data["properties"]["station_name"]
+    out["source"] = "MeteoSwiss"
+    out["elevation"] = float(data["properties"]["altitude"])
+    out["ch1903+"] = data["geometry"]["coordinates"]
+    lat, lng = ch1903_plus_to_latlng(out["ch1903+"][0], out["ch1903+"][1])
+    out["latlng"] = [lat, lng]
+
+    if not os.path.exists(station_dir):
+        raise HTTPException(status_code=400, detail="Data not available for {}".format(station_id))
+    files = os.listdir(station_dir)
+    files = [os.path.join(station_dir, f) for f in files if f.endswith(".csv")]
+    files.sort()
+    df = pd.read_csv(files[0])
+    start_date = pd.to_datetime(df["Date"].iloc[0], format='%Y%m%d%H', utc=True)
+    df = pd.read_csv(files[-1])
+    end_date = pd.to_datetime(df["Date"].iloc[-1], format='%Y%m%d%H', utc=True)
+    out["parameters"] = []
+    parameters = list(df.columns[2:])
+    for p in parameters:
+        if p in parameters_dict:
+            d = parameters_dict[p]
+            d["id"] = p
+            d["start_date"] = start_date
+            d["end_date"] = end_date
+            out["parameters"].append(d)
+    return out
+
+
 def get_meteodata_measured(filesystem, station_id, parameter, start_date, end_date):
     station_id = station_id[:3].upper()
     station_dir = os.path.join(filesystem, "media/meteoswiss/meteodata", station_id)
@@ -289,24 +348,18 @@ def get_meteodata_measured(filesystem, station_id, parameter, start_date, end_da
 
     files = os.listdir(station_dir)
     files.sort()
-    files = [f for f in files if int(start_date[:4]) <= int(f.split(".")[1]) <= int(end_date[:4])]
-    dfs = []
-    for file in files:
-        if file.endswith(".csv"):
-            df = pd.read_csv(os.path.join(station_dir, file))
-            dfs.append(df)
-    if len(dfs) == 0:
-        raise HTTPException(status_code=400,
-                            detail="No data available between {} and {}".format(start_date, end_date))
-    df = pd.concat(dfs, ignore_index=True)
+    files = [os.path.join(station_dir, f) for f in files if int(start_date[:4]) <= int(f.split(".")[1]) <= int(end_date[:4]) and f.endswith(".csv")]
+    df = pd.concat(map(pd.read_csv, files), ignore_index=True)
     if parameter not in df.columns:
-        raise HTTPException(status_code=400, detail="Parameter {} not available at station {}".format(parameter, station_id))
+        raise HTTPException(status_code=400,
+                            detail="Parameter {} not available at station {}".format(parameter, station_id))
     df["time"] = pd.to_datetime(df['Date'], format='%Y%m%d%H', utc=True)
+    df[parameter] = pd.to_numeric(df[parameter], errors='coerce').round(1)
+    df.dropna(subset=[parameter], inplace=True)
     start = datetime.strptime(start_date, '%Y%m%d').replace(tzinfo=timezone.utc)
     end = datetime.strptime(end_date, '%Y%m%d').replace(tzinfo=timezone.utc) + timedelta(days=1)
     selected = df[(df['time'] >= start) & (df['time'] <= end)]
     if len(selected) == 0:
         raise HTTPException(status_code=400,
                             detail="Not data available between {} and {}".format(start_date, end_date))
-    out = {"Time": list(selected["time"]), parameter: list(selected[parameter])}
-    return out
+    return {"Time": list(selected["time"]), parameter: list(selected[parameter])}
