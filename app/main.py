@@ -2,7 +2,7 @@ from fastapi import FastAPI, Query, Request, Depends, Path
 from fastapi.responses import RedirectResponse, PlainTextResponse, JSONResponse
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.cors import CORSMiddleware
-
+from typing import Union
 import sentry_sdk
 
 from app import simulations, meteoswiss, bafu, remotesensing, validate
@@ -212,14 +212,17 @@ if internal:
     async def bafu_hydrodata_measured(station_id: str = Path(..., regex=r"^\d{4}$", title="Station ID", example=2009, description="4 digit station identification code"),
                                       parameter: str = Path(..., title="Parameter", example="AbflussPneumatikunten", description="Parameter"),
                                       start_date: str = validate.path_date(description="The start date in YYYYmmdd format"),
-                                      end_date: str = validate.path_date(description="The end date in YYYYmmdd format")):
+                                      end_date: str = validate.path_date(description="The end date in YYYYmmdd format"),
+                                      resample: Union[bafu.ResampleOptions, None] = None):
         """
         Hydrological data from the automatic measuring network of Bafu.
 
-        All station id's and the available parameters can be access from the metadata endpoint.
+        All station id's and the available parameters
+        can be access from the metadata endpoint. Data is a mix of hourly data (pre-2022) and 5-min data and can be
+        resampled to hourly or daily.
         """
         validate.date_range(start_date, end_date)
-        return bafu.get_hydrodata_measured(filesystem, station_id, parameter, start_date, end_date)
+        return bafu.get_hydrodata_measured(filesystem, station_id, parameter, start_date, end_date, resample)
 
     @app.get("/bafu/hydrodata/predicted/{status}/{station_id}/{model}", tags=["Bafu"])
     async def bafu_hydrodata_predicted(status: bafu.HydrodataPredicted = Path(..., title="Status", description="Publication status"),

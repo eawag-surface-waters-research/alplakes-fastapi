@@ -71,6 +71,24 @@ def test_bafu_hydrodata_measured():
     assert isinstance(data[parameter][0], float)
     assert datetime.strptime(data["Time"][0], "%Y-%m-%dT%H:%M:%S%z")
 
+def test_bafu_hydrodata_measured_resample():
+    """
+    Test the bafu_hydrodata_measured endpoint, resampling to one hour
+    """
+    parameter = "AbflussPneumatikunten"
+    response = client.get("/bafu/hydrodata/measured/2009/{}/20210207/20230201?resample=hourly".format(parameter))
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, dict)
+    assert parameter in data
+    assert "Time" in data
+    assert isinstance(data[parameter], list)
+    assert isinstance(data["Time"], list)
+    assert isinstance(data[parameter][0], float)
+    assert datetime.strptime(data["Time"][0], "%Y-%m-%dT%H:%M:%S%z")
+    assert (datetime.strptime(data["Time"][1], "%Y-%m-%dT%H:%M:%S%z") -
+            datetime.strptime(data["Time"][0], "%Y-%m-%dT""%H:%M:%S%z")).total_seconds() == 3600
+
 
 @pytest.mark.parametrize("url", [
     "/simulations/transect/delft3d-flow/geneva/202304030400/202304050400/46.351,46.294/6.177,6.277",
