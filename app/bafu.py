@@ -89,7 +89,7 @@ def get_hydrodata_measured(filesystem, station_id, parameter, start_date, end_da
     df.dropna(subset=[parameter_column_name], inplace=True)
     start = datetime.strptime(start_date, '%Y%m%d').replace(tzinfo=timezone.utc)
     end = datetime.strptime(end_date, '%Y%m%d').replace(tzinfo=timezone.utc) + timedelta(days=1)
-    df = df[(df['time'] >= start) & (df['time'] <= end)]
+    df = df[(df['time'] >= start) & (df['time'] < end)]
     resample_options = {"hourly": "H", "daily": "D"}
     if resample is not None:
         df.set_index('time', inplace=True)

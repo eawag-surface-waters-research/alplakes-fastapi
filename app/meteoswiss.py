@@ -358,7 +358,7 @@ def get_meteodata_measured(filesystem, station_id, parameter, start_date, end_da
     df.dropna(subset=[parameter], inplace=True)
     start = datetime.strptime(start_date, '%Y%m%d').replace(tzinfo=timezone.utc)
     end = datetime.strptime(end_date, '%Y%m%d').replace(tzinfo=timezone.utc) + timedelta(days=1)
-    selected = df[(df['time'] >= start) & (df['time'] <= end)]
+    selected = df[(df['time'] >= start) & (df['time'] < end)]
     if len(selected) == 0:
         raise HTTPException(status_code=400,
                             detail="Not data available between {} and {}".format(start_date, end_date))
