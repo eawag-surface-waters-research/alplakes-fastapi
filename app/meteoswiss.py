@@ -324,18 +324,18 @@ def get_meteodata_station_metadata(filesystem, station_id):
     files = os.listdir(station_dir)
     files = [os.path.join(station_dir, f) for f in files if f.endswith(".csv")]
     files.sort()
-    df = pd.read_csv(files[0])
-    start_date = pd.to_datetime(df["Date"].iloc[0], format='%Y%m%d%H', utc=True)
-    df = pd.read_csv(files[-1])
-    end_date = pd.to_datetime(df["Date"].iloc[-1], format='%Y%m%d%H', utc=True)
+    df = pd.concat(map(pd.read_csv, files), ignore_index=True)
+    df["Date"] = pd.to_datetime(df["Date"], format='%Y%m%d%H', utc=True)
+    df[df.columns[2:]] = df[df.columns[2:]].apply(pd.to_numeric, errors='coerce')
+    df = df.dropna(axis=1, how='all')
     out["parameters"] = []
     parameters = list(df.columns[2:])
     for p in parameters:
         if p in parameters_dict:
             d = parameters_dict[p]
             d["id"] = p
-            d["start_date"] = start_date
-            d["end_date"] = end_date
+            d["start_date"] = min(df.loc[df[p].notna(), 'Date'])
+            d["end_date"] = max(df.loc[df[p].notna(), 'Date'])
             out["parameters"].append(d)
     return out
 
@@ -361,5 +361,5 @@ def get_meteodata_measured(filesystem, station_id, parameter, start_date, end_da
     selected = df[(df['time'] >= start) & (df['time'] < end)]
     if len(selected) == 0:
         raise HTTPException(status_code=400,
-                            detail="Not data available between {} and {}".format(start_date, end_date))
+                            detail="No data available between {} and {}".format(start_date, end_date))
     return {"Time": list(selected["time"]), parameter: list(selected[parameter])}
