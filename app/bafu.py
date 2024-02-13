@@ -95,6 +95,7 @@ def get_hydrodata_measured(filesystem, station_id, parameter, start_date, end_da
         df.set_index('time', inplace=True)
         df = df.resample(resample_options[resample]).mean(numeric_only=True)
         df = df.reset_index()
+    df.dropna(subset=[parameter_column_name], inplace=True)
     if len(df) == 0:
         raise HTTPException(status_code=400,
                             detail="Not data available between {} and {}".format(start_date, end_date))
