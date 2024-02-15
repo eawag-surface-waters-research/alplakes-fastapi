@@ -318,24 +318,22 @@ def get_meteodata_station_metadata(filesystem, station_id):
     out["ch1903+"] = data["geometry"]["coordinates"]
     lat, lng = ch1903_plus_to_latlng(out["ch1903+"][0], out["ch1903+"][1])
     out["latlng"] = [lat, lng]
-
     if not os.path.exists(station_dir):
         raise HTTPException(status_code=400, detail="Data not available for {}".format(station_id))
     files = os.listdir(station_dir)
     files = [os.path.join(station_dir, f) for f in files if f.endswith(".csv")]
     files.sort()
     df = pd.concat(map(pd.read_csv, files), ignore_index=True)
-    df["Date"] = pd.to_datetime(df["Date"], format='%Y%m%d%H', utc=True)
-    df[df.columns[2:]] = df[df.columns[2:]].apply(pd.to_numeric, errors='coerce')
-    df = df.dropna(axis=1, how='all')
+    df[df.columns[2:]] = df[df.columns[2:]].apply(pd.to_numeric, errors='coerce').notna()
+    df = df.loc[:, df.any()]
     out["parameters"] = []
     parameters = list(df.columns[2:])
     for p in parameters:
         if p in parameters_dict:
             d = parameters_dict[p]
             d["id"] = p
-            d["start_date"] = min(df.loc[df[p].notna(), 'Date'])
-            d["end_date"] = max(df.loc[df[p].notna(), 'Date'])
+            d["start_date"] = datetime.strptime(str(min(df.loc[df[p], 'Date'])), "%Y%m%d%H").replace(tzinfo=timezone.utc)
+            d["end_date"] = datetime.strptime(str(max(df.loc[df[p], 'Date'])), "%Y%m%d%H").replace(tzinfo=timezone.utc)
             out["parameters"].append(d)
     return out
 
