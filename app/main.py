@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import Union
 import sentry_sdk
 
-from app import simulations, meteoswiss, bafu, remotesensing, validate
+from app import simulations, meteoswiss, bafu, remotesensing, insitu, validate
 
 import os
 
@@ -257,6 +257,25 @@ if internal:
         validate.date_range(start_date, end_date)
         return bafu.get_hydrodata_total_lake_inflow(filesystem, lake, parameter, start_date, end_date)
 
+if internal:
+    @app.get("/insitu/secchi/metadata", tags=["Insitu"])
+    async def insitu_secchi_metadata():
+        """
+        Insitu Secchi depth measurements from assorted monitoring programs
+
+        Metadata for all included lakes.
+        """
+        return insitu.get_insitu_secchi_metadata(filesystem)
+
+
+    @app.get("/insitu/secchi/{lake}", tags=["Insitu"])
+    async def insitu_secchi_lake(lake: str = Path(..., title="Lake", example="geneva", description="Lake name")):
+        """
+        Insitu Secchi depth measurements from assorted monitoring programs
+
+        Full timeseries for requested lake.
+        """
+        return insitu.get_insitu_secchi_lake(filesystem, lake)
 
 @app.get("/simulations/metadata", tags=["Simulations"])
 async def simulations_metadata():

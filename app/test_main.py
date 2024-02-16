@@ -90,6 +90,33 @@ def test_bafu_hydrodata_measured_resample():
             datetime.strptime(data["Time"][0], "%Y-%m-%dT""%H:%M:%S%z")).total_seconds() == 3600
 
 
+def test_insitu_secchi_metadata():
+    """
+    Test the insitu_secchi_metadata endpoint.
+    """
+    response = client.get("/insitu/secchi/metadata")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, list)
+
+
+def test_insitu_secchi_lake():
+    """
+    Test the insitu_secchi_lake endpoint.
+    """
+    lake = "geneva"
+    response = client.get("/insitu/secchi/{}".format(lake))
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, dict)
+    assert "Time" in data
+    assert "Secchi depth [m]" in data
+    assert isinstance(data["Secchi depth [m]"], list)
+    assert isinstance(data["Time"], list)
+    assert isinstance(data["Secchi depth [m]"][0], float)
+    assert datetime.strptime(data["Time"][0], "%Y-%m-%dT%H:%M:%S%z")
+
+
 @pytest.mark.parametrize("url", [
     "/simulations/transect/delft3d-flow/geneva/202304030400/202304050400/46.351,46.294/6.177,6.277",
     "/simulations/transect/delft3d-flow/geneva/202304080400/202304110400/46.351,46.294,46.351/6.177,6.277,6.177",
