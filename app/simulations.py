@@ -760,3 +760,6 @@ def get_simulations_layer_average_temperature_delft3dflow(filesystem, lake, star
     output = {"date": functions.filter_parameter(times), "temperature": functions.filter_parameter(out)}
     return output
 
+
+class OneDimensionalModels(str, Enum):
+    simstrat = "simstrat"

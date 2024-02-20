@@ -18,6 +18,10 @@ def path_date(description="The date in YYYYmmdd format", example="20230101"):
     return Path(..., regex=r"^\d{8}$", title="Date", description=description, example=example)
 
 
+def path_month(description="The date in YYYYmm format", example="202301"):
+    return Path(..., regex=r"^\d{6}$", title="Date", description=description, example=example)
+
+
 def path_depth(example="1", description="Depth (m)"):
     return Path(..., title="Depth", ge=0, le=500, description=description, example=example)
 
