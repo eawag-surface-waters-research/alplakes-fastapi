@@ -82,6 +82,8 @@ def get_hydrodata_measured(filesystem, station_id, parameter, start_date, end_da
     files = os.listdir(os.path.join(station_dir, parameter))
     files.sort()
     files = [os.path.join(station_dir, parameter, f) for f in files if int(start_date[:4]) <= int(f.split(".")[0].split("_")[-1]) <= int(end_date[:4]) and f.endswith(".csv")]
+    if len(files) == 0:
+        raise HTTPException(status_code=400, detail="No data available for requested time period.")
     df = pd.concat(map(pd.read_csv, files), ignore_index=True)
     parameter_column_name = df.columns[1]
     df["time"] = pd.to_datetime(df['Time'], utc=True)
