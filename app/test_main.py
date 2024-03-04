@@ -71,6 +71,7 @@ def test_bafu_hydrodata_measured():
     assert isinstance(data[parameter][0], float)
     assert datetime.strptime(data["Time"][0], "%Y-%m-%dT%H:%M:%S%z")
 
+
 def test_bafu_hydrodata_measured_resample():
     """
     Test the bafu_hydrodata_measured endpoint, resampling to one hour
@@ -128,3 +129,90 @@ def test_simulations_transect_period(url):
     response = client.get(url)
     assert response.status_code == 200
     assert isinstance(response.json(), dict)
+
+
+def test_one_dimensional_simulations_metadata():
+    """
+    Test the one_dimensional_simulations_metadata endpoint.
+    """
+    response = client.get("/simulations/1d/metadata")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, list)
+
+
+def test_one_dimensional_simulations_metadata_lake():
+    """
+    Test the one_dimensional_simulations_metadata_lake endpoint.
+    """
+    response = client.get("/simulations/1d/metadata/simstrat/aegeri")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, dict)
+
+
+def test_one_dimensional_simulations_file():
+    """
+    Test the one_dimensional_simulations_file endpoint.
+    """
+    response = client.get("/simulations/1d/file/simstrat/aegeri/202301")
+    assert response.status_code == 200
+    content_type = response.headers.get('content-type', '').lower()
+    assert 'application/nc' in content_type, "Response content type is not NetCDF"
+
+
+def test_one_dimensional_simulations_point():
+    """
+    Test the one_dimensional_simulations_point endpoint.
+    """
+    response = client.get("/simulations/1d/point/simstrat/aegeri/T/202309050300/202309072300/1")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, dict)
+    assert "time" in data
+    assert isinstance(data["time"], list)
+    assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
+    assert "T" in data
+    assert isinstance(data["T"], list)
+    assert isinstance(data["T"][0], float)
+
+
+def test_one_dimensional_simulations_depth_time():
+    """
+    Test the one_dimensional_simulations_depth_time endpoint.
+    """
+    response = client.get("/simulations/1d/depthtime/simstrat/aegeri/T/202309050300/202309072300")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, dict)
+    assert "time" in data
+    assert isinstance(data["time"], list)
+    assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
+    assert "T" in data
+    assert isinstance(data["T"], list)
+    assert isinstance(data["T"][0][0], float)
+
+
+def test_one_dimensional_simulations_day_of_year():
+    """
+    Test the one_dimensional_simulations_day_of_year endpoint.
+    """
+    response = client.get("/simulations/1d/doy/simstrat/aegeri/T/1")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, dict)
+    assert "doy" in data
+    assert isinstance(data["doy"], list)
+    assert isinstance(data["doy"][0], int)
+    assert "mean" in data
+    assert isinstance(data["mean"], list)
+    assert isinstance(data["mean"][0], float)
+    assert "max" in data
+    assert isinstance(data["max"], list)
+    assert isinstance(data["max"][0], float)
+    assert "min" in data
+    assert isinstance(data["min"], list)
+    assert isinstance(data["min"][0], float)
+    assert "std" in data
+    assert isinstance(data["std"], list)
+    assert isinstance(data["std"][0], float)

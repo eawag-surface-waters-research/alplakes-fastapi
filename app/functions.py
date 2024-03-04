@@ -24,7 +24,7 @@ def convert_from_unit(time, units):
     if units == "seconds since 2008-03-01 00:00:00":
         return datetime.utcfromtimestamp(time + (datetime(2008, 3, 1).replace(tzinfo=timezone.utc) - datetime(1970, 1, 1).replace(tzinfo=timezone.utc)).total_seconds())
     elif units == "seconds since 1970-01-01 00:00:00":
-        return datetime.utcfromtimestamp(time)
+        return datetime.utcfromtimestamp(float(time))
     elif units == "nano":
         return datetime.utcfromtimestamp(time / 1000000000)
     else:
@@ -62,6 +62,13 @@ def get_closest_location(latitude, longitude, lat_grid, lon_grid):
 def daterange(start_date, end_date, days=1):
     for n in range(int((end_date - start_date).days / days)):
         yield start_date + timedelta(n * days)
+
+
+def monthrange(start_date, end_date, months=1):
+    current_date = start_date
+    while current_date < end_date:
+        yield current_date
+        current_date += relativedelta(months=months)
 
 
 def array_to_list(arr):
@@ -152,6 +159,10 @@ def alplakes_velocity(u, v, alpha):
 
 def alplakes_time(t, units):
     return np.array([convert_from_unit(x, units).strftime("%Y%m%d%H%M") for x in t])
+
+
+def default_time(t, units):
+    return np.array([convert_from_unit(x, units).replace(tzinfo=timezone.utc) for x in t])
 
 
 def unix_time(t, units):
@@ -307,6 +318,16 @@ def sundays_between_dates(start, end, max_weeks=10):
         current = current + timedelta(days=7)
         max_weeks = max_weeks - 1
     return weeks
+
+
+def months_between_dates(start, end, max_months=1200):
+    months = []
+    current = start.replace(day=1)  # Start from the first day of the month
+    while current <= end and max_months > 0:
+        months.append(current)
+        current = current + relativedelta(months=1)
+        max_months = max_months - 1
+    return months
 
 
 def identify_projection(x, y):

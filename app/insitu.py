@@ -31,8 +31,6 @@ def get_insitu_secchi_metadata(filesystem):
     return out
 
 
-
-
 def get_insitu_secchi_lake(filesystem, lake):
     file_path = os.path.join(filesystem, "media", "insitu", "secchi", "{}.csv".format(lake))
     if not os.path.exists(file_path):
