@@ -296,7 +296,7 @@ def get_meteodata_station_metadata(filesystem, station_id):
         "dkl010h0": {"unit": "°", "description": "Wind direction", "period": "hourly mean"},
         "nto000d0": {"unit": "%", "description": "Cloud cover", "period": "daily mean"}}
     out = {"id": station_id}
-    station_id = station_id.upper().replace("SLF", "")
+    station_id = station_id.upper()
     station_dir = os.path.join(filesystem, "media/meteoswiss/meteodata", station_id)
     stations_file = os.path.join(filesystem, "media/meteoswiss/meteodata/stations.json")
     partners_file = os.path.join(filesystem, "media/meteoswiss/meteodata/partners.json")
@@ -323,7 +323,7 @@ def get_meteodata_station_metadata(filesystem, station_id):
     data = next((s for s in stations_data["features"] if s.get('id') == station_id), None)
     out["source"] = "MeteoSwiss"
     if data is None:
-        data = next((s for s in partner_data["features"] if s.get('id') == station_id), None)
+        data = next((s for s in partner_data["features"] if s.get('id') == station_id.replace("SLF", "")), None)
         out["source"] = "MeteoSwiss Partner Station"
     if data is None:
         raise HTTPException(status_code=400, detail="Data not available for {}".format(station_id))
