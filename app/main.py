@@ -161,7 +161,7 @@ if internal:
 
     @app.get("/meteoswiss/meteodata/metadata/{station_id}", tags=["Meteoswiss"])
     async def meteoswiss_meteodata_station_metadata(
-            station_id: str = Path(..., regex=r"^[a-zA-Z]{3}$", title="Station ID", example="PUY",
+            station_id: str = Path(..., regex=r"^[a-zA-Z0-9]{3,5}$", title="Station ID", example="PUY",
                                    description="3 digit station identification code")):
         """
         Meteorological data from the automatic measuring network of MeteoSwiss.
