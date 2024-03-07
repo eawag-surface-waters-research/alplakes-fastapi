@@ -296,7 +296,7 @@ def get_meteodata_station_metadata(filesystem, station_id):
         "dkl010h0": {"unit": "°", "description": "Wind direction", "period": "hourly mean"},
         "nto000d0": {"unit": "%", "description": "Cloud cover", "period": "daily mean"}}
     out = {"id": station_id}
-    station_id = station_id[:3].upper()
+    station_id = station_id.upper()
     station_dir = os.path.join(filesystem, "media/meteoswiss/meteodata", station_id)
     stations_file = os.path.join(filesystem, "media/meteoswiss/meteodata/stations.json")
     if not os.path.exists(stations_file):
@@ -339,7 +339,7 @@ def get_meteodata_station_metadata(filesystem, station_id):
 
 
 def get_meteodata_measured(filesystem, station_id, parameter, start_date, end_date):
-    station_id = station_id[:3].upper()
+    station_id = station_id.upper()
     station_dir = os.path.join(filesystem, "media/meteoswiss/meteodata", station_id)
     if not os.path.exists(station_dir):
         raise HTTPException(status_code=400, detail="Data not available for {}".format(station_id))
