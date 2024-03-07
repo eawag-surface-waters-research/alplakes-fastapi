@@ -299,6 +299,7 @@ def get_meteodata_station_metadata(filesystem, station_id):
     station_id = station_id.upper()
     station_dir = os.path.join(filesystem, "media/meteoswiss/meteodata", station_id)
     stations_file = os.path.join(filesystem, "media/meteoswiss/meteodata/stations.json")
+    partners_file = os.path.join(filesystem, "media/meteoswiss/meteodata/partners.json")
     if not os.path.exists(stations_file):
         response = requests.get(
             "https://alplakes-eawag.s3.eu-central-1.amazonaws.com/static/meteoswiss/meteoswiss_meteodata.json")
@@ -309,7 +310,19 @@ def get_meteodata_station_metadata(filesystem, station_id):
     else:
         with open(stations_file, 'r') as f:
             stations_data = json.load(f)
+    if not os.path.exists(partners_file):
+        response = requests.get(
+            "https://alplakes-eawag.s3.eu-central-1.amazonaws.com/static/meteoswiss/meteoswiss_partner_meteostations.json")
+        response.raise_for_status()
+        partner_data = response.json()
+        with open(partners_file, 'w') as f:
+            json.dump(partner_data, f)
+    else:
+        with open(partners_file, 'r') as f:
+            partner_data = json.load(f)
     data = next((s for s in stations_data["features"] if s.get('id') == station_id), None)
+    if data is None:
+        data = next((s for s in partner_data["features"] if s.get('id') == station_id), None)
     if data is None:
         raise HTTPException(status_code=400, detail="Data not available for {}".format(station_id))
     out["name"] = data["properties"]["station_name"]
