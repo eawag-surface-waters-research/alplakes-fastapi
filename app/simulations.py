@@ -895,17 +895,19 @@ def get_one_dimensional_point_simstrat(filesystem, lake, parameter, start, end, 
                             .format(model, lake, ", ".join(os.listdir(lakes))))
     months = functions.months_between_dates(datetime.strptime(start[0:8], "%Y%m%d").replace(tzinfo=timezone.utc),
                                             datetime.strptime(end[0:8], "%Y%m%d").replace(tzinfo=timezone.utc))
-
+    files = []
     for month in months:
-        if not os.path.isfile(os.path.join(lakes, lake, "{}.nc".format(month.strftime("%Y%m")))):
-            raise HTTPException(status_code=400,
-                                detail="Apologies data is not available for {} month {}".format(lake,
-                                                                                                month.strftime("%Y%m")))
+        file = os.path.join(lakes, lake, "{}.nc".format(month.strftime("%Y%m")))
+        if os.path.isfile(file):
+            files.append(file)
+
+    if len(files) == 0:
+        raise HTTPException(status_code=400,
+                            detail="Apologies data is not available for requested period")
 
     start_datetime = datetime.strptime(start, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
     end_datetime = datetime.strptime(end, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
 
-    files = [os.path.join(lakes, lake, "{}.nc".format(month.strftime("%Y%m"))) for month in months]
     with xr.open_mfdataset(files) as ds:
         if parameter not in ds.variables:
             raise HTTPException(status_code=400, detail="Parameter {} is not available".format(parameter))
