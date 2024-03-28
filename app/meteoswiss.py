@@ -287,6 +287,15 @@ class MeteodataParameters(str, Enum):
 
 
 def get_meteodata_station_metadata(filesystem, station_id):
+    slf_stations = [{
+        "id": "SLFGAD",
+        "properties": {"station_name": "Gschletteregg", "altitude": 2063.0},
+        "geometry": {"coordinates": [2673270.0, 1177465.0]}
+    }, {
+        "id": "SLFGU2",
+        "properties": {"station_name": "Homad", "altitude": 2115.0},
+        "geometry": {"coordinates": [2665100, 1170100]}
+    }]
     parameters_dict = {
         "pva200h0": {"unit": "hPa", "description": "Vapour pressure 2 m above ground", "period": "hourly mean"},
         "gre000h0": {"unit": "W/m²", "description": "Global radiation", "period": "hourly mean"},
@@ -323,32 +332,38 @@ def get_meteodata_station_metadata(filesystem, station_id):
     data = next((s for s in stations_data["features"] if s.get('id') == station_id), None)
     out["source"] = "MeteoSwiss"
     if data is None:
-        data = next((s for s in partner_data["features"] if s.get('id') == station_id.replace("SLF", "")), None)
+        data = next((s for s in partner_data["features"] if s.get('id') == station_id), None)
         out["source"] = "MeteoSwiss Partner Station"
     if data is None:
-        raise HTTPException(status_code=400, detail="Data not available for {}".format(station_id))
+        data = next((s for s in slf_stations if s.get('id') == station_id), None)
+        out["source"] = "SLF Station (Non Meteoswiss Partner Station)"
+    if data is None:
+        raise HTTPException(status_code=400, detail="Station ID {} not recognised".format(station_id))
     out["name"] = data["properties"]["station_name"]
     out["elevation"] = float(data["properties"]["altitude"])
     out["ch1903+"] = data["geometry"]["coordinates"]
     lat, lng = ch1903_plus_to_latlng(out["ch1903+"][0], out["ch1903+"][1])
     out["latlng"] = [lat, lng]
-    if not os.path.exists(station_dir):
-        raise HTTPException(status_code=400, detail="Data not available for {}".format(station_id))
-    files = os.listdir(station_dir)
-    files = [os.path.join(station_dir, f) for f in files if f.endswith(".csv")]
-    files.sort()
-    df = pd.concat(map(pd.read_csv, files), ignore_index=True)
-    df[df.columns[2:]] = df[df.columns[2:]].apply(pd.to_numeric, errors='coerce').notna()
-    df = df.loc[:, df.any()]
     out["parameters"] = []
-    parameters = list(df.columns[2:])
-    for p in parameters:
-        if p in parameters_dict:
-            d = parameters_dict[p]
-            d["id"] = p
-            d["start_date"] = datetime.strptime(str(min(df.loc[df[p], 'Date'])), "%Y%m%d%H").replace(tzinfo=timezone.utc)
-            d["end_date"] = datetime.strptime(str(max(df.loc[df[p], 'Date'])), "%Y%m%d%H").replace(tzinfo=timezone.utc)
-            out["parameters"].append(d)
+    out["data_available"] = False
+    if os.path.exists(station_dir):
+        out["data_available"] = True
+        files = os.listdir(station_dir)
+        files = [os.path.join(station_dir, f) for f in files if f.endswith(".csv")]
+        files.sort()
+        df = pd.concat(map(pd.read_csv, files), ignore_index=True)
+        df[df.columns[2:]] = df[df.columns[2:]].apply(pd.to_numeric, errors='coerce').notna()
+        df = df.loc[:, df.any()]
+        parameters = list(df.columns[2:])
+        for p in parameters:
+            if p in parameters_dict:
+                d = parameters_dict[p]
+                d["id"] = p
+                d["start_date"] = datetime.strptime(str(min(df.loc[df[p], 'Date'])), "%Y%m%d%H").replace(
+                    tzinfo=timezone.utc)
+                d["end_date"] = datetime.strptime(str(max(df.loc[df[p], 'Date'])), "%Y%m%d%H").replace(
+                    tzinfo=timezone.utc)
+                out["parameters"].append(d)
     return out
 
 
@@ -360,7 +375,8 @@ def get_meteodata_measured(filesystem, station_id, parameter, start_date, end_da
 
     files = os.listdir(station_dir)
     files.sort()
-    files = [os.path.join(station_dir, f) for f in files if int(start_date[:4]) <= int(f.split(".")[1]) <= int(end_date[:4]) and f.endswith(".csv")]
+    files = [os.path.join(station_dir, f) for f in files if
+             int(start_date[:4]) <= int(f.split(".")[1]) <= int(end_date[:4]) and f.endswith(".csv")]
     df = pd.concat(map(pd.read_csv, files), ignore_index=True)
     if parameter not in df.columns:
         raise HTTPException(status_code=400,
