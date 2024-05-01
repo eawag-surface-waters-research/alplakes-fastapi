@@ -18,7 +18,8 @@ origins = [
     "https://www.alplakes.eawag.ch",
     "https://www.datalakes-eawag.ch",
     "https://www.datalakes.eawag.ch",
-    "https://master.d1x767yafo35xy.amplifyapp.com"
+    "https://master.d1x767yafo35xy.amplifyapp.com",
+    "https://pr-28.d21l70hd8m002c.amplifyapp.com"
 ]
 
 app = FastAPI(
