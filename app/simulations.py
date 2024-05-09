@@ -31,6 +31,8 @@ def get_metadata(filesystem):
                     missing_dates = []
 
                     with netCDF4.Dataset(os.path.join(path, files[0])) as nc:
+                        height = len(nc.dimensions["M"])
+                        width = len(nc.dimensions["N"])
                         start_date = functions.convert_from_unit(nc.variables["time"][0], nc.variables["time"].units)
 
                     with netCDF4.Dataset(os.path.join(path, files[-1])) as nc:
@@ -48,7 +50,9 @@ def get_metadata(filesystem):
                                        "depths": depths,
                                        "start_date": start_date.strftime("%Y-%m-%d %H:%M"),
                                        "end_date": end_date.strftime("%Y-%m-%d %H:%M"),
-                                       "missing_dates": missing_dates})
+                                       "missing_dates": missing_dates,
+                                       "height": height,
+                                       "width": width})
                 else:
                     raise ValueError("Model not recognised.")
             except:
@@ -71,6 +75,8 @@ def get_metadata_lake(filesystem, model, lake):
 
     if model == "delft3d-flow":
         with netCDF4.Dataset(os.path.join(path, files[0])) as nc:
+            height = len(nc.dimensions["M"])
+            width = len(nc.dimensions["N"])
             start_date = functions.convert_from_unit(nc.variables["time"][0], nc.variables["time"].units)
 
         with netCDF4.Dataset(os.path.join(path, files[-1])) as nc:
@@ -88,7 +94,9 @@ def get_metadata_lake(filesystem, model, lake):
                 "depths": depths,
                 "start_date": start_date.strftime("%Y-%m-%d %H:%M"),
                 "end_date": end_date.strftime("%Y-%m-%d %H:%M"),
-                "missing_weeks": missing_dates}
+                "missing_weeks": missing_dates,
+                "height": height,
+                "width": width}
     else:
         raise ValueError("Model not recognised.")
 
