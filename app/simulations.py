@@ -996,6 +996,7 @@ def get_one_dimensional_day_of_year_simstrat(filesystem, lake, parameter, depth)
                             .format(model, lake, ", ".join(os.listdir(lakes))))
     files = [os.path.join(lakes, lake, file) for file in os.listdir(os.path.join(lakes, lake)) if file.endswith(".nc")]
     files.sort()
+    files = files[24:]  # Remove first two years as a warmup
     with xr.open_mfdataset(files) as ds:
         if parameter not in ds.variables:
             raise HTTPException(status_code=400, detail="Parameter {} is not available".format(parameter))
