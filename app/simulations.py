@@ -995,7 +995,7 @@ def get_one_dimensional_day_of_year_simstrat(filesystem, lake, parameter, depth)
         raise HTTPException(status_code=400,
                             detail="{} simulation results are not available for {} please select from: [{}]"
                             .format(model, lake, ", ".join(os.listdir(lakes))))
-    doy_file = os.path.join(filesystem, "media/1dsimulations", model, "doy", "{}_{}.json".format(lake, depth))
+    doy_file = os.path.join(filesystem, "media/1dsimulations", model, "doy", "{}_{}_{}.json".format(lake, parameter, depth))
     if os.path.isfile(doy_file):
         with open(doy_file, "r") as f:
             out = json.load(f)
