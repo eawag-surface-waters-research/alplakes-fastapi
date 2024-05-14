@@ -1,4 +1,5 @@
 import os
+import json
 import netCDF4
 import numpy as np
 import xarray as xr
@@ -994,6 +995,12 @@ def get_one_dimensional_day_of_year_simstrat(filesystem, lake, parameter, depth)
         raise HTTPException(status_code=400,
                             detail="{} simulation results are not available for {} please select from: [{}]"
                             .format(model, lake, ", ".join(os.listdir(lakes))))
+    doy_file = os.path.join(filesystem, "media/1dsimulations", model, "doy", "{}_{}.json".format(lake, depth))
+    if os.path.isfile(doy_file):
+        with open(doy_file, "r") as f:
+            out = json.load(f)
+        return out
+
     files = [os.path.join(lakes, lake, file) for file in os.listdir(os.path.join(lakes, lake)) if file.endswith(".nc")]
     files.sort()
     files = files[24:]  # Remove first two years as a warmup
@@ -1002,8 +1009,8 @@ def get_one_dimensional_day_of_year_simstrat(filesystem, lake, parameter, depth)
             raise HTTPException(status_code=400, detail="Parameter {} is not available".format(parameter))
         ds['time'] = ds.indexes['time'].tz_localize('UTC')
         ds['time'] = pd.to_datetime(ds['time'].values)
+        ds = ds.sel(time=ds['time.year'] != pd.Timestamp.now().year)
         out["unit"] = ds[parameter].units
-
         if len(ds[parameter].shape) == 2:
             depths = ds.depth[:].values * - 1
             index = functions.get_closest_index(depth, depths)
@@ -1022,4 +1029,7 @@ def get_one_dimensional_day_of_year_simstrat(filesystem, lake, parameter, depth)
         out["max"] = functions.filter_parameter(max_values_doy.values)
         out["min"] = functions.filter_parameter(min_values_doy.values)
         out["std"] = functions.filter_parameter(std_values_doy.values)
+    os.makedirs(os.path.dirname(doy_file), exist_ok=True)
+    with open(doy_file, "w") as f:
+        json.dump(out, f)
     return out
