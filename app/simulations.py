@@ -987,9 +987,15 @@ def get_one_dimensional_day_of_year(filesystem, model, lake, parameter, depth):
         raise HTTPException(status_code=400, detail="Apologies not available for {}".format(model))
 
 
+def write_one_dimensional_day_of_year(filesystem, model, lake, parameter, depth):
+    if model == "simstrat":
+        return write_one_dimensional_day_of_year_simstrat(filesystem, lake, parameter, depth)
+    else:
+        raise HTTPException(status_code=400, detail="Apologies not available for {}".format(model))
+
+
 def get_one_dimensional_day_of_year_simstrat(filesystem, lake, parameter, depth):
     model = "simstrat"
-    out = {"lake": lake, "model": model}
     lakes = os.path.join(filesystem, "media/1dsimulations", model, "results")
     if not os.path.isdir(os.path.join(lakes, lake)):
         raise HTTPException(status_code=400,
@@ -1000,7 +1006,20 @@ def get_one_dimensional_day_of_year_simstrat(filesystem, lake, parameter, depth)
         with open(doy_file, "r") as f:
             out = json.load(f)
         return out
+    else:
+        raise HTTPException(status_code=400, detail="Apologies DOY has not been computed for your request.")
 
+
+def write_one_dimensional_day_of_year_simstrat(filesystem, lake, parameter, depth):
+    model = "simstrat"
+    out = {"lake": lake, "model": model}
+    lakes = os.path.join(filesystem, "media/1dsimulations", model, "results")
+    if not os.path.isdir(os.path.join(lakes, lake)):
+        raise HTTPException(status_code=400,
+                            detail="{} simulation results are not available for {} please select from: [{}]"
+                            .format(model, lake, ", ".join(os.listdir(lakes))))
+    doy_file = os.path.join(filesystem, "media/1dsimulations", model, "doy",
+                            "{}_{}_{}.json".format(lake, parameter, depth))
     files = [os.path.join(lakes, lake, file) for file in os.listdir(os.path.join(lakes, lake)) if file.endswith(".nc")]
     files.sort()
     files = files[24:]  # Remove first two years as a warmup
@@ -1032,4 +1051,3 @@ def get_one_dimensional_day_of_year_simstrat(filesystem, lake, parameter, depth)
     os.makedirs(os.path.dirname(doy_file), exist_ok=True)
     with open(doy_file, "w") as f:
         json.dump(out, f)
-    return out
