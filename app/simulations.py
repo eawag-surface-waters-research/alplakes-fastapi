@@ -783,6 +783,12 @@ class OneDimensionalModels(str, Enum):
     simstrat = "simstrat"
 
 
+class SimstratResampleOptions(str, Enum):
+    daily = "daily"
+    monthly = "monthly"
+    yearly = "yearly"
+
+
 def get_one_dimensional_metadata(filesystem):
     metadata = []
     models = os.listdir(os.path.join(filesystem, "media/1dsimulations"))
@@ -886,15 +892,15 @@ def get_one_dimensional_file(filesystem, model, lake, month):
                                                                                                              month))
 
 
-def get_one_dimensional_point(filesystem, model, lake, parameter, start_time, end_time, depth):
+def get_one_dimensional_point(filesystem, model, lake, parameter, start_time, end_time, depth, resample=None):
     if model == "simstrat":
-        return get_one_dimensional_point_simstrat(filesystem, lake, parameter, start_time, end_time, depth)
+        return get_one_dimensional_point_simstrat(filesystem, lake, parameter, start_time, end_time, depth, resample)
     else:
         raise HTTPException(status_code=400,
                             detail="Apologies not available for {}".format(model))
 
 
-def get_one_dimensional_point_simstrat(filesystem, lake, parameter, start, end, depth):
+def get_one_dimensional_point_simstrat(filesystem, lake, parameter, start, end, depth, resample):
     model = "simstrat"
     out = {"lake": lake, "model": model}
     lakes = os.path.join(filesystem, "media/1dsimulations", model, "results")
@@ -914,24 +920,27 @@ def get_one_dimensional_point_simstrat(filesystem, lake, parameter, start, end, 
         raise HTTPException(status_code=400,
                             detail="Apologies data is not available for requested period")
 
-    start_datetime = datetime.strptime(start, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
-    end_datetime = datetime.strptime(end, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
+    start_datetime = datetime.strptime(start, "%Y%m%d%H%M").replace(tzinfo=timezone.utc).astimezone().replace(tzinfo=None)
+    end_datetime = datetime.strptime(end, "%Y%m%d%H%M").replace(tzinfo=timezone.utc).astimezone().replace(tzinfo=None)
 
     with xr.open_mfdataset(files) as ds:
         if parameter not in ds.variables:
             raise HTTPException(status_code=400, detail="Parameter {} is not available".format(parameter))
-        ds['time'] = ds.indexes['time'].tz_localize('UTC')
         ds = ds.sel(time=slice(start_datetime, end_datetime))
-
         if len(ds[parameter].shape) == 2:
             depths = ds.depth[:].values * - 1
             index = functions.get_closest_index(depth, depths)
             out["depth"] = depths[index]
-            values = ds[parameter][index, :].values
-        else:
-            values = ds[parameter][:].values
-        out["time"] = functions.default_time(ds.time[:].values, "nano").tolist()
-        out[parameter] = functions.filter_parameter(values)
+            ds = ds.sel(depth=depths[index] * -1)
+
+        df = pd.DataFrame({'time': pd.to_datetime(ds['time'].values).tz_localize('UTC'), 'values': ds[parameter][:].values})
+        resample_options = {"hourly": "H", "daily": "D", "monthly": "M", "yearly": "Y"}
+        if resample is not None:
+            df.set_index('time', inplace=True)
+            df = df.resample(resample_options[resample], label='left').mean(numeric_only=True)
+            df = df.reset_index()
+        out["time"] = df["time"].tolist()
+        out[parameter] = functions.filter_parameter(df["values"])
         out["unit"] = ds[parameter].units
         return out
 
@@ -969,7 +978,6 @@ def get_one_dimensional_depth_time_simstrat(filesystem, lake, parameter, start, 
             raise HTTPException(status_code=400, detail="Parameter {} is not available".format(parameter))
         ds['time'] = ds.indexes['time'].tz_localize('UTC')
         ds = ds.sel(time=slice(start_datetime, end_datetime))
-
         if len(ds[parameter].shape) == 1:
             raise HTTPException(status_code=400, detail="Parameter {} exists but is not 2D".format(parameter))
         depths = ds.depth[:].values * - 1

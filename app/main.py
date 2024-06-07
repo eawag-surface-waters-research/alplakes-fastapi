@@ -469,13 +469,14 @@ async def one_dimensional_simulations_point(
         parameter: str = Path(..., title="Parameter", description="Parameter", example="T"),
         start_time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202309050300"),
         end_time: str = validate.path_time(description="The end time in YYYYmmddHHMM format (UTC)", example="202309072300"),
-        depth: float = validate.path_depth()):
+        depth: float = validate.path_depth(),
+        resample: Union[simulations.SimstratResampleOptions, None] = None):
     """
     Simulated timeseries of parameter for a given location and depth.
     See the metadata endpoints for list of available parameters.
     """
     validate.time_range(start_time, end_time)
-    return simulations.get_one_dimensional_point(filesystem, model, lake, parameter, start_time, end_time, depth)
+    return simulations.get_one_dimensional_point(filesystem, model, lake, parameter, start_time, end_time, depth, resample)
 
 
 @app.get("/simulations/1d/depthtime/{model}/{lake}/{parameter}/{start_time}/{end_time}", tags=["1D Simulations"])
