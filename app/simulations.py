@@ -939,6 +939,7 @@ def get_one_dimensional_point_simstrat(filesystem, lake, parameter, start, end, 
             df.set_index('time', inplace=True)
             df = df.resample(resample_options[resample], label='left').mean(numeric_only=True)
             df = df.reset_index()
+            out["resample"] = resample + " mean"
         out["time"] = df["time"].tolist()
         out[parameter] = functions.filter_parameter(df["values"])
         out["unit"] = ds[parameter].units
