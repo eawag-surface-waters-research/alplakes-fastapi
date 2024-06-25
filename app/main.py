@@ -506,20 +506,21 @@ async def one_dimensional_simulations_day_of_year(
     return simulations.get_one_dimensional_day_of_year(filesystem, model, lake, parameter, depth)
 
 
-@app.get("/simulations/1d/doy/write/{model}/{lake}/{parameter}/{depth}", tags=["1D Simulations"])
-async def write_one_dimensional_simulations_day_of_year(
-        background_tasks: BackgroundTasks,
-        model: simulations.OneDimensionalModels = Path(..., title="Model", description="Model name"),
-        lake: str = Path(..., title="Lake", description="Lake key", example="aegeri"),
-        parameter: str = Path(..., title="Parameter", description="Parameter", example="T"),
-        depth: float = validate.path_depth()):
-    """
-    Compute day of year statistics for a given parameter.
-    WARNING: Processing is slow due to the large volumes of data, once it has completed data is available from the doy
-    endpoint.
-    """
-    background_tasks.add_task(simulations.write_one_dimensional_day_of_year, filesystem, model, lake, parameter, depth)
-    return Response(status_code=202)
+if internal:
+    @app.get("/simulations/1d/doy/write/{model}/{lake}/{parameter}/{depth}", tags=["1D Simulations"])
+    async def write_one_dimensional_simulations_day_of_year(
+            background_tasks: BackgroundTasks,
+            model: simulations.OneDimensionalModels = Path(..., title="Model", description="Model name"),
+            lake: str = Path(..., title="Lake", description="Lake key", example="aegeri"),
+            parameter: str = Path(..., title="Parameter", description="Parameter", example="T"),
+            depth: float = validate.path_depth()):
+        """
+        Compute day of year statistics for a given parameter.
+        WARNING: Processing is slow due to the large volumes of data, once it has completed data is available from the doy
+        endpoint.
+        """
+        background_tasks.add_task(simulations.write_one_dimensional_day_of_year, filesystem, model, lake, parameter, depth)
+        return Response(status_code=202)
 
 
 @app.get("/remotesensing/metadata", tags=["Remote Sensing"])
