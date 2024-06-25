@@ -1033,7 +1033,7 @@ def write_one_dimensional_day_of_year_simstrat(filesystem, lake, parameter, dept
     files.sort()
     files = files[24:]  # Remove first two years as a warmup
     try:
-        with xr.open_mfdataset(files, parallel=False, decode_cf=False) as ds:
+        with xr.open_mfdataset(files, parallel=False) as ds:
             if parameter not in ds.variables:
                 raise HTTPException(status_code=400, detail="Parameter {} is not available".format(parameter))
             ds['time'] = ds.indexes['time'].tz_localize('UTC')
