@@ -1076,6 +1076,7 @@ def write_one_dimensional_day_of_year_simstrat(filesystem, lake, parameter, dept
         os.makedirs(os.path.dirname(doy_file), exist_ok=True)
         with open(doy_file, "w") as f:
             json.dump(out, f)
+        print("Succeeded in producing DOY for {}".format(lake))
     except Exception as e:
         print(e)
         print("Failed to produce DOY for {}".format(lake))
