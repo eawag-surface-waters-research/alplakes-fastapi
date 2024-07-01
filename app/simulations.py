@@ -1033,45 +1033,40 @@ def write_one_dimensional_day_of_year_simstrat(filesystem, lake, parameter, dept
     files.sort()
     files = files[24:]  # Remove first two years as a warmup
     try:
-        with xr.open_mfdataset(files, parallel=False) as ds:
-            if parameter not in ds.variables:
-                raise HTTPException(status_code=400, detail="Parameter {} is not available".format(parameter))
-            ds['time'] = ds.indexes['time'].tz_localize('UTC')
-            ds['time'] = pd.to_datetime(ds['time'].values)
-            ds = ds.sel(time=ds['time.year'] != pd.Timestamp.now().year)
-            out["unit"] = ds[parameter].units
-            if len(ds[parameter].shape) == 2:
-                depths = ds.depth[:].values * - 1
-                index = functions.get_closest_index(depth, depths)
-                out["depth"] = depths[index]
-                data = ds[parameter].isel({"depth": index})
-            else:
-                data = ds[parameter]
+        for i, file in enumerate(files):
+            with netCDF4.Dataset(file) as nc:
+                if i == 0:
+                    index = functions.get_closest_index(depth, np.array(nc.variables["depth"][:]))
+                    df = pd.DataFrame({'time': nc.variables["time"][:], 'value': nc.variables[parameter][index, :]})
+                else:
+                    df_new = pd.DataFrame({'time': nc.variables["time"][:], 'value': nc.variables[parameter][index, :]})
+                    df = pd.concat([df, df_new])
+        df["time"] = pd.to_datetime(df['time'], unit='s', utc=True)
+        df.set_index('time', inplace=True)
+        grouped = df.groupby(df.index.dayofyear)['value']
+        max_values_doy = grouped.max()
+        mean_values_doy = grouped.mean()
+        min_values_doy = grouped.min()
+        std_values_doy = grouped.std()
+        percentile_5_doy = grouped.quantile(0.05)
+        percentile_25_doy = grouped.quantile(0.25)
+        percentile_75_doy = grouped.quantile(0.75)
+        percentile_95_doy = grouped.quantile(0.95)
 
-            data = data.chunk({'time': -1})
-            max_values_doy = data.groupby('time.dayofyear').max(dim='time')
-            mean_values_doy = data.groupby('time.dayofyear').mean(dim='time')
-            min_values_doy = data.groupby('time.dayofyear').min(dim='time')
-            std_values_doy = data.groupby('time.dayofyear').std(dim='time')
-            percentile_5_doy = data.groupby('time.dayofyear').quantile(0.05, dim='time')
-            percentile_25_doy = data.groupby('time.dayofyear').quantile(0.25, dim='time')
-            percentile_75_doy = data.groupby('time.dayofyear').quantile(0.75, dim='time')
-            percentile_95_doy = data.groupby('time.dayofyear').quantile(0.95, dim='time')
+        last_year = pd.Timestamp.now().year - 1
+        df_previous_year = df[f'{last_year}-01-01':f'{last_year}-12-31']
+        daily_average_last_year = df_previous_year.groupby(df_previous_year.index.dayofyear)['value'].mean()
 
-            last_year = pd.Timestamp.now().year - 1
-            data_previous_year = data.sel(time=slice(f'{last_year}-01-01', f'{last_year}-12-31'))
-            daily_average_last_year = data_previous_year.groupby('time.dayofyear').mean(dim='time')
-
-            out["doy"] = list(range(1, 367))
-            out["mean"] = functions.filter_parameter(mean_values_doy.values)
-            out["max"] = functions.filter_parameter(max_values_doy.values)
-            out["min"] = functions.filter_parameter(min_values_doy.values)
-            out["std"] = functions.filter_parameter(std_values_doy.values)
-            out["perc5"] = functions.filter_parameter(percentile_5_doy.values)
-            out["perc25"] = functions.filter_parameter(percentile_25_doy.values)
-            out["perc75"] = functions.filter_parameter(percentile_75_doy.values)
-            out["perc95"] = functions.filter_parameter(percentile_95_doy.values)
-            out["lastyear"] = functions.filter_parameter(daily_average_last_year.values)
+        out["doy"] = list(range(1, 367))
+        out["mean"] = functions.filter_parameter(mean_values_doy.values)
+        out["max"] = functions.filter_parameter(max_values_doy.values)
+        out["min"] = functions.filter_parameter(min_values_doy.values)
+        out["std"] = functions.filter_parameter(std_values_doy.values)
+        out["perc5"] = functions.filter_parameter(percentile_5_doy.values)
+        out["perc25"] = functions.filter_parameter(percentile_25_doy.values)
+        out["perc75"] = functions.filter_parameter(percentile_75_doy.values)
+        out["perc95"] = functions.filter_parameter(percentile_95_doy.values)
+        out["lastyear"] = functions.filter_parameter(daily_average_last_year.values)
 
         os.makedirs(os.path.dirname(doy_file), exist_ok=True)
         with open(doy_file, "w") as f:
