@@ -46,6 +46,40 @@ def get_cosmo_metadata(filesystem):
     return models
 
 
+def get_icon_metadata(filesystem):
+    models = [{"model": "icon-ch1-eps", "description": "Cosmo-1e 33 hour ensemble forecast"},
+              {"model": "icon-ch2-eps", "description": "Cosmo-2e 5 day ensemble forecast"}]
+
+    for model in models:
+        files = os.listdir(os.path.join(filesystem, "media/meteoswiss/icon", model["model"]))
+        if len(files) > 0:
+            files.sort()
+            combined = '_'.join(files)
+            missing_dates = []
+
+            start_date = datetime.strptime(files[0][:10], '%Y_%m_%d')
+            end_date = datetime.strptime(files[-1][:10], '%Y_%m_%d')
+
+            for d in daterange(start_date, end_date):
+                if d.strftime('%Y_%m_%d') not in combined:
+                    if model["model"] == "KENDA-CH1":
+                        missing_dates.append((d - timedelta(days=1)).strftime("%Y-%m-%d"))
+                    else:
+                        missing_dates.append(d.strftime("%Y-%m-%d"))
+
+            if model["model"] == "KENDA-CH1":
+                start_date = start_date - timedelta(days=1)
+                end_date = end_date - timedelta(days=1)
+
+            model["start_date"] = start_date.strftime("%Y-%m-%d")
+            model["end_date"] = end_date.strftime("%Y-%m-%d")
+            model["missing_dates"] = missing_dates
+        else:
+            model["start_date"] = "NA"
+            model["end_date"] = "NA"
+    return models
+
+
 class CosmoForecast(str, Enum):
     VNXZ32 = "VNXZ32"
     VNXQ94 = "VNXQ94"
@@ -118,6 +152,113 @@ def get_cosmo_point_forecast(filesystem, model, variables, forecast_date, lat, l
 
         dist = ((ds.variables["lat_1"] - lat) ** 2 + (ds.variables["lon_1"] - lng) ** 2) ** 0.5
         xy = np.unravel_index(dist.argmin(), dist.shape)
+        x, y = xy[0], xy[1]
+        output["lat"] = float(ds.variables["lat_1"][x, y].values)
+        output["lng"] = float(ds.variables["lon_1"][x, y].values)
+
+        for var in variables:
+            if var in ds.variables.keys():
+                if len(ds.variables[var].dims) == 3:
+                    data = ds.variables[var][:, x, y].values
+                elif len(ds.variables[var].dims) == 4:
+                    data = ds.variables[var][:, 0, x, y].values
+                elif len(ds.variables[var].dims) == 5:
+                    data = ds.variables[var][:, 0, 0, x, y].values
+                else:
+                    data = []
+                output[var] = {"name": ds.variables[var].attrs["long_name"],
+                               "unit": ds.variables[var].attrs["units"],
+                               "data": np.where(np.isnan(data), None, data).tolist()}
+            else:
+                output[var] = []
+    return output
+
+
+class IconForecast(str, Enum):
+    icon_ch2_eps = "icon-ch2-eps"
+    icon_ch1_eps = "icon-ch1-eps"
+
+
+def get_icon_area_forecast(filesystem, model, input_variables, forecast_date, ll_lat, ll_lng, ur_lat, ur_lng):
+    formatted_forecast_date = datetime.strptime(forecast_date, "%Y%m%d").strftime("%Y_%m_%d")
+    file = os.path.join(filesystem, "media/meteoswiss/icon", model, "{}_00_{}_eawag_lakes.nc".format(formatted_forecast_date, model))
+    print(file)
+    if not os.path.isfile(file):
+        raise HTTPException(status_code=400,
+                            detail="Data not available for ICON {} for the following date: {}".format(model,
+                                                                                                       forecast_date))
+    output = {}
+    with xr.open_mfdataset(file) as ds:
+        bad_variables = []
+        variables = []
+        for var in input_variables:
+            if var.replace("_MEAN", "") in ds.variables.keys():
+                variables.append(var.replace("_MEAN", ""))
+            elif var + "_MEAN" in ds.variables.keys():
+                variables.append(var + "_MEAN")
+            else:
+                bad_variables.append(var)
+        if len(bad_variables) > 0:
+            raise HTTPException(status_code=400,
+                                detail="{} are bad variables for ICON {}. Please select from: {}".format(
+                                    ", ".join(bad_variables), model, ", ".join(ds.keys())))
+
+        output["time"] = [str(t)[:26] for t in ds.variables["time"].values]
+        x, y = np.where(((ds.variables["lat_1"] >= ll_lat) & (ds.variables["lat_1"] <= ur_lat) & (
+                ds.variables["lon_1"] >= ll_lng) & (ds.variables["lon_1"] <= ur_lng)))
+
+        if len(x) == 0:
+            raise HTTPException(status_code=400,
+                                detail="Data not available for ICON {} for the requsted area.".format(model))
+
+        x_min, x_max, y_min, y_max = min(x), max(x) + 1, min(y), max(y) + 1
+        output["lat"] = ds.variables["lat_1"][x_min:x_max, y_min:y_max].values.tolist()
+        output["lng"] = ds.variables["lon_1"][x_min:x_max, y_min:y_max].values.tolist()
+        for var in variables:
+            if var in ds.variables.keys():
+                if len(ds.variables[var].dims) == 3:
+                    data = ds.variables[var][:, x_min:x_max, y_min:y_max].values
+                elif len(ds.variables[var].dims) == 4:
+                    data = ds.variables[var][:, 0, x_min:x_max, y_min:y_max].values
+                elif len(ds.variables[var].dims) == 5:
+                    data = ds.variables[var][:, 0, 0, x_min:x_max, y_min:y_max].values
+                else:
+                    data = []
+                output[var] = {"name": ds.variables[var].attrs["long_name"],
+                               "unit": ds.variables[var].attrs["units"],
+                               "data": np.where(np.isnan(data), None, data).tolist()}
+            else:
+                output[var] = []
+    return output
+
+
+def get_icon_point_forecast(filesystem, model, input_variables, forecast_date, lat, lng):
+    formatted_forecast_date = datetime.strptime(forecast_date, "%Y%m%d").strftime("%Y_%m_%d")
+    file = os.path.join(filesystem, "media/meteoswiss/icon", model, "{}_00_{}_eawag_lakes.nc".format(formatted_forecast_date, model))
+    if not os.path.isfile(file):
+        raise HTTPException(status_code=400,
+                            detail="Data not available for ICON {} for the following date: {}".format(model,
+                                                                                                       forecast_date))
+    output = {}
+    with xr.open_mfdataset(file) as ds:
+        bad_variables = []
+        variables = []
+        for var in input_variables:
+            if var.replace("_MEAN", "") in ds.variables.keys():
+                variables.append(var.replace("_MEAN", ""))
+            elif var + "_MEAN" in ds.variables.keys():
+                variables.append(var + "_MEAN")
+            else:
+                bad_variables.append(var)
+        if len(bad_variables) > 0:
+            raise HTTPException(status_code=400,
+                                detail="{} are bad variables for ICON {}. Please select from: {}".format(
+                                    ", ".join(bad_variables), model, ", ".join(ds.keys())))
+
+        output["time"] = [str(t)[:26] for t in ds.variables["time"].values]
+
+        dist = ((ds.variables["lat_1"] - lat) ** 2 + (ds.variables["lon_1"] - lng) ** 2) ** 0.5
+        xy = np.unravel_index(np.argmin(dist.values), dist.shape)
         x, y = xy[0], xy[1]
         output["lat"] = float(ds.variables["lat_1"][x, y].values)
         output["lng"] = float(ds.variables["lon_1"][x, y].values)

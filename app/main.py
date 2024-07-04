@@ -152,6 +152,63 @@ if internal:
         validate.date(forecast_date)
         return meteoswiss.get_cosmo_point_forecast(filesystem, model, variables, forecast_date, lat, lng)
 
+
+    @app.get("/meteoswiss/icon/metadata", tags=["Meteoswiss"])
+    async def meteoswiss_icon_metadata():
+        """
+        JSON of all the available MeteoSwiss ICON data.
+        """
+        return meteoswiss.get_icon_metadata(filesystem)
+
+
+    @app.get("/meteoswiss/icon/area/forecast/{model}/{forecast_date}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}",
+             tags=["Meteoswiss"])
+    async def meteoswiss_icon_area_forecast(model: meteoswiss.IconForecast,
+                                             forecast_date: str = validate.path_date(
+                                                 description="The forecast date in YYYYmmdd format", example="20240703"),
+                                             ll_lat: float = validate.path_latitude(example="46.49",
+                                                                                    description="Latitude of lower left corner of bounding box (WGS 84)"),
+                                             ll_lng: float = validate.path_longitude(example="6.65",
+                                                                                     description="Longitude of lower left corner of bounding box (WGS 84)"),
+                                             ur_lat: float = validate.path_latitude(example="46.51",
+                                                                                    description="Latitude of upper right corner of bounding box (WGS 84)"),
+                                             ur_lng: float = validate.path_longitude(example="6.67",
+                                                                                     description="Longitude of upper right corner of bounding box (WGS 84)"),
+                                             variables: list[str] = Query(
+                                                 default=["T_2M", "U", "V", "GLOB",
+                                                          "RELHUM_2M", "PMSL", "CLCT"])):
+        """
+        Weather data from MeteoSwiss ICON forecasts for a rectangular bounding box.
+
+        Available models:
+        - icon-ch2-eps (forecast):  ICON-CH2-EPS 5 day ensemble forecast
+        - icon-ch1-eps (forecast):  ICON-CH1-EPS 33 hour ensemble forecast
+        """
+        validate.date(forecast_date)
+        return meteoswiss.get_icon_area_forecast(filesystem, model, variables, forecast_date, ll_lat, ll_lng, ur_lat,
+                                                  ur_lng)
+
+
+    @app.get("/meteoswiss/icon/point/forecast/{model}/{forecast_date}/{lat}/{lng}", tags=["Meteoswiss"])
+    async def meteoswiss_icon_point_forecast(model: meteoswiss.IconForecast,
+                                              forecast_date: str = validate.path_date(
+                                                  description="The forecast date in YYYYmmdd format", example="20240703"),
+                                              lat: float = validate.path_latitude(),
+                                              lng: float = validate.path_longitude(),
+                                              variables: list[str] = Query(
+                                                  default=["T_2M", "U", "V", "GLOB",
+                                                           "RELHUM_2M",
+                                                           "PMSL", "CLCT"])):
+        """
+        Weather data from MeteoSwiss ICON forecasts for a single point.
+
+        Available models:
+        - icon-ch2-eps (forecast):  ICON-CH2-EPS 5 day ensemble forecast
+        - icon-ch1-eps (forecast):  ICON-CH1-EPS 33 hour ensemble forecast
+        """
+        validate.date(forecast_date)
+        return meteoswiss.get_icon_point_forecast(filesystem, model, variables, forecast_date, lat, lng)
+
     @app.get("/meteoswiss/meteodata/metadata", tags=["Meteoswiss"])
     async def meteoswiss_meteodata_metadata():
         """

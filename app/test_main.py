@@ -20,6 +20,45 @@ def test_meteoswiss_cosmo_metadata():
     assert isinstance(response.json(), list)
 
 
+def test_meteoswiss_icon_metadata():
+    """
+    Test the meteoswiss_icon_metadata endpoint to ensure it returns the expected list.
+    """
+    response = client.get("/meteoswiss/icon/metadata")
+    assert response.status_code == 200
+    assert isinstance(response.json(), list)
+
+
+def test_icon_area_forecast():
+    """
+    Test the meteoswiss_icon_area_forecast endpoint to ensure it returns the expected data.
+    """
+    response = client.get("/meteoswiss/icon/area/forecast/icon-ch2-eps/20240703/46.49/6.65/46.51/6.67")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, dict)
+    assert "time" in data
+    assert isinstance(data["time"], list)
+    assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S.%f")
+    assert "lat" in data
+    assert "lng" in data
+
+
+def test_icon_point_forecast():
+    """
+    Test the meteoswiss_icon_point_forecast endpoint to ensure it returns the expected data.
+    """
+    response = client.get("/meteoswiss/icon/point/forecast/icon-ch2-eps/20240703/46.49/6.65")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, dict)
+    assert "time" in data
+    assert isinstance(data["time"], list)
+    assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S.%f")
+    assert "lat" in data
+    assert "lng" in data
+
+
 def test_meteoswiss_meteodata_station_metadata():
     """
     Test the meteoswiss_meteodata_station_metadata endpoint to ensure it returns the expected list.
