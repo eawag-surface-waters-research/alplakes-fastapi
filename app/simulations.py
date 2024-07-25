@@ -678,7 +678,9 @@ def get_simulations_point_delft3dflow(filesystem, lake, start, end, depth, latit
             max_time = np.max(time)
             start_time = functions.convert_to_unit(start_datetime, nc.variables["time"].units)
             end_time = functions.convert_to_unit(end_datetime, nc.variables["time"].units)
-            if min_time <= start_time <= max_time:
+            if start_time > max_time:
+                continue
+            if min_time <= start_time:
                 time_index_start = functions.get_closest_index(start_time, time)
             else:
                 time_index_start = 0
@@ -707,6 +709,10 @@ def get_simulations_point_delft3dflow(filesystem, lake, start, end, depth, latit
                 u_out = np.concatenate((u_out, u), axis=0)
                 v_out = np.concatenate((v_out, v), axis=0)
                 at_out = np.concatenate((at_out, at), axis=0)
+
+    if len(t_out) == 0:
+        raise HTTPException(status_code=400,
+                            detail="Apologies data is not available within your time selection.")
 
     output = {"lake": lake,
               "time": at_out.tolist(),
