@@ -12,7 +12,6 @@ from app.functions import daterange, ch1903_plus_to_latlng
 
 def get_cosmo_metadata(filesystem):
     models = [{"model": "VNXQ34", "description": "Cosmo-1e 1 day deterministic"},
-              {"model": "VNJK21", "description": "Cosmo-1e 1 day ensemble forecast"},
               {"model": "VNXQ94", "description": "Cosmo-1e 33 hour ensemble forecast"},
               {"model": "VNXZ32", "description": "Cosmo-2e 5 day ensemble forecast"}]
 
@@ -47,8 +46,9 @@ def get_cosmo_metadata(filesystem):
 
 
 def get_icon_metadata(filesystem):
-    models = [{"model": "icon-ch1-eps", "description": "Cosmo-1e 33 hour ensemble forecast"},
-              {"model": "icon-ch2-eps", "description": "Cosmo-2e 5 day ensemble forecast"}]
+    models = [{"model": "icon-ch1-eps", "description": "ICON-CH1-EPS 33 hour ensemble forecast"},
+              {"model": "icon-ch2-eps", "description": "ICON-CH2-EPS 5 day ensemble forecast"},
+              {"model": "kenda-ch1", "description": "KENDA-CH1 1 day deterministic reanalysis"}]
 
     for model in models:
         files = os.listdir(os.path.join(filesystem, "media/meteoswiss/icon", model["model"]))
@@ -62,12 +62,12 @@ def get_icon_metadata(filesystem):
 
             for d in daterange(start_date, end_date):
                 if d.strftime('%Y_%m_%d') not in combined:
-                    if model["model"] == "KENDA-CH1":
+                    if model["model"] == "kenda-ch1":
                         missing_dates.append((d - timedelta(days=1)).strftime("%Y-%m-%d"))
                     else:
                         missing_dates.append(d.strftime("%Y-%m-%d"))
 
-            if model["model"] == "KENDA-CH1":
+            if model["model"] == "kenda-ch1":
                 start_date = start_date - timedelta(days=1)
                 end_date = end_date - timedelta(days=1)
 
@@ -182,7 +182,6 @@ class IconForecast(str, Enum):
 def get_icon_area_forecast(filesystem, model, input_variables, forecast_date, ll_lat, ll_lng, ur_lat, ur_lng):
     formatted_forecast_date = datetime.strptime(forecast_date, "%Y%m%d").strftime("%Y_%m_%d")
     file = os.path.join(filesystem, "media/meteoswiss/icon", model, "{}_00_{}_eawag_lakes.nc".format(formatted_forecast_date, model))
-    print(file)
     if not os.path.isfile(file):
         raise HTTPException(status_code=400,
                             detail="Data not available for ICON {} for the following date: {}".format(model,
@@ -283,7 +282,6 @@ def get_icon_point_forecast(filesystem, model, input_variables, forecast_date, l
 
 class CosmoReanalysis(str, Enum):
     VNXQ34 = "VNXQ34"
-    VNJK21 = "VNJK21"
 
 
 def get_cosmo_area_reanalysis(filesystem, model, variables, start_date, end_date, ll_lat, ll_lng, ur_lat, ur_lng):
@@ -412,6 +410,140 @@ def get_cosmo_point_reanalysis(filesystem, model, variables, start_date, end_dat
     except xr.MergeError as e:
         raise HTTPException(status_code=400,
                             detail="COSMO grid is not consistent between {} and {}, please access individual days.".format(
+                                start_date, end_date))
+    except Exception as e:
+        raise
+
+
+class IconReanalysis(str, Enum):
+    kenda_ch1 = "kenda-ch1"
+
+
+def get_icon_area_reanalysis(filesystem, model, variables, start_date, end_date, ll_lat, ll_lng, ur_lat, ur_lng):
+    # For reanalysis files the date on the file is one day after the data in the file
+    folder = os.path.join(filesystem, "media/meteoswiss/icon", model)
+    start_date = datetime.strptime(start_date, '%Y%m%d')
+    end_date = datetime.strptime(end_date, '%Y%m%d')
+    files = [os.path.join(folder, "{}_00_kenda-ch1_eawag_lakes.nc".format((start_date + timedelta(days=x)).strftime("%Y_%m_%d")))
+             for x in range(1, (end_date - start_date).days + 2)]
+    bad_files = []
+    for file in files:
+        if not os.path.isfile(file):
+            actual_date = datetime.strptime(file.split("/")[-1][:10], '%Y_%m_%d') - timedelta(days=1)
+            bad_files.append(actual_date.strftime("%Y-%m-%d"))
+    if len(bad_files) > 0:
+        raise HTTPException(status_code=400,
+                            detail="Data not available for KENDA {} for the following dates: {}".format(model,
+                                                                                                        ", ".join(
+                                                                                                            bad_files)))
+    output = {}
+    try:
+        with xr.open_mfdataset(files) as ds:
+            bad_variables = []
+            for var in variables:
+                if var not in ds.variables.keys():
+                    bad_variables.append(var)
+            if len(bad_variables) > 0:
+                raise HTTPException(status_code=400,
+                                    detail="{} are bad variables for COSMO {}. Please select from: {}".format(
+                                        ", ".join(bad_variables), model, ", ".join(ds.keys())))
+            output["time"] = np.array(ds.variables["time"].values, dtype=str).tolist()
+            if len(ds.variables["lat_1"].shape) == 3:
+                x, y = np.where(((ds.variables["lat_1"][0] >= ll_lat) & (ds.variables["lat_1"][0] <= ur_lat) & (
+                        ds.variables["lon_1"][0] >= ll_lng) & (ds.variables["lon_1"][0] <= ur_lng)))
+            else:
+                x, y = np.where(((ds.variables["lat_1"] >= ll_lat) & (ds.variables["lat_1"] <= ur_lat) & (
+                        ds.variables["lon_1"] >= ll_lng) & (ds.variables["lon_1"] <= ur_lng)))
+
+            if len(x) == 0:
+                raise HTTPException(status_code=400,
+                                    detail="Requested area is outside of the KENDA coverage area, or is too small.".format(
+                                        model))
+
+            x_min, x_max, y_min, y_max = min(x), max(x) + 1, min(y), max(y) + 1
+            if len(ds.variables["lat_1"].dims) == 3:
+                output["lat"] = ds.variables["lat_1"][0, x_min:x_max, y_min:y_max].values.tolist()
+                output["lng"] = ds.variables["lon_1"][0, x_min:x_max, y_min:y_max].values.tolist()
+            else:
+                output["lat"] = ds.variables["lat_1"][x_min:x_max, y_min:y_max].values.tolist()
+                output["lng"] = ds.variables["lon_1"][x_min:x_max, y_min:y_max].values.tolist()
+            for var in variables:
+                if var in ds.variables.keys():
+                    if len(ds.variables[var].dims) == 3:
+                        data = ds.variables[var][:, x_min:x_max, y_min:y_max].values
+                    elif len(ds.variables[var].dims) == 4:
+                        data = ds.variables[var][:, 0, x_min:x_max, y_min:y_max].values
+                    else:
+                        data = []
+                    output[var] = {"name": ds.variables[var].attrs["long_name"],
+                                   "unit": ds.variables[var].attrs["units"],
+                                   "data": np.where(np.isnan(data), None, data).tolist()}
+                else:
+                    output[var] = []
+        return output
+    except xr.MergeError as e:
+        raise HTTPException(status_code=400,
+                            detail="KENDA grid is not consistent between {} and {}, please access individual days.".format(
+                                start_date, end_date))
+    except Exception as e:
+        raise
+
+
+def get_icon_point_reanalysis(filesystem, model, variables, start_date, end_date, lat, lng):
+    # For reanalysis files the date on the file is one day after the data in the file
+    folder = os.path.join(filesystem, "media/meteoswiss/icon", model)
+    start_date = datetime.strptime(start_date, '%Y%m%d')
+    end_date = datetime.strptime(end_date, '%Y%m%d')
+    files = [os.path.join(folder, "{}_00_kenda-ch1_eawag_lakes.nc".format((start_date + timedelta(days=x)).strftime("%Y_%m_%d"))) for x in range(1, (end_date - start_date).days + 2)]
+    bad_files = []
+    for file in files:
+        if not os.path.isfile(file):
+            actual_date = datetime.strptime(file.split("/")[-1][:10], '%Y_%m_%d') - timedelta(days=1)
+            bad_files.append(actual_date.strftime("%Y-%m-%d"))
+    if len(bad_files) > 0:
+        raise HTTPException(status_code=400,
+                            detail="Data not available for KENDA {} for the following dates: {}".format(model,
+                                                                                                        ", ".join(
+                                                                                                            bad_files)))
+    output = {}
+    try:
+        with xr.open_mfdataset(files) as ds:
+            bad_variables = []
+            for var in variables:
+                if var not in ds.variables.keys():
+                    bad_variables.append(var)
+            if len(bad_variables) > 0:
+                raise HTTPException(status_code=400,
+                                    detail="{} are bad variables for KENDA {}. Please select from: {}".format(
+                                        ", ".join(bad_variables), model, ", ".join(ds.keys())))
+            output["time"] = np.array(ds.variables["time"].values, dtype=str).tolist()
+
+            dist = ((ds.variables["lat_1"] - lat) ** 2 + (ds.variables["lon_1"] - lng) ** 2) ** 0.5
+            xy = np.unravel_index(dist.argmin(), dist.shape)
+            x, y = xy[0], xy[1]
+            if len(ds.variables["lat_1"].shape) == 3:
+                output["lat"] = float(ds.variables["lat_1"][0, x, y].values)
+                output["lng"] = float(ds.variables["lon_1"][0, x, y].values)
+            else:
+                output["lat"] = float(ds.variables["lat_1"][x, y].values)
+                output["lng"] = float(ds.variables["lon_1"][x, y].values)
+            for var in variables:
+                if var in ds.variables.keys():
+                    if len(ds.variables[var].dims) == 3:
+                        data = ds.variables[var][:, x, y].values
+                    elif len(ds.variables[var].dims) == 4:
+                        data = ds.variables[var][:, 0, x, y].values
+                    else:
+                        data = []
+                    output[var] = {"name": ds.variables[var].attrs["long_name"],
+                                   "unit": ds.variables[var].attrs["units"],
+                                   "data": np.where(np.isnan(data), None, data).tolist()}
+                else:
+                    output[var] = []
+        return output
+    except xr.MergeError as e:
+        raise HTTPException(status_code=400,
+                            detail="KENDA grid is not consistent between {} and {}, please access individual days.".format(
                                 start_date, end_date))
     except Exception as e:
         raise

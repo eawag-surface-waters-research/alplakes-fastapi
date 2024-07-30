@@ -241,7 +241,9 @@ def get_simulations_layer_alplakes_delft3dflow(filesystem, lake, parameter, star
             max_time = np.max(time)
             start_time = functions.convert_to_unit(start_datetime, nc.variables["time"].units)
             end_time = functions.convert_to_unit(end_datetime, nc.variables["time"].units)
-            if min_time <= start_time <= max_time:
+            if start_time > max_time:
+                continue
+            if min_time <= start_time:
                 time_index_start = functions.get_closest_index(start_time, time)
             else:
                 time_index_start = 0
@@ -589,7 +591,9 @@ def get_simulations_depthtime_delft3dflow(filesystem, lake, start, end, latitude
             max_time = np.max(time)
             start_time = functions.convert_to_unit(start_datetime, nc.variables["time"].units)
             end_time = functions.convert_to_unit(end_datetime, nc.variables["time"].units)
-            if min_time <= start_time <= max_time:
+            if start_time > max_time:
+                continue
+            if min_time <= start_time:
                 time_index_start = functions.get_closest_index(start_time, time)
             else:
                 time_index_start = 0
@@ -761,7 +765,9 @@ def get_simulations_layer_average_temperature_delft3dflow(filesystem, lake, star
             max_time = np.max(time)
             start_time = functions.convert_to_unit(start_datetime, nc.variables["time"].units)
             end_time = functions.convert_to_unit(end_datetime, nc.variables["time"].units)
-            if min_time <= start_time <= max_time:
+            if start_time > max_time:
+                continue
+            if min_time <= start_time:
                 time_index_start = functions.get_closest_index(start_time, time)
             else:
                 time_index_start = 0

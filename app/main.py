@@ -93,7 +93,6 @@ if internal:
 
         Available models:
         - VNXQ34 (reanalysis): Cosmo-1e 1 day deterministic
-        - VNJK21 (reanalysis): Cosmo-1e 1 day ensemble forecast
         """
         validate.date_range(start_date, end_date)
         return meteoswiss.get_cosmo_area_reanalysis(filesystem, model, variables, start_date, end_date, ll_lat, ll_lng, ur_lat, ur_lng)
@@ -128,8 +127,6 @@ if internal:
 
         Available models:
         - VNXQ34 (reanalysis): Cosmo-1e 1 day deterministic
-        - VNJK21 (reanalysis): Cosmo-1e 1 day ensemble forecast
-
         """
         validate.date_range(start_date, end_date)
         return meteoswiss.get_cosmo_point_reanalysis(filesystem, model, variables, start_date, end_date, lat, lng)
@@ -161,6 +158,32 @@ if internal:
         return meteoswiss.get_icon_metadata(filesystem)
 
 
+    @app.get("/meteoswiss/icon/area/reanalysis/{model}/{start_date}/{end_date}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}", tags=["Meteoswiss"])
+    async def meteoswiss_icon_area_reanalysis(model: meteoswiss.IconReanalysis,
+                                               start_date: str = validate.path_date(
+                                                   description="The start date in YYYYmmdd format", example="20240729"),
+                                               end_date: str = validate.path_date(
+                                                   description="The end date in YYYYmmdd format", example="20240730"),
+                                               ll_lat: float = validate.path_latitude(example="46.49",
+                                                                                      description="Latitude of lower left corner of bounding box (WGS 84)"),
+                                               ll_lng: float = validate.path_longitude(example="6.65",
+                                                                                       description="Longitude of lower left corner of bounding box (WGS 84)"),
+                                               ur_lat: float = validate.path_latitude(example="46.51",
+                                                                                      description="Latitude of upper right corner of bounding box (WGS 84)"),
+                                               ur_lng: float = validate.path_longitude(example="6.67",
+                                                                                       description="Longitude of upper right corner of bounding box (WGS 84)"),
+                                               variables: list[str] = Query(
+                                                   default=["T_2M", "U", "V", "GLOB", "RELHUM_2M", "PMSL", "CLCT"])):
+        """
+        Weather data from MeteoSwiss ICON reanalysis for a rectangular bounding box.
+
+        Available models:
+        - kenda-ch1 (reanalysis): 1 day deterministic
+        """
+        validate.date_range(start_date, end_date)
+        return meteoswiss.get_icon_area_reanalysis(filesystem, model, variables, start_date, end_date, ll_lat, ll_lng,
+                                                    ur_lat, ur_lng)
+
     @app.get("/meteoswiss/icon/area/forecast/{model}/{forecast_date}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}",
              tags=["Meteoswiss"])
     async def meteoswiss_icon_area_forecast(model: meteoswiss.IconForecast,
@@ -188,6 +211,24 @@ if internal:
         return meteoswiss.get_icon_area_forecast(filesystem, model, variables, forecast_date, ll_lat, ll_lng, ur_lat,
                                                   ur_lng)
 
+    @app.get("/meteoswiss/icon/point/reanalysis/{model}/{start_date}/{end_date}/{lat}/{lng}", tags=["Meteoswiss"])
+    async def meteoswiss_icon_point_reanalysis(model: meteoswiss.IconReanalysis,
+                                               start_date: str = validate.path_date(
+                                                   description="The start date in YYYYmmdd format", example="20240729"),
+                                               end_date: str = validate.path_date(
+                                                   description="The end date in YYYYmmdd format", example="20240730"),
+                                               lat: float = validate.path_latitude(),
+                                               lng: float = validate.path_longitude(),
+                                               variables: list[str] = Query(
+                                                   default=["T_2M", "U", "V", "GLOB", "RELHUM_2M", "PMSL", "CLCT"])):
+        """
+        Weather data from MeteoSwiss ICON reanalysis for a single point.
+
+        Available models:
+        - kenda-ch1 (reanalysis): 1 day deterministic
+        """
+        validate.date_range(start_date, end_date)
+        return meteoswiss.get_icon_point_reanalysis(filesystem, model, variables, start_date, end_date, lat, lng)
 
     @app.get("/meteoswiss/icon/point/forecast/{model}/{forecast_date}/{lat}/{lng}", tags=["Meteoswiss"])
     async def meteoswiss_icon_point_forecast(model: meteoswiss.IconForecast,
