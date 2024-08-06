@@ -54,7 +54,7 @@ def date_range(start, end):
 def time_range(start, end):
     time(start)
     time(end)
-    if datetime.strptime(start, '%Y%m%d%H%M') > datetime.strptime(end, '%Y%m%d%H%M'):
+    if datetime.strptime(start, '%Y%m%d%H%M') >= datetime.strptime(end, '%Y%m%d%H%M'):
         raise HTTPException(status_code=400, detail="Start time must be before end time.")
 
 

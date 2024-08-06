@@ -65,7 +65,7 @@ async def value_error_exception_handler(request: Request, exc: ValueError):
                             "updates on bug fixes please contact James Runnalls (james.runnall@eawag.ch)"})
 
 
-@app.get("/")
+@app.get("/", include_in_schema=False)
 def welcome():
     return {"Welcome to the Alplakes API from Eawag. Navigate to /docs or /redoc for documentation. For "
             "queries please contact James Runnalls (james.runnall@eawag.ch)."}
@@ -443,7 +443,7 @@ async def simulations_layer(model: simulations.Models = Path(..., title="Model",
 
 
 @app.get("/simulations/layer_alplakes/{model}/{lake}/{parameter}/{start_time}/{end_time}/{depth}", tags=["3D Simulations"],
-         response_class=PlainTextResponse)
+         response_class=PlainTextResponse, include_in_schema=False)
 async def simulations_layer_alplakes(model: simulations.Models = Path(..., title="Model", description="Model name"),
                                      lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
                                      parameter: simulations.Parameters = Path(..., title="Parameter", description="Parameter"),
