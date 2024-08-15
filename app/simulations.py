@@ -1053,8 +1053,10 @@ def write_one_dimensional_day_of_year_simstrat(filesystem, lake, parameter, dept
                 else:
                     df_new = pd.DataFrame({'time': nc.variables["time"][:], 'value': nc.variables[parameter][index, :]})
                     df = pd.concat([df, df_new])
+        last_year = pd.Timestamp.now().year - 1
         df["time"] = pd.to_datetime(df['time'], unit='s', utc=True)
         df.set_index('time', inplace=True)
+        df = df[:f'{last_year}-12-31']
         grouped = df.groupby(df.index.dayofyear)['value']
         max_values_doy = grouped.max()
         mean_values_doy = grouped.mean()
@@ -1064,11 +1066,10 @@ def write_one_dimensional_day_of_year_simstrat(filesystem, lake, parameter, dept
         percentile_25_doy = grouped.quantile(0.25)
         percentile_75_doy = grouped.quantile(0.75)
         percentile_95_doy = grouped.quantile(0.95)
-
-        last_year = pd.Timestamp.now().year - 1
         df_previous_year = df[f'{last_year}-01-01':f'{last_year}-12-31']
         daily_average_last_year = df_previous_year.groupby(df_previous_year.index.dayofyear)['value'].mean()
-
+        out["min_date"] = df.index.min().isoformat()
+        out["max_date"] = df.index.max().isoformat()
         out["doy"] = list(range(1, 367))
         out["mean"] = functions.filter_parameter(mean_values_doy.values)
         out["max"] = functions.filter_parameter(max_values_doy.values)
