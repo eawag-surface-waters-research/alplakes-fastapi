@@ -27,7 +27,7 @@ app = FastAPI(
     description="Alplakes API provides researchers and the public programmatic access to "
                 "historical and forecasted simulation data from lakes across the alpine region. The API supports both "
                 "geospatial and temporal queries. It is the backend for the website www.alplakes.eawag.ch. For bug "
-                "reports, collaborations or requests please get in touch.",
+                "reports, collaborations, requests or to join the mailing list for updates please get in touch.",
     version="1.0.0",
     contact={
         "name": "James Runnalls",
@@ -163,7 +163,7 @@ if internal:
                                                start_date: str = validate.path_date(
                                                    description="The start date in YYYYmmdd format", example="20240729"),
                                                end_date: str = validate.path_date(
-                                                   description="The end date in YYYYmmdd format", example="20240730"),
+                                                   description="The end date in YYYYmmdd format", example="20240729"),
                                                ll_lat: float = validate.path_latitude(example="46.49",
                                                                                       description="Latitude of lower left corner of bounding box (WGS 84)"),
                                                ll_lng: float = validate.path_longitude(example="6.65",
@@ -322,39 +322,6 @@ if internal:
         """
         validate.date_range(start_date, end_date)
         return bafu.get_hydrodata_measured(filesystem, station_id, parameter, start_date, end_date, resample)
-
-    @app.get("/bafu/hydrodata/predicted/{status}/{station_id}/{model}", tags=["Bafu"])
-    async def bafu_hydrodata_predicted(status: bafu.HydrodataPredicted = Path(..., title="Status", description="Publication status"),
-                                       station_id: str = Path(..., regex=r"^\d{4}$", title="Station ID", example=2009, description="4 digit station identification code"),
-                                       model: str = Path(..., title="Model", description="Predictive model", example="C1E_Med")):
-        """
-        Hydrological predictions from the Bafu predictive river models. Data is only available for the most recent prediction.
-
-        All station id's and the available parameters can be access from the metadata endpoint.
-
-        Publication status:
-        - unofficial: pqprevi-unofficial
-        - official: pqprevi-official
-        """
-        return bafu.get_hydrodata_predicted(filesystem, status, station_id, model)
-
-    @app.get("/bafu/hydrodata/total_lake_inflow/metadata", tags=["Bafu"])
-    async def bafu_hydrodata_total_lake_inflow_metadata():
-        """
-        Metadata for the Bafu total lake inflow predictions.
-        """
-        return bafu.metadata_hydrodata_total_lake_inflow(filesystem)
-
-    @app.get("/bafu/hydrodata/total_lake_inflow/{lake}/{parameter}/{start_date}/{end_date}", tags=["Bafu"])
-    async def bafu_hydrodata_total_lake_inflow(lake: str = Path(..., title="Lake", example="Lac_Leman", description="Lake name"),
-                                               parameter: str = Path(..., title="Parameter", example="C1E_Med", description="Parameter"),
-                                               start_date: str = validate.path_date(description="The start date in YYYYmmdd format"),
-                                               end_date: str = validate.path_date(description="The end date in YYYYmmdd format")):
-        """
-        Predicted total lake inflow from Bafu.
-        """
-        validate.date_range(start_date, end_date)
-        return bafu.get_hydrodata_total_lake_inflow(filesystem, lake, parameter, start_date, end_date)
 
 if internal:
     @app.get("/insitu/secchi/metadata", tags=["Insitu"])

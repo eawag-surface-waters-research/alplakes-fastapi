@@ -12,128 +12,170 @@ def test_welcome():
 
 
 def test_meteoswiss_cosmo_metadata():
-    """
-    Test the meteoswiss_cosmo_metadata endpoint to ensure it returns the expected list.
-    """
     response = client.get("/meteoswiss/cosmo/metadata")
     assert response.status_code == 200
     assert isinstance(response.json(), list)
 
 
+def test_get_cosmo_area_reanalysis():
+    response = client.get("/meteoswiss/cosmo/area/reanalysis/VNXQ34/20230101/20230101/46.49/6.65/46.51/6.67")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, dict)
+    assert "time" in data
+    assert isinstance(data["time"], list)
+    assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
+    assert "lat" in data
+    assert "lng" in data
+
+
+def test_get_cosmo_area_forecast():
+    response = client.get("/meteoswiss/cosmo/area/forecast/VNXZ32/20230101/46.49/6.65/46.51/6.67")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, dict)
+    assert "time" in data
+    assert isinstance(data["time"], list)
+    assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
+    assert "lat" in data
+    assert "lng" in data
+
+
+def test_get_cosmo_point_reanalysis():
+    response = client.get("/meteoswiss/cosmo/point/reanalysis/VNXQ34/20230101/20230101/46.5/6.67")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, dict)
+    assert "time" in data
+    assert isinstance(data["time"], list)
+    assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
+    assert "lat" in data
+    assert "lng" in data
+
+
+def test_get_cosmo_point_forecast():
+    response = client.get("/meteoswiss/cosmo/point/forecast/VNXZ32/20230101/46.5/6.67")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, dict)
+    assert "time" in data
+    assert isinstance(data["time"], list)
+    assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
+    assert "lat" in data
+    assert "lng" in data
+
+
 def test_meteoswiss_icon_metadata():
-    """
-    Test the meteoswiss_icon_metadata endpoint to ensure it returns the expected list.
-    """
     response = client.get("/meteoswiss/icon/metadata")
     assert response.status_code == 200
     assert isinstance(response.json(), list)
 
 
+def test_get_icon_area_reanalysis():
+    response = client.get("/meteoswiss/icon/area/reanalysis/kenda-ch1/20240729/20240729/46.49/6.65/46.51/6.67")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, dict)
+    assert "time" in data
+    assert isinstance(data["time"], list)
+    assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
+    assert "lat" in data
+    assert "lng" in data
+
+
 def test_icon_area_forecast():
-    """
-    Test the meteoswiss_icon_area_forecast endpoint to ensure it returns the expected data.
-    """
     response = client.get("/meteoswiss/icon/area/forecast/icon-ch2-eps/20240703/46.49/6.65/46.51/6.67")
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, dict)
     assert "time" in data
     assert isinstance(data["time"], list)
-    assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S.%f")
+    assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
+    assert "lat" in data
+    assert "lng" in data
+
+
+def test_icon_point_reanalysis():
+    response = client.get("/meteoswiss/icon/point/reanalysis/kenda-ch1/20240729/20240729/46.49/6.65")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, dict)
+    assert "time" in data
+    assert isinstance(data["time"], list)
+    assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
     assert "lat" in data
     assert "lng" in data
 
 
 def test_icon_point_forecast():
-    """
-    Test the meteoswiss_icon_point_forecast endpoint to ensure it returns the expected data.
-    """
     response = client.get("/meteoswiss/icon/point/forecast/icon-ch2-eps/20240703/46.49/6.65")
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, dict)
     assert "time" in data
     assert isinstance(data["time"], list)
-    assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S.%f")
+    assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
     assert "lat" in data
     assert "lng" in data
 
 
-def test_meteoswiss_meteodata_station_metadata():
-    """
-    Test the meteoswiss_meteodata_station_metadata endpoint to ensure it returns the expected list.
-    """
+def test_meteoswiss_meteodata_station_metadata_station():
     response = client.get("/meteoswiss/meteodata/metadata/PUY")
     assert response.status_code == 200
     assert isinstance(response.json(), dict)
 
 
 def test_meteoswiss_meteodata_measured():
-    """
-    Test the meteoswiss_meteodata_measured endpoint
-    """
     parameter = "pva200h0"
-    response = client.get("/meteoswiss/meteodata/measured/PUY/{}/19810101/20100101".format(parameter))
+    response = client.get("/meteoswiss/meteodata/measured/PUY/{}/20230101/20240210".format(parameter))
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, dict)
     assert parameter in data
-    assert "Time" in data
+    assert "time" in data
     assert isinstance(data[parameter], list)
-    assert isinstance(data["Time"], list)
+    assert isinstance(data["time"], list)
     assert isinstance(data[parameter][0], float)
-    assert datetime.strptime(data["Time"][0], "%Y-%m-%dT%H:%M:%S%z")
+    assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
 
 
 def test_bafu_hydrodata_station_metadata():
-    """
-    Test the bafu_hydrodata_station_metadata endpoint
-    """
     response = client.get("/bafu/hydrodata/metadata/2009")
     assert response.status_code == 200
     assert isinstance(response.json(), dict)
 
 
 def test_bafu_hydrodata_measured():
-    """
-    Test the bafu_hydrodata_measured endpoint
-    """
     parameter = "AbflussPneumatikunten"
     response = client.get("/bafu/hydrodata/measured/2009/{}/20210207/20230201".format(parameter))
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, dict)
     assert parameter in data
-    assert "Time" in data
+    assert "time" in data
     assert isinstance(data[parameter], list)
-    assert isinstance(data["Time"], list)
+    assert isinstance(data["time"], list)
     assert isinstance(data[parameter][0], float)
-    assert datetime.strptime(data["Time"][0], "%Y-%m-%dT%H:%M:%S%z")
+    assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
 
 
 def test_bafu_hydrodata_measured_resample():
-    """
-    Test the bafu_hydrodata_measured endpoint, resampling to one hour
-    """
     parameter = "AbflussPneumatikunten"
     response = client.get("/bafu/hydrodata/measured/2009/{}/20210207/20230201?resample=hourly".format(parameter))
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, dict)
     assert parameter in data
-    assert "Time" in data
+    assert "time" in data
     assert isinstance(data[parameter], list)
-    assert isinstance(data["Time"], list)
+    assert isinstance(data["time"], list)
     assert isinstance(data[parameter][0], float)
-    assert datetime.strptime(data["Time"][0], "%Y-%m-%dT%H:%M:%S%z")
-    assert (datetime.strptime(data["Time"][1], "%Y-%m-%dT%H:%M:%S%z") -
-            datetime.strptime(data["Time"][0], "%Y-%m-%dT""%H:%M:%S%z")).total_seconds() == 3600
+    assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
+    assert (datetime.strptime(data["time"][1], "%Y-%m-%dT%H:%M:%S%z") -
+            datetime.strptime(data["time"][0], "%Y-%m-%dT""%H:%M:%S%z")).total_seconds() == 3600
 
 
 def test_insitu_secchi_metadata():
-    """
-    Test the insitu_secchi_metadata endpoint.
-    """
     response = client.get("/insitu/secchi/metadata")
     assert response.status_code == 200
     data = response.json()
@@ -141,20 +183,17 @@ def test_insitu_secchi_metadata():
 
 
 def test_insitu_secchi_lake():
-    """
-    Test the insitu_secchi_lake endpoint.
-    """
     lake = "geneva"
     response = client.get("/insitu/secchi/{}".format(lake))
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, dict)
-    assert "Time" in data
+    assert "time" in data
     assert "Secchi depth [m]" in data
     assert isinstance(data["Secchi depth [m]"], list)
-    assert isinstance(data["Time"], list)
+    assert isinstance(data["time"], list)
     assert isinstance(data["Secchi depth [m]"][0], float)
-    assert datetime.strptime(data["Time"][0], "%Y-%m-%dT%H:%M:%S%z")
+    assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
 
 
 @pytest.mark.parametrize("url", [

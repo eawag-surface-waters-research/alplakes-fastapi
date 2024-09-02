@@ -14,7 +14,6 @@ def get_cosmo_metadata(filesystem):
     models = [{"model": "VNXQ34", "description": "Cosmo-1e 1 day deterministic"},
               {"model": "VNXQ94", "description": "Cosmo-1e 33 hour ensemble forecast"},
               {"model": "VNXZ32", "description": "Cosmo-2e 5 day ensemble forecast"}]
-
     for model in models:
         files = os.listdir(os.path.join(filesystem, "media/meteoswiss/cosmo", model["model"]))
         if len(files) > 0:
@@ -85,7 +84,7 @@ class CosmoForecast(str, Enum):
     VNXQ94 = "VNXQ94"
 
 
-def get_cosmo_area_forecast(filesystem, model, variables, forecast_date, ll_lat, ll_lng, ur_lat, ur_lng):
+def get_cosmo_area_forecast(filesystem, model, input_variables, forecast_date, ll_lat, ll_lng, ur_lat, ur_lng):
     file = os.path.join(filesystem, "media/meteoswiss/cosmo", model, "{}.{}0000.nc".format(model, forecast_date))
     if not os.path.isfile(file):
         raise HTTPException(status_code=400,
@@ -94,21 +93,28 @@ def get_cosmo_area_forecast(filesystem, model, variables, forecast_date, ll_lat,
     output = {}
     with xr.open_mfdataset(file) as ds:
         bad_variables = []
-        for var in variables:
-            if var not in ds.variables.keys():
+        variables = []
+        for var in input_variables:
+            if var in ds.variables.keys():
+                variables.append(var)
+            elif var.replace("_MEAN", "") in ds.variables.keys():
+                variables.append(var.replace("_MEAN", ""))
+            elif var + "_MEAN" in ds.variables.keys():
+                variables.append(var + "_MEAN")
+            else:
                 bad_variables.append(var)
         if len(bad_variables) > 0:
             raise HTTPException(status_code=400,
                                 detail="{} are bad variables for COSMO {}. Please select from: {}".format(
                                     ", ".join(bad_variables), model, ", ".join(ds.keys())))
 
-        output["time"] = np.array(ds.variables["time"].values, dtype=str).tolist()
+        output["time"] = meteoswiss_time_iso(ds.variables["time"])
         x, y = np.where(((ds.variables["lat_1"] >= ll_lat) & (ds.variables["lat_1"] <= ur_lat) & (
                 ds.variables["lon_1"] >= ll_lng) & (ds.variables["lon_1"] <= ur_lng)))
 
         if len(x) == 0:
             raise HTTPException(status_code=400,
-                                detail="Data not available for COSMO {} for the requsted area.".format(model))
+                                detail="Data not available for COSMO {} for the requested area.".format(model))
 
         x_min, x_max, y_min, y_max = min(x), max(x) + 1, min(y), max(y) + 1
         output["lat"] = ds.variables["lat_1"][x_min:x_max, y_min:y_max].values.tolist()
@@ -148,7 +154,7 @@ def get_cosmo_point_forecast(filesystem, model, variables, forecast_date, lat, l
                                 detail="{} are bad variables for COSMO {}. Please select from: {}".format(
                                     ", ".join(bad_variables), model, ", ".join(ds.keys())))
 
-        output["time"] = np.array(ds.variables["time"].values, dtype=str).tolist()
+        output["time"] = meteoswiss_time_iso(ds.variables["time"])
 
         dist = ((ds.variables["lat_1"] - lat) ** 2 + (ds.variables["lon_1"] - lng) ** 2) ** 0.5
         xy = np.unravel_index(dist.argmin(), dist.shape)
@@ -201,8 +207,7 @@ def get_icon_area_forecast(filesystem, model, input_variables, forecast_date, ll
             raise HTTPException(status_code=400,
                                 detail="{} are bad variables for ICON {}. Please select from: {}".format(
                                     ", ".join(bad_variables), model, ", ".join(ds.keys())))
-
-        output["time"] = [str(t)[:26] for t in ds.variables["time"].values]
+        output["time"] = meteoswiss_time_iso(ds.variables["time"])
         x, y = np.where(((ds.variables["lat_1"] >= ll_lat) & (ds.variables["lat_1"] <= ur_lat) & (
                 ds.variables["lon_1"] >= ll_lng) & (ds.variables["lon_1"] <= ur_lng)))
 
@@ -253,9 +258,7 @@ def get_icon_point_forecast(filesystem, model, input_variables, forecast_date, l
             raise HTTPException(status_code=400,
                                 detail="{} are bad variables for ICON {}. Please select from: {}".format(
                                     ", ".join(bad_variables), model, ", ".join(ds.keys())))
-
-        output["time"] = [str(t)[:26] for t in ds.variables["time"].values]
-
+        output["time"] = meteoswiss_time_iso(ds.variables["time"])
         dist = ((ds.variables["lat_1"] - lat) ** 2 + (ds.variables["lon_1"] - lng) ** 2) ** 0.5
         xy = np.unravel_index(np.argmin(dist.values), dist.shape)
         x, y = xy[0], xy[1]
@@ -284,7 +287,7 @@ class CosmoReanalysis(str, Enum):
     VNXQ34 = "VNXQ34"
 
 
-def get_cosmo_area_reanalysis(filesystem, model, variables, start_date, end_date, ll_lat, ll_lng, ur_lat, ur_lng):
+def get_cosmo_area_reanalysis(filesystem, model, input_variables, start_date, end_date, ll_lat, ll_lng, ur_lat, ur_lng):
     # For reanalysis files the date on the file is one day after the data in the file
     folder = os.path.join(filesystem, "media/meteoswiss/cosmo", model)
     start_date = datetime.strptime(start_date, '%Y%m%d')
@@ -305,14 +308,19 @@ def get_cosmo_area_reanalysis(filesystem, model, variables, start_date, end_date
     try:
         with xr.open_mfdataset(files) as ds:
             bad_variables = []
-            for var in variables:
-                if var not in ds.variables.keys():
+            variables = []
+            for var in input_variables:
+                if var.replace("_MEAN", "") in ds.variables.keys():
+                    variables.append(var.replace("_MEAN", ""))
+                elif var + "_MEAN" in ds.variables.keys():
+                    variables.append(var + "_MEAN")
+                else:
                     bad_variables.append(var)
             if len(bad_variables) > 0:
                 raise HTTPException(status_code=400,
                                     detail="{} are bad variables for COSMO {}. Please select from: {}".format(
                                         ", ".join(bad_variables), model, ", ".join(ds.keys())))
-            output["time"] = np.array(ds.variables["time"].values, dtype=str).tolist()
+            output["time"] = meteoswiss_time_iso(ds.variables["time"])
             if len(ds.variables["lat_1"].shape) == 3:
                 x, y = np.where(((ds.variables["lat_1"][0] >= ll_lat) & (ds.variables["lat_1"][0] <= ur_lat) & (
                         ds.variables["lon_1"][0] >= ll_lng) & (ds.variables["lon_1"][0] <= ur_lng)))
@@ -382,7 +390,7 @@ def get_cosmo_point_reanalysis(filesystem, model, variables, start_date, end_dat
                 raise HTTPException(status_code=400,
                                     detail="{} are bad variables for COSMO {}. Please select from: {}".format(
                                         ", ".join(bad_variables), model, ", ".join(ds.keys())))
-            output["time"] = np.array(ds.variables["time"].values, dtype=str).tolist()
+            output["time"] = meteoswiss_time_iso(ds.variables["time"])
 
             dist = ((ds.variables["lat_1"] - lat) ** 2 + (ds.variables["lon_1"] - lng) ** 2) ** 0.5
             xy = np.unravel_index(dist.argmin(), dist.shape)
@@ -447,7 +455,7 @@ def get_icon_area_reanalysis(filesystem, model, variables, start_date, end_date,
                 raise HTTPException(status_code=400,
                                     detail="{} are bad variables for COSMO {}. Please select from: {}".format(
                                         ", ".join(bad_variables), model, ", ".join(ds.keys())))
-            output["time"] = np.array(ds.variables["time"].values, dtype=str).tolist()
+            output["time"] = meteoswiss_time_iso(ds.variables["time"])
             if len(ds.variables["lat_1"].shape) == 3:
                 x, y = np.where(((ds.variables["lat_1"][0] >= ll_lat) & (ds.variables["lat_1"][0] <= ur_lat) & (
                         ds.variables["lon_1"][0] >= ll_lng) & (ds.variables["lon_1"][0] <= ur_lng)))
@@ -516,7 +524,7 @@ def get_icon_point_reanalysis(filesystem, model, variables, start_date, end_date
                 raise HTTPException(status_code=400,
                                     detail="{} are bad variables for KENDA {}. Please select from: {}".format(
                                         ", ".join(bad_variables), model, ", ".join(ds.keys())))
-            output["time"] = np.array(ds.variables["time"].values, dtype=str).tolist()
+            output["time"] = meteoswiss_time_iso(ds.variables["time"])
 
             dist = ((ds.variables["lat_1"] - lat) ** 2 + (ds.variables["lon_1"] - lng) ** 2) ** 0.5
             xy = np.unravel_index(dist.argmin(), dist.shape)
@@ -633,9 +641,9 @@ def get_meteodata_station_metadata(filesystem, station_id):
                 d = parameters_dict[p]
                 d["id"] = p
                 d["start_date"] = datetime.strptime(str(min(df.loc[df[p], 'Date'])), "%Y%m%d%H").replace(
-                    tzinfo=timezone.utc)
+                    tzinfo=timezone.utc).strftime("%Y-%m-%d")
                 d["end_date"] = datetime.strptime(str(max(df.loc[df[p], 'Date'])), "%Y%m%d%H").replace(
-                    tzinfo=timezone.utc)
+                    tzinfo=timezone.utc).strftime("%Y-%m-%d")
                 out["parameters"].append(d)
     return out
 
@@ -657,10 +665,14 @@ def get_meteodata_measured(filesystem, station_id, parameter, start_date, end_da
     df["time"] = pd.to_datetime(df['Date'], format='%Y%m%d%H', utc=True)
     df[parameter] = pd.to_numeric(df[parameter], errors='coerce').round(1)
     df.dropna(subset=[parameter], inplace=True)
-    start = datetime.strptime(start_date, '%Y%m%d').replace(tzinfo=timezone.utc)
-    end = datetime.strptime(end_date, '%Y%m%d').replace(tzinfo=timezone.utc) + timedelta(days=1)
+    start = datetime.strptime(start_date, '%Y%m%d').replace(tzinfo=timezone.utc).isoformat()
+    end = (datetime.strptime(end_date, '%Y%m%d').replace(tzinfo=timezone.utc) + timedelta(days=1)).isoformat()
     selected = df[(df['time'] >= start) & (df['time'] < end)]
     if len(selected) == 0:
         raise HTTPException(status_code=400,
                             detail="No data available between {} and {}".format(start_date, end_date))
-    return {"Time": list(selected["time"]), parameter: list(selected[parameter])}
+    return {"time": list(selected["time"]), parameter: list(selected[parameter])}
+
+def meteoswiss_time_iso(time_array):
+    return [datetime.utcfromtimestamp(time.astype('datetime64[s]').astype('int')).replace(tzinfo=timezone.utc).isoformat() for
+     time in np.array(time_array.values, dtype='datetime64[ns]')]

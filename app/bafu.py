@@ -57,9 +57,9 @@ def get_hydrodata_station_metadata(filesystem, station_id):
         files = [os.path.join(station_dir, parameter, f) for f in files if f.endswith(".csv")]
         files.sort()
         df = pd.read_csv(files[0])
-        start_date = pd.to_datetime(df["Time"].iloc[0], utc=True)
+        start_date = pd.to_datetime(df["Time"].iloc[0], utc=True).strftime("%Y-%m-%d")
         df = pd.read_csv(files[-1])
-        end_date = pd.to_datetime(df["Time"].iloc[-1], utc=True)
+        end_date = pd.to_datetime(df["Time"].iloc[-1], utc=True).strftime("%Y-%m-%d")
         d["start_date"] = start_date
         d["end_date"] = end_date
         out["parameters"].append(d)
@@ -101,7 +101,7 @@ def get_hydrodata_measured(filesystem, station_id, parameter, start_date, end_da
     if len(df) == 0:
         raise HTTPException(status_code=400,
                             detail="Not data available between {} and {}".format(start_date, end_date))
-    return {"Time": list(df["time"]), parameter: list(df[parameter_column_name])}
+    return {"time": list(df["time"]), parameter: list(df[parameter_column_name])}
 
 
 class HydrodataPredicted(str, Enum):
