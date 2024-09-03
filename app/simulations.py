@@ -821,8 +821,8 @@ def get_one_dimensional_metadata(filesystem):
 
                     m["lakes"].append({"name": lake,
                                        "depths": depths,
-                                       "start_date": start_date.strftime("%Y-%m-%d %H:%M"),
-                                       "end_date": end_date.strftime("%Y-%m-%d %H:%M"),
+                                       "start_date": start_date.strftime("%Y-%m-%d"),
+                                       "end_date": end_date.strftime("%Y-%m-%d"),
                                        "missing_dates": missing_dates})
                 else:
                     raise ValueError("Model not recognised.")
@@ -849,11 +849,11 @@ def get_one_dimensional_metadata_lake(filesystem, model, lake):
     if model == "simstrat":
         with netCDF4.Dataset(os.path.join(path, files[0])) as nc:
             start_date = functions.convert_from_unit(nc.variables["time"][0], nc.variables["time"].units)
-            out["start_date"] = start_date.strftime("%Y-%m-%d %H:%M")
+            out["start_date"] = start_date.strftime("%Y-%m-%d")
 
         with netCDF4.Dataset(os.path.join(path, files[-1])) as nc:
             end_date = functions.convert_from_unit(nc.variables["time"][-1], nc.variables["time"].units)
-            out["end_date"] = end_date.strftime("%Y-%m-%d %H:%M")
+            out["end_date"] = end_date.strftime("%Y-%m-%d")
             depths = np.array(nc.variables["depth"][:]) * -1
             depths = depths[depths > 0]
             depths.sort()
@@ -900,7 +900,7 @@ def get_one_dimensional_point(filesystem, model, lake, parameter, start_time, en
 
 def get_one_dimensional_point_simstrat(filesystem, lake, parameter, start, end, depth, resample):
     model = "simstrat"
-    out = {"lake": lake, "model": model}
+    out = {}
     lakes = os.path.join(filesystem, "media/1dsimulations", model, "results")
     if not os.path.isdir(os.path.join(lakes, lake)):
         raise HTTPException(status_code=400,
@@ -928,7 +928,7 @@ def get_one_dimensional_point_simstrat(filesystem, lake, parameter, start, end, 
         if len(ds[parameter].shape) == 2:
             depths = ds.depth[:].values * - 1
             index = functions.get_closest_index(depth, depths)
-            out["depth"] = depths[index]
+            out["depth"] = {"data": depths[index], "unit": "m", "description": "Distance from the surface to the closest grid point to requested depth"}
             ds = ds.sel(depth=depths[index] * -1)
 
         df = pd.DataFrame({'time': pd.to_datetime(ds['time'].values).tz_localize('UTC'), 'values': ds[parameter][:].values})
@@ -938,9 +938,8 @@ def get_one_dimensional_point_simstrat(filesystem, lake, parameter, start, end, 
             df = df.resample(resample_options[resample], label='left').mean(numeric_only=True)
             df = df.reset_index()
             out["resample"] = resample + " mean"
-        out["time"] = df["time"].tolist()
-        out[parameter] = functions.filter_parameter(df["values"])
-        out["unit"] = ds[parameter].units
+        out["time"] = [x.replace(tzinfo=timezone.utc).isoformat() for x in df["time"].tolist()]
+        out[parameter] = {"data": functions.filter_parameter(df["values"]), "unit": ds[parameter].units, "description": ds[parameter].long_name}
         return out
 
 
@@ -953,7 +952,7 @@ def get_one_dimensional_depth_time(filesystem, model, lake, parameter, start_tim
 
 def get_one_dimensional_depth_time_simstrat(filesystem, lake, parameter, start, end):
     model = "simstrat"
-    out = {"lake": lake, "model": model}
+    out = {}
     lakes = os.path.join(filesystem, "media/1dsimulations", model, "results")
     if not os.path.isdir(os.path.join(lakes, lake)):
         raise HTTPException(status_code=400,
@@ -980,10 +979,10 @@ def get_one_dimensional_depth_time_simstrat(filesystem, lake, parameter, start, 
         if len(ds[parameter].shape) == 1:
             raise HTTPException(status_code=400, detail="Parameter {} exists but is not 2D".format(parameter))
         depths = ds.depth[:].values * - 1
-        out["depths"] = functions.filter_parameter(depths)
-        out["time"] = functions.default_time(ds.time[:].values, "nano").tolist()
-        out[parameter] = functions.filter_parameter(ds[parameter][:].values)
-        out["unit"] = ds[parameter].units
+        out["time"] = [x.replace(tzinfo=timezone.utc).isoformat() for x in
+                       functions.default_time(ds.time[:].values, "nano").tolist()]
+        out["depths"] = {"data": functions.filter_parameter(depths), "unit": "m", "description": "Distance from the surface to the closest grid point to requested depth"}
+        out[parameter] = {"data": functions.filter_parameter(ds[parameter][:].values), "unit": ds[parameter].units, "description": ds[parameter].long_name}
         return out
 
 
@@ -1009,6 +1008,7 @@ def get_one_dimensional_day_of_year_simstrat(filesystem, lake, parameter, depth)
                             detail="{} simulation results are not available for {} please select from: [{}]"
                             .format(model, lake, ", ".join(os.listdir(lakes))))
     doy_file = os.path.join(filesystem, "media/1dsimulations", model, "doy", "{}_{}_{}.json".format(lake, parameter, depth))
+    print(doy_file)
     if os.path.isfile(doy_file):
         with open(doy_file, "r") as f:
             out = json.load(f)
@@ -1019,17 +1019,18 @@ def get_one_dimensional_day_of_year_simstrat(filesystem, lake, parameter, depth)
 
 def write_one_dimensional_day_of_year_simstrat(filesystem, lake, parameter, depth):
     model = "simstrat"
-    out = {"lake": lake, "model": model}
+    out = {}
     lakes = os.path.join(filesystem, "media/1dsimulations", model, "results")
     if not os.path.isdir(os.path.join(lakes, lake)):
         raise HTTPException(status_code=400,
                             detail="{} simulation results are not available for {} please select from: [{}]"
                             .format(model, lake, ", ".join(os.listdir(lakes))))
     doy_file = os.path.join(filesystem, "media/1dsimulations", model, "doy",
-                            "{}_{}_{}.json".format(lake, parameter, depth))
+                            "{}_{}_{}.json".format(lake, parameter, float(depth)))
     files = [os.path.join(lakes, lake, file) for file in os.listdir(os.path.join(lakes, lake)) if file.endswith(".nc")]
     files.sort()
-    files = files[24:]  # Remove first two years as a warmup
+    if len(files) > 24:
+        files = files[24:]  # Remove first two years as a warmup
     try:
         for i, file in enumerate(files):
             with netCDF4.Dataset(file) as nc:

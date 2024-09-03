@@ -18,7 +18,7 @@ def path_date(description="The date in YYYYmmdd format", example="20230101"):
     return Path(..., regex=r"^\d{8}$", title="Date", description=description, example=example)
 
 
-def path_month(description="The date in YYYYmm format", example="202301"):
+def path_month(description="The date in YYYYmm format", example="202405"):
     return Path(..., regex=r"^\d{6}$", title="Date", description=description, example=example)
 
 

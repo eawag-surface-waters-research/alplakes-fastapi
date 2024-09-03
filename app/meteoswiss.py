@@ -7,13 +7,54 @@ import xarray as xr
 from enum import Enum
 from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException
+from typing import Dict, List, Union, Any
+from pydantic import BaseModel
 from app.functions import daterange, ch1903_plus_to_latlng
+
+
+class CosmoForecast(str, Enum):
+    VNXZ32 = "VNXZ32"
+    VNXQ94 = "VNXQ94"
+
+class IconForecast(str, Enum):
+    icon_ch2_eps = "icon-ch2-eps"
+    icon_ch1_eps = "icon-ch1-eps"
+
+class VariableKeyModel1D(BaseModel):
+    data: List[Any]
+    unit: Union[str, None] = None
+    description: Union[str, None] = None
+
+class VariableKeyModel2D(BaseModel):
+    data: List[List[Any]]
+    unit: Union[str, None] = None
+    description: Union[str, None] = None
+
+class ResponseModel2D(BaseModel):
+    time: List[str]
+    lat: List[List[float]]
+    lng: List[List[float]]
+    variables: Dict[str, VariableKeyModel2D]
+
+class ResponseModel1D(BaseModel):
+    time: List[str]
+    lat: List[List[float]]
+    lng: List[List[float]]
+    variables: Dict[str, VariableKeyModel1D]
+
+class Metadata(BaseModel):
+    model: str
+    description: str
+    start_date: str
+    end_date: str
+    missing_dates: List[str]
 
 
 def get_cosmo_metadata(filesystem):
     models = [{"model": "VNXQ34", "description": "Cosmo-1e 1 day deterministic"},
               {"model": "VNXQ94", "description": "Cosmo-1e 33 hour ensemble forecast"},
               {"model": "VNXZ32", "description": "Cosmo-2e 5 day ensemble forecast"}]
+    out = []
     for model in models:
         files = os.listdir(os.path.join(filesystem, "media/meteoswiss/cosmo", model["model"]))
         if len(files) > 0:
@@ -38,10 +79,8 @@ def get_cosmo_metadata(filesystem):
             model["start_date"] = start_date.strftime("%Y-%m-%d")
             model["end_date"] = end_date.strftime("%Y-%m-%d")
             model["missing_dates"] = missing_dates
-        else:
-            model["start_date"] = "NA"
-            model["end_date"] = "NA"
-    return models
+            out.append(model)
+    return out
 
 
 def get_icon_metadata(filesystem):
@@ -77,11 +116,6 @@ def get_icon_metadata(filesystem):
             model["start_date"] = "NA"
             model["end_date"] = "NA"
     return models
-
-
-class CosmoForecast(str, Enum):
-    VNXZ32 = "VNXZ32"
-    VNXQ94 = "VNXQ94"
 
 
 def get_cosmo_area_forecast(filesystem, model, input_variables, forecast_date, ll_lat, ll_lng, ur_lat, ur_lng):
@@ -129,15 +163,15 @@ def get_cosmo_area_forecast(filesystem, model, input_variables, forecast_date, l
                     data = ds.variables[var][:, 0, 0, x_min:x_max, y_min:y_max].values
                 else:
                     data = []
-                output[var] = {"description": ds.variables[var].attrs["long_name"],
+                output[var.replace("_MEAN", "")] = {"description": ds.variables[var].attrs["long_name"],
                                "unit": ds.variables[var].attrs["units"],
                                "data": np.where(np.isnan(data), None, data).tolist()}
             else:
-                output[var] = []
+                output[var.replace("_MEAN", "")] = []
     return output
 
 
-def get_cosmo_point_forecast(filesystem, model, variables, forecast_date, lat, lng):
+def get_cosmo_point_forecast(filesystem, model, input_variables, forecast_date, lat, lng):
     file = os.path.join(filesystem, "media/meteoswiss/cosmo", model, "{}.{}0000.nc".format(model, forecast_date))
     if not os.path.isfile(file):
         raise HTTPException(status_code=400,
@@ -146,8 +180,15 @@ def get_cosmo_point_forecast(filesystem, model, variables, forecast_date, lat, l
     output = {}
     with xr.open_mfdataset(file) as ds:
         bad_variables = []
-        for var in variables:
-            if var not in ds.variables.keys():
+        variables = []
+        for var in input_variables:
+            if var in ds.variables.keys():
+                variables.append(var)
+            elif var.replace("_MEAN", "") in ds.variables.keys():
+                variables.append(var.replace("_MEAN", ""))
+            elif var + "_MEAN" in ds.variables.keys():
+                variables.append(var + "_MEAN")
+            else:
                 bad_variables.append(var)
         if len(bad_variables) > 0:
             raise HTTPException(status_code=400,
@@ -157,7 +198,7 @@ def get_cosmo_point_forecast(filesystem, model, variables, forecast_date, lat, l
         output["time"] = meteoswiss_time_iso(ds.variables["time"])
 
         dist = ((ds.variables["lat_1"] - lat) ** 2 + (ds.variables["lon_1"] - lng) ** 2) ** 0.5
-        xy = np.unravel_index(dist.argmin(), dist.shape)
+        xy = np.unravel_index(np.argmin(dist.values), dist.shape)
         x, y = xy[0], xy[1]
         output["lat"] = float(ds.variables["lat_1"][x, y].values)
         output["lng"] = float(ds.variables["lon_1"][x, y].values)
@@ -172,17 +213,12 @@ def get_cosmo_point_forecast(filesystem, model, variables, forecast_date, lat, l
                     data = ds.variables[var][:, 0, 0, x, y].values
                 else:
                     data = []
-                output[var] = {"description": ds.variables[var].attrs["long_name"],
+                output[var.replace("_MEAN", "")] = {"description": ds.variables[var].attrs["long_name"],
                                "unit": ds.variables[var].attrs["units"],
                                "data": np.where(np.isnan(data), None, data).tolist()}
             else:
-                output[var] = []
+                output[var.replace("_MEAN", "")] = []
     return output
-
-
-class IconForecast(str, Enum):
-    icon_ch2_eps = "icon-ch2-eps"
-    icon_ch1_eps = "icon-ch1-eps"
 
 
 def get_icon_area_forecast(filesystem, model, input_variables, forecast_date, ll_lat, ll_lng, ur_lat, ur_lng):
@@ -228,11 +264,11 @@ def get_icon_area_forecast(filesystem, model, input_variables, forecast_date, ll
                     data = ds.variables[var][:, 0, 0, x_min:x_max, y_min:y_max].values
                 else:
                     data = []
-                output[var] = {"description": ds.variables[var].attrs["long_name"],
+                output[var.replace("_MEAN", "")] = {"description": ds.variables[var].attrs["long_name"],
                                "unit": ds.variables[var].attrs["units"],
                                "data": np.where(np.isnan(data), None, data).tolist()}
             else:
-                output[var] = []
+                output[var.replace("_MEAN", "")] = []
     return output
 
 
@@ -275,11 +311,11 @@ def get_icon_point_forecast(filesystem, model, input_variables, forecast_date, l
                     data = ds.variables[var][:, 0, 0, x, y].values
                 else:
                     data = []
-                output[var] = {"description": ds.variables[var].attrs["long_name"],
+                output[var.replace("_MEAN", "")] = {"description": ds.variables[var].attrs["long_name"],
                                "unit": ds.variables[var].attrs["units"],
                                "data": np.where(np.isnan(data), None, data).tolist()}
             else:
-                output[var] = []
+                output[var.replace("_MEAN", "")] = []
     return output
 
 
@@ -340,6 +376,7 @@ def get_cosmo_area_reanalysis(filesystem, model, input_variables, start_date, en
             else:
                 output["lat"] = ds.variables["lat_1"][x_min:x_max, y_min:y_max].values.tolist()
                 output["lng"] = ds.variables["lon_1"][x_min:x_max, y_min:y_max].values.tolist()
+            output["variables"] = {}
             for var in variables:
                 if var in ds.variables.keys():
                     if len(ds.variables[var].dims) == 3:
@@ -348,11 +385,9 @@ def get_cosmo_area_reanalysis(filesystem, model, input_variables, start_date, en
                         data = ds.variables[var][:, 0, x_min:x_max, y_min:y_max].values
                     else:
                         data = []
-                    output[var] = {"description": ds.variables[var].attrs["long_name"],
+                    output["variables"][var.replace("_MEAN", "")] = {"description": ds.variables[var].attrs["long_name"],
                                    "unit": ds.variables[var].attrs["units"],
                                    "data": np.where(np.isnan(data), None, data).tolist()}
-                else:
-                    output[var] = []
         return output
     except xr.MergeError as e:
         raise HTTPException(status_code=400,
@@ -362,7 +397,7 @@ def get_cosmo_area_reanalysis(filesystem, model, input_variables, start_date, en
         raise
 
 
-def get_cosmo_point_reanalysis(filesystem, model, variables, start_date, end_date, lat, lng):
+def get_cosmo_point_reanalysis(filesystem, model, input_variables, start_date, end_date, lat, lng):
     # For reanalysis files the date on the file is one day after the data in the file
     folder = os.path.join(filesystem, "media/meteoswiss/cosmo", model)
     start_date = datetime.strptime(start_date, '%Y%m%d')
@@ -383,8 +418,15 @@ def get_cosmo_point_reanalysis(filesystem, model, variables, start_date, end_dat
     try:
         with xr.open_mfdataset(files) as ds:
             bad_variables = []
-            for var in variables:
-                if var not in ds.variables.keys():
+            variables = []
+            for var in input_variables:
+                if var in ds.variables.keys():
+                    variables.append(var)
+                elif var.replace("_MEAN", "") in ds.variables.keys():
+                    variables.append(var.replace("_MEAN", ""))
+                elif var + "_MEAN" in ds.variables.keys():
+                    variables.append(var + "_MEAN")
+                else:
                     bad_variables.append(var)
             if len(bad_variables) > 0:
                 raise HTTPException(status_code=400,
@@ -393,7 +435,7 @@ def get_cosmo_point_reanalysis(filesystem, model, variables, start_date, end_dat
             output["time"] = meteoswiss_time_iso(ds.variables["time"])
 
             dist = ((ds.variables["lat_1"] - lat) ** 2 + (ds.variables["lon_1"] - lng) ** 2) ** 0.5
-            xy = np.unravel_index(dist.argmin(), dist.shape)
+            xy = np.unravel_index(np.argmin(dist.values), dist.shape)
             x, y = xy[0], xy[1]
             if len(ds.variables["lat_1"].shape) == 3:
                 output["lat"] = float(ds.variables["lat_1"][0, x, y].values)
@@ -409,11 +451,11 @@ def get_cosmo_point_reanalysis(filesystem, model, variables, start_date, end_dat
                         data = ds.variables[var][:, 0, x, y].values
                     else:
                         data = []
-                    output[var] = {"description": ds.variables[var].attrs["long_name"],
+                    output[var.replace("_MEAN", "")] = {"description": ds.variables[var].attrs["long_name"],
                                    "unit": ds.variables[var].attrs["units"],
                                    "data": np.where(np.isnan(data), None, data).tolist()}
                 else:
-                    output[var] = []
+                    output[var.replace("_MEAN", "")] = []
         return output
     except xr.MergeError as e:
         raise HTTPException(status_code=400,
@@ -427,7 +469,7 @@ class IconReanalysis(str, Enum):
     kenda_ch1 = "kenda-ch1"
 
 
-def get_icon_area_reanalysis(filesystem, model, variables, start_date, end_date, ll_lat, ll_lng, ur_lat, ur_lng):
+def get_icon_area_reanalysis(filesystem, model, input_variables, start_date, end_date, ll_lat, ll_lng, ur_lat, ur_lng):
     # For reanalysis files the date on the file is one day after the data in the file
     folder = os.path.join(filesystem, "media/meteoswiss/icon", model)
     start_date = datetime.strptime(start_date, '%Y%m%d')
@@ -448,8 +490,15 @@ def get_icon_area_reanalysis(filesystem, model, variables, start_date, end_date,
     try:
         with xr.open_mfdataset(files) as ds:
             bad_variables = []
-            for var in variables:
-                if var not in ds.variables.keys():
+            variables = []
+            for var in input_variables:
+                if var in ds.variables.keys():
+                    variables.append(var)
+                elif var.replace("_MEAN", "") in ds.variables.keys():
+                    variables.append(var.replace("_MEAN", ""))
+                elif var + "_MEAN" in ds.variables.keys():
+                    variables.append(var + "_MEAN")
+                else:
                     bad_variables.append(var)
             if len(bad_variables) > 0:
                 raise HTTPException(status_code=400,
@@ -483,11 +532,11 @@ def get_icon_area_reanalysis(filesystem, model, variables, start_date, end_date,
                         data = ds.variables[var][:, 0, x_min:x_max, y_min:y_max].values
                     else:
                         data = []
-                    output[var] = {"description": ds.variables[var].attrs["long_name"],
+                    output[var.replace("_MEAN", "")] = {"description": ds.variables[var].attrs["long_name"],
                                    "unit": ds.variables[var].attrs["units"],
                                    "data": np.where(np.isnan(data), None, data).tolist()}
                 else:
-                    output[var] = []
+                    output[var.replace("_MEAN", "")] = []
         return output
     except xr.MergeError as e:
         raise HTTPException(status_code=400,
@@ -497,7 +546,7 @@ def get_icon_area_reanalysis(filesystem, model, variables, start_date, end_date,
         raise
 
 
-def get_icon_point_reanalysis(filesystem, model, variables, start_date, end_date, lat, lng):
+def get_icon_point_reanalysis(filesystem, model, input_variables, start_date, end_date, lat, lng):
     # For reanalysis files the date on the file is one day after the data in the file
     folder = os.path.join(filesystem, "media/meteoswiss/icon", model)
     start_date = datetime.strptime(start_date, '%Y%m%d')
@@ -517,8 +566,15 @@ def get_icon_point_reanalysis(filesystem, model, variables, start_date, end_date
     try:
         with xr.open_mfdataset(files) as ds:
             bad_variables = []
-            for var in variables:
-                if var not in ds.variables.keys():
+            variables = []
+            for var in input_variables:
+                if var in ds.variables.keys():
+                    variables.append(var)
+                elif var.replace("_MEAN", "") in ds.variables.keys():
+                    variables.append(var.replace("_MEAN", ""))
+                elif var + "_MEAN" in ds.variables.keys():
+                    variables.append(var + "_MEAN")
+                else:
                     bad_variables.append(var)
             if len(bad_variables) > 0:
                 raise HTTPException(status_code=400,
@@ -527,7 +583,7 @@ def get_icon_point_reanalysis(filesystem, model, variables, start_date, end_date
             output["time"] = meteoswiss_time_iso(ds.variables["time"])
 
             dist = ((ds.variables["lat_1"] - lat) ** 2 + (ds.variables["lon_1"] - lng) ** 2) ** 0.5
-            xy = np.unravel_index(dist.argmin(), dist.shape)
+            xy = np.unravel_index(np.argmin(dist.values), dist.shape)
             x, y = xy[0], xy[1]
             if len(ds.variables["lat_1"].shape) == 3:
                 output["lat"] = float(ds.variables["lat_1"][0, x, y].values)
@@ -543,11 +599,11 @@ def get_icon_point_reanalysis(filesystem, model, variables, start_date, end_date
                         data = ds.variables[var][:, 0, x, y].values
                     else:
                         data = []
-                    output[var] = {"description": ds.variables[var].attrs["long_name"],
+                    output[var.replace("_MEAN", "")] = {"description": ds.variables[var].attrs["long_name"],
                                    "unit": ds.variables[var].attrs["units"],
                                    "data": np.where(np.isnan(data), None, data).tolist()}
                 else:
-                    output[var] = []
+                    output[var.replace("_MEAN", "")] = []
         return output
     except xr.MergeError as e:
         raise HTTPException(status_code=400,

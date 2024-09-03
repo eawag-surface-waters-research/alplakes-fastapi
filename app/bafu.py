@@ -72,6 +72,15 @@ class ResampleOptions(str, Enum):
 
 
 def get_hydrodata_measured(filesystem, station_id, parameter, start_date, end_date, resample=None):
+    parameter_types = [
+        {"substring": "pegel", "unit": "m a.s.l", "description": "Water level above sea level"},
+        {"substring": "abfluss", "unit": "m3", "description": "Water discharge"},
+        {"substring": "phwert", "unit": "", "description": "Water pH"},
+        {"substring": "wassertemperatur", "unit": "degC", "description": "Water temperature"},
+        {"substring": "sauerstoff", "unit": "mg/l", "description": "Dissolved oxygen concentration"},
+        {"substring": "leitfaehigkeit", "unit": "µS/cm", "description": "Water conductivity in microSiemens/cm"},
+        {"substring": "truebung", "unit": "NTU", "description": "Water turbidity"},
+    ]
     station_dir = os.path.join(filesystem, "media/bafu/hydrodata/stations", str(station_id))
     if not os.path.exists(station_dir):
         raise HTTPException(status_code=400,
@@ -101,7 +110,12 @@ def get_hydrodata_measured(filesystem, station_id, parameter, start_date, end_da
     if len(df) == 0:
         raise HTTPException(status_code=400,
                             detail="Not data available between {} and {}".format(start_date, end_date))
-    return {"time": list(df["time"]), parameter: list(df[parameter_column_name])}
+    properties = next((p for p in parameter_types if p["substring"] in parameter.lower()), None)
+    d = {"data": list(df[parameter_column_name])}
+    if not properties == None:
+        d["unit"] = properties["unit"]
+        d["description"] = properties["description"]
+    return {"time": list(df["time"]), parameter: d}
 
 
 class HydrodataPredicted(str, Enum):

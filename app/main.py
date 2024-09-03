@@ -2,7 +2,7 @@ from fastapi import FastAPI, Query, Request, Depends, Path, BackgroundTasks, Res
 from fastapi.responses import RedirectResponse, PlainTextResponse, JSONResponse
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Union
+from typing import Dict, List, Union, Any
 import sentry_sdk
 
 from app import simulations, meteoswiss, bafu, remotesensing, insitu, validate
@@ -72,14 +72,14 @@ def welcome():
 
 
 if internal:
-    @app.get("/meteoswiss/cosmo/metadata", tags=["Meteoswiss"])
+    @app.get("/meteoswiss/cosmo/metadata", tags=["Meteoswiss"], response_model=List[meteoswiss.Metadata])
     async def meteoswiss_cosmo_metadata():
         """
-        JSON of all the available MeteoSwiss COSMO data.
+        Metadata for available MeteoSwiss COSMO data.
         """
         return meteoswiss.get_cosmo_metadata(filesystem)
 
-    @app.get("/meteoswiss/cosmo/area/reanalysis/{model}/{start_date}/{end_date}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}", tags=["Meteoswiss"])
+    @app.get("/meteoswiss/cosmo/area/reanalysis/{model}/{start_date}/{end_date}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}", tags=["Meteoswiss"], response_model=meteoswiss.ResponseModel2D)
     async def meteoswiss_cosmo_area_reanalysis(model: meteoswiss.CosmoReanalysis,
                                                start_date: str = validate.path_date(description="The start date in YYYYmmdd format"),
                                                end_date: str = validate.path_date(description="The end date in YYYYmmdd format"),
@@ -97,14 +97,14 @@ if internal:
         validate.date_range(start_date, end_date)
         return meteoswiss.get_cosmo_area_reanalysis(filesystem, model, variables, start_date, end_date, ll_lat, ll_lng, ur_lat, ur_lng)
 
-    @app.get("/meteoswiss/cosmo/area/forecast/{model}/{forecast_date}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}", tags=["Meteoswiss"])
+    @app.get("/meteoswiss/cosmo/area/forecast/{model}/{forecast_date}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}", tags=["Meteoswiss"], response_model=meteoswiss.ResponseModel2D)
     async def meteoswiss_cosmo_area_forecast(model: meteoswiss.CosmoForecast,
                                              forecast_date: str = validate.path_date(description="The forecast date in YYYYmmdd format"),
                                              ll_lat: float = validate.path_latitude(example="46.49", description="Latitude of lower left corner of bounding box (WGS 84)"),
                                              ll_lng: float = validate.path_longitude(example="6.65", description="Longitude of lower left corner of bounding box (WGS 84)"),
                                              ur_lat: float = validate.path_latitude(example="46.51", description="Latitude of upper right corner of bounding box (WGS 84)"),
                                              ur_lng: float = validate.path_longitude(example="6.67", description="Longitude of upper right corner of bounding box (WGS 84)"),
-                                             variables: list[str] = Query(default=["T_2M_MEAN", "U_MEAN", "V_MEAN", "GLOB_MEAN", "RELHUM_2M_MEAN", "PMSL_MEAN", "CLCT_MEAN"])):
+                                             variables: list[str] = Query(default=["T_2M", "U", "V", "GLOB", "RELHUM_2M", "PMSL", "CLCT"])):
         """
         Weather data from MeteoSwiss COSMO forecasts for a rectangular bounding box.
 
@@ -115,7 +115,7 @@ if internal:
         validate.date(forecast_date)
         return meteoswiss.get_cosmo_area_forecast(filesystem, model, variables, forecast_date, ll_lat, ll_lng, ur_lat, ur_lng)
 
-    @app.get("/meteoswiss/cosmo/point/reanalysis/{model}/{start_date}/{end_date}/{lat}/{lng}", tags=["Meteoswiss"])
+    @app.get("/meteoswiss/cosmo/point/reanalysis/{model}/{start_date}/{end_date}/{lat}/{lng}", tags=["Meteoswiss"], response_model=meteoswiss.ResponseModel1D)
     async def meteoswiss_cosmo_point_reanalysis(model: meteoswiss.CosmoReanalysis,
                                                 start_date: str = validate.path_date(description="The start date in YYYYmmdd format"),
                                                 end_date: str = validate.path_date(description="The end date in YYYYmmdd format"),
@@ -131,14 +131,14 @@ if internal:
         validate.date_range(start_date, end_date)
         return meteoswiss.get_cosmo_point_reanalysis(filesystem, model, variables, start_date, end_date, lat, lng)
 
-    @app.get("/meteoswiss/cosmo/point/forecast/{model}/{forecast_date}/{lat}/{lng}", tags=["Meteoswiss"])
+    @app.get("/meteoswiss/cosmo/point/forecast/{model}/{forecast_date}/{lat}/{lng}", tags=["Meteoswiss"], response_model=meteoswiss.ResponseModel1D)
     async def meteoswiss_cosmo_point_forecast(model: meteoswiss.CosmoForecast,
                                               forecast_date: str = validate.path_date(description="The forecast date in YYYYmmdd format"),
                                               lat: float = validate.path_latitude(),
                                               lng: float = validate.path_longitude(),
                                               variables: list[str] = Query(
-                                                  default=["T_2M_MEAN", "U_MEAN", "V_MEAN", "GLOB_MEAN", "RELHUM_2M_MEAN",
-                                                           "PMSL_MEAN", "CLCT_MEAN"])):
+                                                  default=["T_2M", "U", "V", "GLOB", "RELHUM_2M",
+                                                           "PMSL", "CLCT"])):
         """
         Weather data from MeteoSwiss COSMO forecasts for a single point.
 
@@ -150,7 +150,7 @@ if internal:
         return meteoswiss.get_cosmo_point_forecast(filesystem, model, variables, forecast_date, lat, lng)
 
 
-    @app.get("/meteoswiss/icon/metadata", tags=["Meteoswiss"])
+    @app.get("/meteoswiss/icon/metadata", tags=["Meteoswiss"], response_model=List[meteoswiss.Metadata])
     async def meteoswiss_icon_metadata():
         """
         JSON of all the available MeteoSwiss ICON data.
@@ -158,7 +158,7 @@ if internal:
         return meteoswiss.get_icon_metadata(filesystem)
 
 
-    @app.get("/meteoswiss/icon/area/reanalysis/{model}/{start_date}/{end_date}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}", tags=["Meteoswiss"])
+    @app.get("/meteoswiss/icon/area/reanalysis/{model}/{start_date}/{end_date}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}", tags=["Meteoswiss"], response_model=meteoswiss.ResponseModel2D)
     async def meteoswiss_icon_area_reanalysis(model: meteoswiss.IconReanalysis,
                                                start_date: str = validate.path_date(
                                                    description="The start date in YYYYmmdd format", example="20240729"),
@@ -184,8 +184,7 @@ if internal:
         return meteoswiss.get_icon_area_reanalysis(filesystem, model, variables, start_date, end_date, ll_lat, ll_lng,
                                                     ur_lat, ur_lng)
 
-    @app.get("/meteoswiss/icon/area/forecast/{model}/{forecast_date}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}",
-             tags=["Meteoswiss"])
+    @app.get("/meteoswiss/icon/area/forecast/{model}/{forecast_date}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}", tags=["Meteoswiss"], response_model=meteoswiss.ResponseModel2D)
     async def meteoswiss_icon_area_forecast(model: meteoswiss.IconForecast,
                                              forecast_date: str = validate.path_date(
                                                  description="The forecast date in YYYYmmdd format", example="20240703"),
@@ -211,7 +210,7 @@ if internal:
         return meteoswiss.get_icon_area_forecast(filesystem, model, variables, forecast_date, ll_lat, ll_lng, ur_lat,
                                                   ur_lng)
 
-    @app.get("/meteoswiss/icon/point/reanalysis/{model}/{start_date}/{end_date}/{lat}/{lng}", tags=["Meteoswiss"])
+    @app.get("/meteoswiss/icon/point/reanalysis/{model}/{start_date}/{end_date}/{lat}/{lng}", tags=["Meteoswiss"], response_model=meteoswiss.ResponseModel1D)
     async def meteoswiss_icon_point_reanalysis(model: meteoswiss.IconReanalysis,
                                                start_date: str = validate.path_date(
                                                    description="The start date in YYYYmmdd format", example="20240729"),
@@ -230,7 +229,7 @@ if internal:
         validate.date_range(start_date, end_date)
         return meteoswiss.get_icon_point_reanalysis(filesystem, model, variables, start_date, end_date, lat, lng)
 
-    @app.get("/meteoswiss/icon/point/forecast/{model}/{forecast_date}/{lat}/{lng}", tags=["Meteoswiss"])
+    @app.get("/meteoswiss/icon/point/forecast/{model}/{forecast_date}/{lat}/{lng}", tags=["Meteoswiss"], response_model=meteoswiss.ResponseModel1D)
     async def meteoswiss_icon_point_forecast(model: meteoswiss.IconForecast,
                                               forecast_date: str = validate.path_date(
                                                   description="The forecast date in YYYYmmdd format", example="20240703"),
@@ -364,11 +363,11 @@ async def simulations_metadata_lake(model: simulations.Models = Path(..., title=
 @app.get("/simulations/file/{model}/{lake}/{sunday}", tags=["3D Simulations"])
 async def simulations_file(model: simulations.Models = Path(..., title="Model", description="Model name"),
                            lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
-                           sunday: str = validate.path_date(description="The Sunday in YYYYmmdd format")):
+                           sunday: str = validate.path_date(description="The Sunday in YYYYmmdd format", example="20230402")):
     """
     NetCDF simulation results for a one-week period.
 
-    Weeks are specified by providing the date (YYYYmmdd) for the Sunday proceeding the desired week.
+    ⚠️ **Warning:** Trying to run this endpoint in the docs is likely to crash your browser due to the size of the files. Call the url directly for downloading.
     """
     validate.sunday(sunday)
     return simulations.get_simulations_file(filesystem, model, lake, sunday)
@@ -495,7 +494,7 @@ async def simulations_depth_time(model: simulations.Models = Path(..., title="Mo
 @app.get("/simulations/1d/metadata", tags=["1D Simulations"])
 async def one_dimensional_simulations_metadata():
     """
-    JSON of all the available 1D simulation data.
+    Available 1D simulation data.
     """
     return simulations.get_one_dimensional_metadata(filesystem)
 
@@ -505,7 +504,7 @@ async def one_dimensional_simulations_metadata_lake(
         model: simulations.OneDimensionalModels = Path(..., title="Model", description="Model name"),
         lake: str = Path(..., title="Lake", description="Lake key", example="aegeri")):
     """
-    JSON of the available simulation data for a specific lake and model.
+    Available 1D simulation data for a specific lake and model.
     """
     return simulations.get_one_dimensional_metadata_lake(filesystem, model, lake)
 
@@ -516,9 +515,7 @@ async def one_dimensional_simulations_file(
         lake: str = Path(..., title="Lake", description="Lake key", example="aegeri"),
         month: str = validate.path_month(description="The month in YYYYmm format")):
     """
-    NetCDF simulation results for a one-month period.
-
-    Months are specified by providing the date (YYYYmm).
+    Full model output in NetCDF for a given month
     """
     return simulations.get_one_dimensional_file(filesystem, model, lake, month)
 
@@ -528,12 +525,13 @@ async def one_dimensional_simulations_point(
         model: simulations.OneDimensionalModels = Path(..., title="Model", description="Model name"),
         lake: str = Path(..., title="Lake", description="Lake key", example="aegeri"),
         parameter: str = Path(..., title="Parameter", description="Parameter", example="T"),
-        start_time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202309050300"),
-        end_time: str = validate.path_time(description="The end time in YYYYmmddHHMM format (UTC)", example="202309072300"),
+        start_time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202405050300"),
+        end_time: str = validate.path_time(description="The end time in YYYYmmddHHMM format (UTC)", example="202406072300"),
         depth: float = validate.path_depth(),
         resample: Union[simulations.SimstratResampleOptions, None] = None):
     """
     Simulated timeseries of parameter for a given location and depth.
+
     See the metadata endpoints for list of available parameters.
     """
     validate.time_range(start_time, end_time)
@@ -545,8 +543,8 @@ async def one_dimensional_simulations_depth_time(
         model: simulations.OneDimensionalModels = Path(..., title="Model", description="Model name"),
         lake: str = Path(..., title="Lake", description="Lake key", example="aegeri"),
         parameter: str = Path(..., title="Parameter", description="Parameter", example="T"),
-        start_time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202309050300"),
-        end_time: str = validate.path_time(description="The end time in YYYYmmddHHMM format (UTC)", example="202309072300")):
+        start_time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202405050300"),
+        end_time: str = validate.path_time(description="The end time in YYYYmmddHHMM format (UTC)", example="202406072300")):
     """
     Vertical profile for a specific period.
     """
@@ -562,7 +560,8 @@ async def one_dimensional_simulations_day_of_year(
         depth: float = validate.path_depth()):
     """
     Day of year statistics for a given parameter.
-    WARNING: Only available once computed using the write endpoint
+
+    ⚠️ **Warning:** Only available once computed using the write endpoint
     """
     return simulations.get_one_dimensional_day_of_year(filesystem, model, lake, parameter, depth)
 
@@ -577,7 +576,8 @@ if internal:
             depth: float = validate.path_depth()):
         """
         Compute day of year statistics for a given parameter.
-        WARNING: Processing is slow due to the large volumes of data, once it has completed data is available from the doy
+
+        ⚠️ **Warning:** Processing is slow due to the large volumes of data, once it has completed data is available from the doy
         endpoint.
         """
         background_tasks.add_task(simulations.write_one_dimensional_day_of_year, filesystem, model, lake, parameter, depth)

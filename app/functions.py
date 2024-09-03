@@ -2,8 +2,6 @@ import os
 import json
 import math
 import shutil
-from symbol import except_clause
-
 import requests
 import numpy as np
 import pandas as pd
