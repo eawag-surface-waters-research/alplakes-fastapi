@@ -195,18 +195,100 @@ def test_insitu_secchi_lake():
     assert isinstance(data["Secchi depth [m]"][0], float)
     assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
 
+def test_simulations_metadata():
+    response = client.get("/simulations/metadata")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, list)
+
+def test_simulations_metadata_lake():
+    response = client.get("/simulations/metadata/delft3d-flow/geneva")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, dict)
+
+def test_simulations_point():
+    response = client.get("/simulations/point/delft3d-flow/geneva/202304050300/202304112300/1/46.5/6.67")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, dict)
+    assert "time" in data
+    assert isinstance(data["time"], list)
+    assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
+    assert "lat" in data
+    assert "lng" in data
+
+def test_simulations_layer():
+    response = client.get("/simulations/layer/delft3d-flow/geneva/202304050300/1")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, dict)
+    assert "time" in data
+    assert datetime.strptime(data["time"], "%Y-%m-%dT%H:%M:%S%z")
+    assert "lat" in data
+    assert "lng" in data
+
+def test_simulations_layer_alplakes():
+    response = client.get("/simulations/layer_alplakes/delft3d-flow/geneva/temperature/202304050300/202304112300/1")
+    assert response.status_code == 200
+
+def test_simulations_layer_average_temperature():
+    response = client.get("/simulations/layer/average_temperature/delft3d-flow/geneva/202304050300/202304112300/1")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, dict)
+    assert "time" in data
+    assert isinstance(data["time"], list)
+    assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
+
+def test_simulations_simulations_profile():
+    response = client.get("/simulations/profile/delft3d-flow/geneva/202304050300/46.5/6.67")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, dict)
+    assert "time" in data
+    assert datetime.strptime(data["time"], "%Y-%m-%dT%H:%M:%S%z")
+
+@pytest.mark.parametrize("url", [
+    "/simulations/transect/delft3d-flow/geneva/202304030400/46.351,46.294/6.177,6.277",
+    "/simulations/transect/delft3d-flow/geneva/202304080400/46.351,46.294,46.351/6.177,6.277,6.177",
+    "/simulations/transect/delft3d-flow/garda/202312050000/45.435,45.589,45.719/10.687,10.635,10.673",
+], ids=["delft3d-flow_single_file_single_segment_ch1903",
+        "delft3d-flow_multiple_files_multiple_segments_ch1903",
+        "delft3d-flow_multiple_files_multiple_segments_utm"])
+def test_simulations_transect(url):
+    response = client.get(url)
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, dict)
+    assert "time" in data
+    assert datetime.strptime(data["time"], "%Y-%m-%dT%H:%M:%S%z")
 
 @pytest.mark.parametrize("url", [
     "/simulations/transect/delft3d-flow/geneva/202304030400/202304050400/46.351,46.294/6.177,6.277",
     "/simulations/transect/delft3d-flow/geneva/202304080400/202304110400/46.351,46.294,46.351/6.177,6.277,6.177",
     "/simulations/transect/delft3d-flow/garda/202312050000/202312150000/45.435,45.589,45.719/10.687,10.635,10.673",
-], ids=["delft3d-flow_single_file_single_segment_ch1903",
-        "delft3d-flow_multiple_files_multiple_segments_ch1903",
-        "delft3d-flow_multiple_files_multiple_segments_utm"])
+], ids=["delft3d-flow_single_file_single_segment_ch1903_period",
+        "delft3d-flow_multiple_files_multiple_segments_ch1903_period",
+        "delft3d-flow_multiple_files_multiple_segments_utm_period"])
 def test_simulations_transect_period(url):
     response = client.get(url)
     assert response.status_code == 200
-    assert isinstance(response.json(), dict)
+    data = response.json()
+    assert isinstance(data, dict)
+    assert "time" in data
+    assert isinstance(data["time"], list)
+    assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
+
+
+def test_simulations_depth_time():
+    response = client.get("/simulations/depthtime/delft3d-flow/geneva/202304050300/202304112300/46.5/6.67")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, dict)
+    assert "time" in data
+    assert isinstance(data["time"], list)
+    assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
 
 
 def test_one_dimensional_simulations_metadata():

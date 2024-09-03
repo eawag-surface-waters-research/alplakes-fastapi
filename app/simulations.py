@@ -49,8 +49,8 @@ def get_metadata(filesystem):
 
                     m["lakes"].append({"name": lake,
                                        "depths": depths,
-                                       "start_date": start_date.strftime("%Y-%m-%d %H:%M"),
-                                       "end_date": end_date.strftime("%Y-%m-%d %H:%M"),
+                                       "start_date": start_date.strftime("%Y-%m-%d"),
+                                       "end_date": end_date.strftime("%Y-%m-%d"),
                                        "missing_dates": missing_dates,
                                        "height": height,
                                        "width": width})
@@ -93,8 +93,8 @@ def get_metadata_lake(filesystem, model, lake):
 
         return {"name": lake,
                 "depths": depths,
-                "start_date": start_date.strftime("%Y-%m-%d %H:%M"),
-                "end_date": end_date.strftime("%Y-%m-%d %H:%M"),
+                "start_date": start_date.strftime("%Y-%m-%d"),
+                "end_date": end_date.strftime("%Y-%m-%d"),
                 "missing_weeks": missing_dates,
                 "height": height,
                 "width": width}
@@ -177,34 +177,24 @@ def get_simulations_layer_delft3dflow(filesystem, lake, time, depth):
         depth_index = functions.get_closest_index(depth, np.array(nc.variables["ZK_LYR"][:]) * -1)
         time = nc.variables["time"][time_index].tolist()
         depth = nc.variables["ZK_LYR"][depth_index].tolist() * -1
-        x = functions.filter_parameter(nc.variables["XZ"][:], nodata=0.0)
-        y = functions.filter_parameter(nc.variables["YZ"][:], nodata=0.0)
         t = functions.filter_parameter(nc.variables["R1"][time_index, 0, depth_index, :])
         u, v, = functions.rotate_velocity(nc.variables["U1"][time_index, depth_index, :],
                                           nc.variables["V1"][time_index, depth_index, :],
                                           nc.variables["ALFAS"][:])
-
-        out = {"time": {"name": nc.variables["time"].long_name,
-                        "units": nc.variables["time"].units,
-                        "string": functions.convert_from_unit(time, nc.variables["time"].units).strftime(
-                            "%Y-%m-%d %H:%M:%S"),
-                        "data": time},
-               "depth": {"name": nc.variables["ZK_LYR"].long_name,
+        lat_grid, lng_grid = functions.coordinates_to_latlng(nc.variables["XZ"][:], nc.variables["YZ"][:])
+        out = {"time": functions.convert_from_unit(time, nc.variables["time"].units).replace(tzinfo=timezone.utc).isoformat(),
+               "depth": {"description": "Distance from the surface to the closest grid point to requested depth",
                          "units": nc.variables["ZK_LYR"].units,
                          "data": depth},
-               "x": {"name": nc.variables["XZ"].long_name,
-                     "units": nc.variables["XZ"].units,
-                     "data": x},
-               "y": {"name": nc.variables["YZ"].long_name,
-                     "units": nc.variables["YZ"].units,
-                     "data": y},
-               "t": {"name": "Water temperature",
+               "lat": functions.filter_parameter(lat_grid, decimals=5, nodata=np.nan),
+               "lng": functions.filter_parameter(lng_grid, decimals=5, nodata=np.nan),
+               "temperature": {"description": "Water temperature",
                      "units": "degC",
                      "data": t},
-               "u": {"name": "Water velocity (North)",
+               "u": {"description": "Eastward flow velocity",
                      "units": "m/s",
                      "data": functions.filter_parameter(u, decimals=5)},
-               "v": {"name": "Water velocity (East)",
+               "v": {"description": "Northward flow velocity",
                      "units": "m/s",
                      "data": functions.filter_parameter(v, decimals=5)}
                }
@@ -276,7 +266,7 @@ def get_simulations_layer_alplakes_delft3dflow(filesystem, lake, parameter, star
                 raise HTTPException(status_code=400,
                                     detail="Parameter {} not recognised, please select from: [geometry, temperature, "
                                            "velocity, thermocline]".format(parameter))
-            t = functions.alplakes_time(time[time_index_start:time_index_end], nc.variables["time"].units)
+            t = np.array([functions.convert_from_unit(x, nc.variables["time"].units).strftime("%Y%m%d%H%M") for x in time[time_index_start:time_index_end]])
             if out is None:
                 out = p
                 times = t
@@ -343,15 +333,14 @@ def get_simulations_profile_delft3dflow(filesystem, lake, dt, latitude, longitud
         u = u[index:]
         v = v[index:]
 
-        output = {"lake": lake,
-                  "datetime": functions.convert_from_unit(time[time_index], nc.variables["time"].units),
-                  "latitude": lat_grid[x_index, y_index],
-                  "longitude": lng_grid[x_index, y_index],
-                  "distance": distance,
-                  "depth": {"data": functions.filter_parameter(depth), "unit": "m"},
-                  "temperature": {"data": t, "unit": "degC"},
-                  "u": {"data": functions.filter_parameter(u, decimals=5), "unit": nc.variables["U1"].units},
-                  "v": {"data": functions.filter_parameter(v, decimals=5), "unit": nc.variables["V1"].units}}
+        output = {"time": functions.alplakes_time(time[time_index], nc.variables["time"].units),
+                  "lat": lat_grid[x_index, y_index],
+                  "lng": lng_grid[x_index, y_index],
+                  "distance": {"data": distance, "unit": "m", "description": "Distance from requested location to center of closest grid point"},
+                  "depth": {"data": functions.filter_parameter(depth), "unit": "m", "description": "Distance from the surface to the closest grid point to requested depth"},
+                  "temperature": {"data": t, "unit": "degC", "description": "Water temperature"},
+                  "u": {"data": functions.filter_parameter(u, decimals=5), "unit": nc.variables["U1"].units, "description": "Eastward flow velocity"},
+                  "v": {"data": functions.filter_parameter(v, decimals=5), "unit": nc.variables["V1"].units, "description": "Northward flow velocity"}}
     return output
 
 
@@ -438,15 +427,14 @@ def get_simulations_transect_delft3dflow(filesystem, lake, dt, latitude_str, lon
         u = u[index:, :]
         v = v[index:, :]
 
-        output = {"lake": lake,
-                  "datetime": functions.convert_from_unit(time[time_index], nc.variables["time"].units),
-                  "distance": functions.filter_parameter(sp_arr),
-                  "latitude": functions.filter_parameter(lat_arr, decimals=5),
-                  "longitude": functions.filter_parameter(lng_arr, decimals=5),
-                  "depth": {"data": functions.filter_parameter(depth), "unit": "m"},
-                  "temperature": {"data": functions.filter_parameter(t), "unit": "degC"},
-                  "u": {"data": functions.filter_parameter(u, decimals=5), "unit": nc.variables["U1"].units},
-                  "v": {"data": functions.filter_parameter(v, decimals=5), "unit": nc.variables["V1"].units}}
+        output = {"time": functions.alplakes_time(time[time_index], nc.variables["time"].units),
+                  "distance": {"data": functions.filter_parameter(sp_arr), "unit": "m", "description": "Distance along transect" },
+                  "lat": functions.filter_parameter(lat_arr, decimals=5),
+                  "lng": functions.filter_parameter(lng_arr, decimals=5),
+                  "depth": {"data": functions.filter_parameter(depth), "unit": "m", "description": "Distance from the surface"},
+                  "temperature": {"data": functions.filter_parameter(t), "unit": "degC", "description": "Water temperature"},
+                  "u": {"data": functions.filter_parameter(u, decimals=5), "unit": nc.variables["U1"].units, "description": "Eastward flow velocity"},
+                  "v": {"data": functions.filter_parameter(v, decimals=5), "unit": nc.variables["V1"].units}, "description": "Northward flow velocity"}
     return output
 
 
@@ -520,10 +508,9 @@ def get_simulations_transect_period_delft3dflow(filesystem, lake, start, end, la
 
         lat_arr, lng_arr = functions.projection_to_latlng(x[xi_arr, yi_arr], y[xi_arr, yi_arr], projection)
 
-        output = {"lake": lake,
-                  "distance": functions.filter_parameter(sp_arr),
-                  "latitude": functions.filter_parameter(lat_arr, decimals=5),
-                  "longitude": functions.filter_parameter(lng_arr, decimals=5),
+        output = {"distance": {"data": functions.filter_parameter(sp_arr), "unit": "m", "description": "Distance along transect"},
+                  "lat": functions.filter_parameter(lat_arr, decimals=5),
+                  "lng": functions.filter_parameter(lng_arr, decimals=5),
                   }
 
         idx = np.where(vd_arr == 0)[0]
@@ -547,13 +534,12 @@ def get_simulations_transect_period_delft3dflow(filesystem, lake, start, end, la
             u, v, = functions.rotate_velocity(u_s[:, index:, :].values, v_s[:, index:, :].values, a_e)
             u[:, :, idx] = -999.
             v[:, :, idx] = -999.
-            output["u"] = {"data": functions.filter_parameter(u, decimals=5), "unit": "m/s"}
-            output["v"] = {"data": functions.filter_parameter(u, decimals=5), "unit": "m/s"}
+            output["u"] = {"data": functions.filter_parameter(u, decimals=5), "unit": "m/s", "description": "Eastward flow velocity"}
+            output["v"] = {"data": functions.filter_parameter(u, decimals=5), "unit": "m/s", "description": "Northward flow velocity"}
 
     output["time"] = functions.alplakes_time(ds.time[:].values, "nano").tolist()
-    output["depth"] = {"data": functions.filter_parameter(depth), "unit": "m"}
-    output["temperature"] = {"data": functions.filter_parameter(t), "unit": "degC"}
-
+    output["depth"] = {"data": functions.filter_parameter(depth), "unit": "m", "description": "Distance from the surface"}
+    output["temperature"] = {"data": functions.filter_parameter(t), "unit": "degC", "description": "Water temperature"}
     return output
 
 
@@ -635,15 +621,14 @@ def get_simulations_depthtime_delft3dflow(filesystem, lake, start, end, latitude
     u_out = u_out[index:, :]
     v_out = v_out[index:, :]
 
-    output = {"lake": lake,
-              "time": at_out.tolist(),
-              "latitude": lat_grid[x_index, y_index],
-              "longitude": lng_grid[x_index, y_index],
-              "distance": distance,
-              "depth": {"data": functions.filter_parameter(depth), "unit": "m"},
-              "temperature": {"data": functions.filter_parameter(t_out), "unit": "degC"},
-              "u": {"data": functions.filter_parameter(u_out, decimals=5), "unit": "m/s"},
-              "v": {"data": functions.filter_parameter(v_out, decimals=5), "unit": "m/s"}}
+    output = {"time": at_out.tolist(),
+              "lat": lat_grid[x_index, y_index],
+              "lng": lng_grid[x_index, y_index],
+              "distance": {"data": distance, "unit": "m", "description": "Distance from requested location to center of closest grid point"},
+              "depth": {"data": functions.filter_parameter(depth), "unit": "m", "description": "Distance from the surface"},
+              "temperature": {"data": functions.filter_parameter(t_out), "unit": "degC", "description": "Water temperature"},
+              "u": {"data": functions.filter_parameter(u_out, decimals=5), "unit": "m/s", "description": "Eastward flow velocity"},
+              "v": {"data": functions.filter_parameter(v_out, decimals=5), "unit": "m/s", "description": "Northward flow velocity"}}
 
     return output
 
@@ -718,16 +703,14 @@ def get_simulations_point_delft3dflow(filesystem, lake, start, end, depth, latit
         raise HTTPException(status_code=400,
                             detail="Apologies data is not available within your time selection.")
 
-    output = {"lake": lake,
-              "time": at_out.tolist(),
-              "latitude": lat_grid[x_index, y_index],
-              "longitude": lng_grid[x_index, y_index],
-              "distance": distance,
-              "depth": {"value": depth, "unit": "m"},
-              "temperature": {"data": functions.filter_parameter(t_out), "unit": "degC"},
-              "u": {"data": functions.filter_parameter(u_out, decimals=5), "unit": "m/s"},
-              "v": {"data": functions.filter_parameter(v_out, decimals=5), "unit": "m/s"}}
-
+    output = {"time": at_out.tolist(),
+              "lat": lat_grid[x_index, y_index],
+              "lng": lng_grid[x_index, y_index],
+              "distance": {"data": distance, "unit": "m", "description": "Distance from requested location to center of closest grid point"},
+              "depth": {"value": depth, "unit": "m", "description": "Distance from the surface to the closest grid point to requested depth"},
+              "temperature": {"data": functions.filter_parameter(t_out), "unit": "degC", "description": "Water temperature"},
+              "u": {"data": functions.filter_parameter(u_out, decimals=5), "unit": "m/s", "description": "Eastward flow velocity"},
+              "v": {"data": functions.filter_parameter(v_out, decimals=5), "unit": "m/s", "description": "Northward flow velocity"}}
     return output
 
 
@@ -780,14 +763,17 @@ def get_simulations_layer_average_temperature_delft3dflow(filesystem, lake, star
             p = functions.alplakes_parameter(
                 nc.variables["R1"][time_index_start:time_index_end, 0, depth_index, :])
             p = np.nanmean(p, axis=(1, 2))
-            t = functions.unix_time(time[time_index_start:time_index_end], nc.variables["time"].units)
+            t = functions.alplakes_time(time[time_index_start:time_index_end], nc.variables["time"].units)
             if out is None:
                 out = p
                 times = t
             else:
                 out = np.concatenate((out, p), axis=0)
                 times = np.concatenate((times, t), axis=0)
-    output = {"date": functions.filter_parameter(times), "temperature": functions.filter_parameter(out)}
+    output = {"time": times.tolist(),
+              "temperature": {"data": functions.filter_parameter(out),
+                              "unit": "degC",
+                              "description": "Water temperature"}}
     return output
 
 

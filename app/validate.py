@@ -10,7 +10,7 @@ def path_longitude(example="6.67", description="Longitude (WGS 84)"):
     return Path(..., title="Longitude", ge=-180, le=180, description=description, example=example)
 
 
-def path_time(description="The time in YYYYmmddHHMM format (UTC)", example="202309050300"):
+def path_time(description="The time in YYYYmmddHHMM format (UTC)", example="202304050300"):
     return Path(..., regex=r"^\d{12}$", title="Datetime", description=description, example=example)
 
 

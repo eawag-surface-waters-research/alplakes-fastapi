@@ -129,7 +129,7 @@ def get_cosmo_area_forecast(filesystem, model, input_variables, forecast_date, l
                     data = ds.variables[var][:, 0, 0, x_min:x_max, y_min:y_max].values
                 else:
                     data = []
-                output[var] = {"name": ds.variables[var].attrs["long_name"],
+                output[var] = {"description": ds.variables[var].attrs["long_name"],
                                "unit": ds.variables[var].attrs["units"],
                                "data": np.where(np.isnan(data), None, data).tolist()}
             else:
@@ -172,7 +172,7 @@ def get_cosmo_point_forecast(filesystem, model, variables, forecast_date, lat, l
                     data = ds.variables[var][:, 0, 0, x, y].values
                 else:
                     data = []
-                output[var] = {"name": ds.variables[var].attrs["long_name"],
+                output[var] = {"description": ds.variables[var].attrs["long_name"],
                                "unit": ds.variables[var].attrs["units"],
                                "data": np.where(np.isnan(data), None, data).tolist()}
             else:
@@ -228,7 +228,7 @@ def get_icon_area_forecast(filesystem, model, input_variables, forecast_date, ll
                     data = ds.variables[var][:, 0, 0, x_min:x_max, y_min:y_max].values
                 else:
                     data = []
-                output[var] = {"name": ds.variables[var].attrs["long_name"],
+                output[var] = {"description": ds.variables[var].attrs["long_name"],
                                "unit": ds.variables[var].attrs["units"],
                                "data": np.where(np.isnan(data), None, data).tolist()}
             else:
@@ -275,7 +275,7 @@ def get_icon_point_forecast(filesystem, model, input_variables, forecast_date, l
                     data = ds.variables[var][:, 0, 0, x, y].values
                 else:
                     data = []
-                output[var] = {"name": ds.variables[var].attrs["long_name"],
+                output[var] = {"description": ds.variables[var].attrs["long_name"],
                                "unit": ds.variables[var].attrs["units"],
                                "data": np.where(np.isnan(data), None, data).tolist()}
             else:
@@ -348,7 +348,7 @@ def get_cosmo_area_reanalysis(filesystem, model, input_variables, start_date, en
                         data = ds.variables[var][:, 0, x_min:x_max, y_min:y_max].values
                     else:
                         data = []
-                    output[var] = {"name": ds.variables[var].attrs["long_name"],
+                    output[var] = {"description": ds.variables[var].attrs["long_name"],
                                    "unit": ds.variables[var].attrs["units"],
                                    "data": np.where(np.isnan(data), None, data).tolist()}
                 else:
@@ -409,7 +409,7 @@ def get_cosmo_point_reanalysis(filesystem, model, variables, start_date, end_dat
                         data = ds.variables[var][:, 0, x, y].values
                     else:
                         data = []
-                    output[var] = {"name": ds.variables[var].attrs["long_name"],
+                    output[var] = {"description": ds.variables[var].attrs["long_name"],
                                    "unit": ds.variables[var].attrs["units"],
                                    "data": np.where(np.isnan(data), None, data).tolist()}
                 else:
@@ -483,7 +483,7 @@ def get_icon_area_reanalysis(filesystem, model, variables, start_date, end_date,
                         data = ds.variables[var][:, 0, x_min:x_max, y_min:y_max].values
                     else:
                         data = []
-                    output[var] = {"name": ds.variables[var].attrs["long_name"],
+                    output[var] = {"description": ds.variables[var].attrs["long_name"],
                                    "unit": ds.variables[var].attrs["units"],
                                    "data": np.where(np.isnan(data), None, data).tolist()}
                 else:
@@ -543,7 +543,7 @@ def get_icon_point_reanalysis(filesystem, model, variables, start_date, end_date
                         data = ds.variables[var][:, 0, x, y].values
                     else:
                         data = []
-                    output[var] = {"name": ds.variables[var].attrs["long_name"],
+                    output[var] = {"description": ds.variables[var].attrs["long_name"],
                                    "unit": ds.variables[var].attrs["units"],
                                    "data": np.where(np.isnan(data), None, data).tolist()}
                 else:

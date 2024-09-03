@@ -2,6 +2,8 @@ import os
 import json
 import math
 import shutil
+from symbol import except_clause
+
 import requests
 import numpy as np
 import pandas as pd
@@ -158,7 +160,10 @@ def alplakes_velocity(u, v, alpha):
 
 
 def alplakes_time(t, units):
-    return np.array([convert_from_unit(x, units).strftime("%Y%m%d%H%M") for x in t])
+    try:
+        return np.array([convert_from_unit(x, units).replace(tzinfo=timezone.utc).isoformat() for x in t])
+    except:
+        return convert_from_unit(t, units).replace(tzinfo=timezone.utc).isoformat()
 
 
 def default_time(t, units):
