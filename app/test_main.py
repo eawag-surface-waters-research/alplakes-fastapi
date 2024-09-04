@@ -102,11 +102,11 @@ def test_meteoswiss_meteodata_station_metadata_station():
 
 
 def test_meteoswiss_meteodata_measured():
-    parameter = "pva200h0"
-    response = client.get("/meteoswiss/meteodata/measured/PUY/{}/20230101/20240210".format(parameter))
+    variable = "pva200h0"
+    response = client.get("/meteoswiss/meteodata/measured/PUY/{}/20230101/20240210".format(variable))
     assert response.status_code == 200
     data = response.json()
-    assert isinstance(data[parameter][0], float)
+    assert isinstance(data["variables"][variable]["data"][0], float)
     assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
 
 

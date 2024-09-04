@@ -153,7 +153,7 @@ if internal:
     @app.get("/meteoswiss/icon/metadata", tags=["Meteoswiss"], response_model=List[meteoswiss.Metadata])
     async def meteoswiss_icon_metadata():
         """
-        JSON of all the available MeteoSwiss ICON data.
+        Metadata for available MeteoSwiss ICON data.
         """
         return meteoswiss.get_icon_metadata(filesystem)
 
@@ -249,15 +249,19 @@ if internal:
         validate.date(forecast_date)
         return meteoswiss.get_icon_point_forecast(filesystem, model, variables, forecast_date, lat, lng)
 
-    @app.get("/meteoswiss/meteodata/metadata", tags=["Meteoswiss"])
+    @app.get("/meteoswiss/meteodata/metadata", tags=["Meteoswiss"], response_class=RedirectResponse, response_description="Redirect to a GeoJSON file")
     async def meteoswiss_meteodata_metadata():
         """
-        GEOJSON of all Meteoswiss stations. Accessed from https://www.geocat.ch/geonetwork/srv/ger/catalog.search#/metadata/d9ea83de-b8d7-44e1-a7e3-3065699eb571
+        Metadata for all Meteoswiss metreological stations.
+
+        Accessed from
+        https://www.geocat.ch/geonetwork/srv/ger/catalog.search#/metadata/d9ea83de-b8d7-44e1-a7e3-3065699eb571.
+        Last updated 27.10.2023 05:30.
         """
         return RedirectResponse("https://alplakes-eawag.s3.eu-central-1.amazonaws.com/static/meteoswiss/meteoswiss_meteodata.json")
 
 
-    @app.get("/meteoswiss/meteodata/metadata/{station_id}", tags=["Meteoswiss"])
+    @app.get("/meteoswiss/meteodata/metadata/{station_id}", tags=["Meteoswiss"], response_model=meteoswiss.ResponseModelMeteoMeta)
     async def meteoswiss_meteodata_station_metadata(
             station_id: str = Path(..., regex=r"^[a-zA-Z0-9]{3,6}$", title="Station ID", example="PUY",
                                    description="3 digit station identification code")):
@@ -268,7 +272,7 @@ if internal:
         """
         return meteoswiss.get_meteodata_station_metadata(filesystem, station_id)
 
-    @app.get("/meteoswiss/meteodata/measured/{station_id}/{parameter}/{start_date}/{end_date}", tags=["Meteoswiss"])
+    @app.get("/meteoswiss/meteodata/measured/{station_id}/{parameter}/{start_date}/{end_date}", tags=["Meteoswiss"], response_model=meteoswiss.ResponseModelMeteo)
     async def meteoswiss_meteodata_measured(station_id: str = Path(..., regex=r"^[a-zA-Z0-9]{3,6}$", title="Station ID", example="PUY", description="3 digit station identification code"),
                                             parameter: meteoswiss.MeteodataParameters = Path(..., title="Parameter", description="Meteoswiss parameter"),
                                             start_date: str = validate.path_date(description="The start date in YYYYmmdd format"),
@@ -289,10 +293,10 @@ if internal:
         return meteoswiss.get_meteodata_measured(filesystem, station_id, parameter, start_date, end_date)
 
 if internal:
-    @app.get("/bafu/hydrodata/metadata", tags=["Bafu"])
+    @app.get("/bafu/hydrodata/metadata", tags=["Bafu"], response_class=RedirectResponse, response_description="Redirect to a GeoJSON file")
     async def bafu_hydrodata_metadata():
         """
-        GEOJSON of all the available BAFU hydrodata.
+        Metadata for all the available BAFU hydrodata.
         """
         return RedirectResponse("https://alplakes-eawag.s3.eu-central-1.amazonaws.com/static/bafu/bafu_hydrodata.json")
 

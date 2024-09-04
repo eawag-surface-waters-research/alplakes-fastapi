@@ -8,7 +8,7 @@ from enum import Enum
 from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException
 from typing import Dict, List, Union, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from app.functions import daterange, ch1903_plus_to_latlng
 
 
@@ -31,16 +31,26 @@ class VariableKeyModel2D(BaseModel):
     description: Union[str, None] = None
 
 class ResponseModel2D(BaseModel):
-    time: List[str]
+    time: List[datetime]
     lat: List[List[float]]
     lng: List[List[float]]
     variables: Dict[str, VariableKeyModel2D]
+    @validator('time', each_item=True)
+    def validate_timezone(cls, value):
+        if value.tzinfo is None:
+            raise ValueError('time must have a timezone')
+        return value
 
 class ResponseModel1D(BaseModel):
-    time: List[str]
-    lat: List[List[float]]
-    lng: List[List[float]]
+    time: List[datetime]
+    lat: float
+    lng: float
     variables: Dict[str, VariableKeyModel1D]
+    @validator('time', each_item=True)
+    def validate_timezone(cls, value):
+        if value.tzinfo is None:
+            raise ValueError('time must have a timezone')
+        return value
 
 class Metadata(BaseModel):
     model: str
@@ -153,6 +163,7 @@ def get_cosmo_area_forecast(filesystem, model, input_variables, forecast_date, l
         x_min, x_max, y_min, y_max = min(x), max(x) + 1, min(y), max(y) + 1
         output["lat"] = ds.variables["lat_1"][x_min:x_max, y_min:y_max].values.tolist()
         output["lng"] = ds.variables["lon_1"][x_min:x_max, y_min:y_max].values.tolist()
+        output["variables"] = {}
         for var in variables:
             if var in ds.variables.keys():
                 if len(ds.variables[var].dims) == 3:
@@ -163,11 +174,9 @@ def get_cosmo_area_forecast(filesystem, model, input_variables, forecast_date, l
                     data = ds.variables[var][:, 0, 0, x_min:x_max, y_min:y_max].values
                 else:
                     data = []
-                output[var.replace("_MEAN", "")] = {"description": ds.variables[var].attrs["long_name"],
+                output["variables"][var.replace("_MEAN", "")] = {"description": ds.variables[var].attrs["long_name"],
                                "unit": ds.variables[var].attrs["units"],
                                "data": np.where(np.isnan(data), None, data).tolist()}
-            else:
-                output[var.replace("_MEAN", "")] = []
     return output
 
 
@@ -202,7 +211,7 @@ def get_cosmo_point_forecast(filesystem, model, input_variables, forecast_date, 
         x, y = xy[0], xy[1]
         output["lat"] = float(ds.variables["lat_1"][x, y].values)
         output["lng"] = float(ds.variables["lon_1"][x, y].values)
-
+        output["variables"] = {}
         for var in variables:
             if var in ds.variables.keys():
                 if len(ds.variables[var].dims) == 3:
@@ -213,11 +222,9 @@ def get_cosmo_point_forecast(filesystem, model, input_variables, forecast_date, 
                     data = ds.variables[var][:, 0, 0, x, y].values
                 else:
                     data = []
-                output[var.replace("_MEAN", "")] = {"description": ds.variables[var].attrs["long_name"],
+                output["variables"][var.replace("_MEAN", "")] = {"description": ds.variables[var].attrs["long_name"],
                                "unit": ds.variables[var].attrs["units"],
                                "data": np.where(np.isnan(data), None, data).tolist()}
-            else:
-                output[var.replace("_MEAN", "")] = []
     return output
 
 
@@ -254,6 +261,7 @@ def get_icon_area_forecast(filesystem, model, input_variables, forecast_date, ll
         x_min, x_max, y_min, y_max = min(x), max(x) + 1, min(y), max(y) + 1
         output["lat"] = ds.variables["lat_1"][x_min:x_max, y_min:y_max].values.tolist()
         output["lng"] = ds.variables["lon_1"][x_min:x_max, y_min:y_max].values.tolist()
+        output["variables"] = {}
         for var in variables:
             if var in ds.variables.keys():
                 if len(ds.variables[var].dims) == 3:
@@ -264,11 +272,9 @@ def get_icon_area_forecast(filesystem, model, input_variables, forecast_date, ll
                     data = ds.variables[var][:, 0, 0, x_min:x_max, y_min:y_max].values
                 else:
                     data = []
-                output[var.replace("_MEAN", "")] = {"description": ds.variables[var].attrs["long_name"],
+                output["variables"][var.replace("_MEAN", "")] = {"description": ds.variables[var].attrs["long_name"],
                                "unit": ds.variables[var].attrs["units"],
                                "data": np.where(np.isnan(data), None, data).tolist()}
-            else:
-                output[var.replace("_MEAN", "")] = []
     return output
 
 
@@ -300,7 +306,7 @@ def get_icon_point_forecast(filesystem, model, input_variables, forecast_date, l
         x, y = xy[0], xy[1]
         output["lat"] = float(ds.variables["lat_1"][x, y].values)
         output["lng"] = float(ds.variables["lon_1"][x, y].values)
-
+        output["variables"] = {}
         for var in variables:
             if var in ds.variables.keys():
                 if len(ds.variables[var].dims) == 3:
@@ -311,11 +317,9 @@ def get_icon_point_forecast(filesystem, model, input_variables, forecast_date, l
                     data = ds.variables[var][:, 0, 0, x, y].values
                 else:
                     data = []
-                output[var.replace("_MEAN", "")] = {"description": ds.variables[var].attrs["long_name"],
+                output["variables"][var.replace("_MEAN", "")] = {"description": ds.variables[var].attrs["long_name"],
                                "unit": ds.variables[var].attrs["units"],
                                "data": np.where(np.isnan(data), None, data).tolist()}
-            else:
-                output[var.replace("_MEAN", "")] = []
     return output
 
 
@@ -443,6 +447,7 @@ def get_cosmo_point_reanalysis(filesystem, model, input_variables, start_date, e
             else:
                 output["lat"] = float(ds.variables["lat_1"][x, y].values)
                 output["lng"] = float(ds.variables["lon_1"][x, y].values)
+            output["variables"] = {}
             for var in variables:
                 if var in ds.variables.keys():
                     if len(ds.variables[var].dims) == 3:
@@ -451,11 +456,9 @@ def get_cosmo_point_reanalysis(filesystem, model, input_variables, start_date, e
                         data = ds.variables[var][:, 0, x, y].values
                     else:
                         data = []
-                    output[var.replace("_MEAN", "")] = {"description": ds.variables[var].attrs["long_name"],
+                    output["variables"][var.replace("_MEAN", "")] = {"description": ds.variables[var].attrs["long_name"],
                                    "unit": ds.variables[var].attrs["units"],
                                    "data": np.where(np.isnan(data), None, data).tolist()}
-                else:
-                    output[var.replace("_MEAN", "")] = []
         return output
     except xr.MergeError as e:
         raise HTTPException(status_code=400,
@@ -524,6 +527,7 @@ def get_icon_area_reanalysis(filesystem, model, input_variables, start_date, end
             else:
                 output["lat"] = ds.variables["lat_1"][x_min:x_max, y_min:y_max].values.tolist()
                 output["lng"] = ds.variables["lon_1"][x_min:x_max, y_min:y_max].values.tolist()
+            output["variables"] = {}
             for var in variables:
                 if var in ds.variables.keys():
                     if len(ds.variables[var].dims) == 3:
@@ -532,11 +536,9 @@ def get_icon_area_reanalysis(filesystem, model, input_variables, start_date, end
                         data = ds.variables[var][:, 0, x_min:x_max, y_min:y_max].values
                     else:
                         data = []
-                    output[var.replace("_MEAN", "")] = {"description": ds.variables[var].attrs["long_name"],
+                    output["variables"][var.replace("_MEAN", "")] = {"description": ds.variables[var].attrs["long_name"],
                                    "unit": ds.variables[var].attrs["units"],
                                    "data": np.where(np.isnan(data), None, data).tolist()}
-                else:
-                    output[var.replace("_MEAN", "")] = []
         return output
     except xr.MergeError as e:
         raise HTTPException(status_code=400,
@@ -591,6 +593,7 @@ def get_icon_point_reanalysis(filesystem, model, input_variables, start_date, en
             else:
                 output["lat"] = float(ds.variables["lat_1"][x, y].values)
                 output["lng"] = float(ds.variables["lon_1"][x, y].values)
+            output["variables"] = {}
             for var in variables:
                 if var in ds.variables.keys():
                     if len(ds.variables[var].dims) == 3:
@@ -599,11 +602,9 @@ def get_icon_point_reanalysis(filesystem, model, input_variables, start_date, en
                         data = ds.variables[var][:, 0, x, y].values
                     else:
                         data = []
-                    output[var.replace("_MEAN", "")] = {"description": ds.variables[var].attrs["long_name"],
+                    output["variables"][var.replace("_MEAN", "")] = {"description": ds.variables[var].attrs["long_name"],
                                    "unit": ds.variables[var].attrs["units"],
                                    "data": np.where(np.isnan(data), None, data).tolist()}
-                else:
-                    output[var.replace("_MEAN", "")] = []
         return output
     except xr.MergeError as e:
         raise HTTPException(status_code=400,
@@ -621,6 +622,39 @@ class MeteodataParameters(str, Enum):
     fkl010h0 = "fkl010h0"
     dkl010h0 = "dkl010h0"
     nto000d0 = "nto000d0"
+
+class VariableKeyModelMeteoMeta(BaseModel):
+    period: str
+    unit: str
+    description: str
+    start_date: str
+    end_date: str
+
+class ResponseModelMeteoMeta(BaseModel):
+    id: str
+    source: str
+    name: str
+    elevation: float
+    ch1903plus: List[float]
+    lat: float
+    lng: float
+    variables: Dict[str, VariableKeyModelMeteoMeta]
+    data_available: bool
+
+class VariableKeyModelMeteo(BaseModel):
+    period: str
+    unit: str
+    description: str
+    data: List[float]
+
+class ResponseModelMeteo(BaseModel):
+    time: List[datetime]
+    variables: Dict[str, VariableKeyModelMeteo]
+    @validator('time', each_item=True)
+    def validate_timezone(cls, value):
+        if value.tzinfo is None:
+            raise ValueError('time must have a timezone')
+        return value
 
 
 def get_meteodata_station_metadata(filesystem, station_id):
@@ -678,10 +712,11 @@ def get_meteodata_station_metadata(filesystem, station_id):
         raise HTTPException(status_code=400, detail="Station ID {} not recognised".format(station_id))
     out["name"] = data["properties"]["station_name"]
     out["elevation"] = float(data["properties"]["altitude"])
-    out["ch1903+"] = data["geometry"]["coordinates"]
-    lat, lng = ch1903_plus_to_latlng(out["ch1903+"][0], out["ch1903+"][1])
-    out["latlng"] = [lat, lng]
-    out["parameters"] = []
+    out["ch1903plus"] = data["geometry"]["coordinates"]
+    lat, lng = ch1903_plus_to_latlng(out["ch1903plus"][0], out["ch1903plus"][1])
+    out["lat"] = lat
+    out["lng"] = lng
+    out["variables"] = {}
     out["data_available"] = False
     if os.path.exists(station_dir):
         out["data_available"] = True
@@ -695,16 +730,23 @@ def get_meteodata_station_metadata(filesystem, station_id):
         for p in parameters:
             if p in parameters_dict:
                 d = parameters_dict[p]
-                d["id"] = p
                 d["start_date"] = datetime.strptime(str(min(df.loc[df[p], 'Date'])), "%Y%m%d%H").replace(
                     tzinfo=timezone.utc).strftime("%Y-%m-%d")
                 d["end_date"] = datetime.strptime(str(max(df.loc[df[p], 'Date'])), "%Y%m%d%H").replace(
                     tzinfo=timezone.utc).strftime("%Y-%m-%d")
-                out["parameters"].append(d)
+                out["variables"][p] = d
     return out
 
 
 def get_meteodata_measured(filesystem, station_id, parameter, start_date, end_date):
+    parameters_dict = {
+        "pva200h0": {"unit": "hPa", "description": "Vapour pressure 2 m above ground", "period": "hourly mean"},
+        "gre000h0": {"unit": "W/m²", "description": "Global radiation", "period": "hourly mean"},
+        "tre200h0": {"unit": "°C", "description": "Air temperature 2 m above ground", "period": "hourly mean"},
+        "rre150h0": {"unit": "mm", "description": "Precipitation", "period": "hourly total"},
+        "fkl010h0": {"unit": "m/s", "description": "Wind speed scalar", "period": "hourly mean"},
+        "dkl010h0": {"unit": "°", "description": "Wind direction", "period": "hourly mean"},
+        "nto000d0": {"unit": "%", "description": "Cloud cover", "period": "daily mean"}}
     station_id = station_id.upper()
     station_dir = os.path.join(filesystem, "media/meteoswiss/meteodata", station_id)
     if not os.path.exists(station_dir):
@@ -727,8 +769,12 @@ def get_meteodata_measured(filesystem, station_id, parameter, start_date, end_da
     if len(selected) == 0:
         raise HTTPException(status_code=400,
                             detail="No data available between {} and {}".format(start_date, end_date))
-    return {"time": list(selected["time"]), parameter: list(selected[parameter])}
+    return {"time": list(selected["time"]),
+            "variables": {parameter: {"data": list(selected[parameter]),
+                                     "unit": parameters_dict[parameter]["unit"],
+                                     "description": parameters_dict[parameter]["description"],
+                                     "period": parameters_dict[parameter]["period"]}}}
 
 def meteoswiss_time_iso(time_array):
-    return [datetime.utcfromtimestamp(time.astype('datetime64[s]').astype('int')).replace(tzinfo=timezone.utc).isoformat() for
+    return [datetime.utcfromtimestamp(time.astype('datetime64[s]').astype('int')).replace(tzinfo=timezone.utc) for
      time in np.array(time_array.values, dtype='datetime64[ns]')]
