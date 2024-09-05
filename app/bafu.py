@@ -1,13 +1,43 @@
 import os
 import json
 import requests
-import numpy as np
 import pandas as pd
 from enum import Enum
-from datetime import datetime, timedelta, timezone
+from typing import Dict, List
+from pydantic import BaseModel, validator
+from datetime import datetime, timedelta, timezone, date
 from fastapi import HTTPException
 from fastapi.responses import FileResponse
 
+class VariableKeyModelMeta(BaseModel):
+    unit: str
+    description: str
+    start_date: date
+    end_date: date
+
+class ResponseModelMeta(BaseModel):
+    id: str
+    source: str
+    name: str
+    elevation: float
+    ch1903plus: List[float]
+    lat: float
+    lng: float
+    variables: Dict[str, VariableKeyModelMeta]
+
+class VariableKeyModel(BaseModel):
+    unit: str
+    description: str
+    data: List[float]
+
+class ResponseModel(BaseModel):
+    time: List[datetime]
+    variables: Dict[str, VariableKeyModel]
+    @validator('time', each_item=True)
+    def validate_timezone(cls, value):
+        if value.tzinfo is None:
+            raise ValueError('time must have a timezone')
+        return value
 
 def get_hydrodata_station_metadata(filesystem, station_id):
     parameter_types = [
@@ -40,15 +70,14 @@ def get_hydrodata_station_metadata(filesystem, station_id):
     out["source"] = "Bafu"
     out["elevation"] = float(data["properties"]["Station elevation"].split(" ")[0])
     x, y = data["properties"]["ch1903"]
-    out["ch1903+"] = [x + 2000000, y + 1000000]
-    out["latlng"] = data["properties"]["wgs84"]
-    out["pqprevi-official"] = data["properties"]["pqprevi-official"]
-    out["pqprevi-unofficial"] = data["properties"]["pqprevi-unofficial"]
-    out["parameters"] = []
+    out["ch1903plus"] = [x + 2000000, y + 1000000]
+    out["lat"] = data["properties"]["wgs84"][0]
+    out["lng"] = data["properties"]["wgs84"][1]
+    out["variables"] = {}
     if not os.path.exists(station_dir):
         raise HTTPException(status_code=400, detail="Data not available for {}".format(station_id))
     for parameter in os.listdir(station_dir):
-        d = {"id": parameter}
+        d = {}
         properties = next((p for p in parameter_types if p["substring"] in parameter.lower()), None)
         if not properties == None:
             d["unit"] = properties["unit"]
@@ -62,7 +91,7 @@ def get_hydrodata_station_metadata(filesystem, station_id):
         end_date = pd.to_datetime(df["Time"].iloc[-1], utc=True).strftime("%Y-%m-%d")
         d["start_date"] = start_date
         d["end_date"] = end_date
-        out["parameters"].append(d)
+        out["variables"][parameter] = d
     return out
 
 
@@ -115,7 +144,7 @@ def get_hydrodata_measured(filesystem, station_id, parameter, start_date, end_da
     if not properties == None:
         d["unit"] = properties["unit"]
         d["description"] = properties["description"]
-    return {"time": list(df["time"]), parameter: d}
+    return {"time": list(df["time"]), "variables": {parameter: d}}
 
 
 class HydrodataPredicted(str, Enum):

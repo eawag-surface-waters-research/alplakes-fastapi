@@ -1,13 +1,31 @@
 import os
-import json
-import requests
-import numpy as np
 import pandas as pd
-from enum import Enum
-from datetime import datetime, timedelta, timezone
+from typing import List
+from datetime import datetime, date
+from typing import Dict, List
+from pydantic import BaseModel, validator
 from fastapi import HTTPException
-from fastapi.responses import FileResponse
 
+class Metadata(BaseModel):
+    key: str
+    measurements: int
+    start_date: date
+    end_date: date
+    month_coverage: List[int]
+
+class VariableKeyModel(BaseModel):
+    unit: str
+    description: str
+    data: List[float]
+
+class ResponseModel(BaseModel):
+    time: List[datetime]
+    variables: Dict[str, VariableKeyModel]
+    @validator('time', each_item=True)
+    def validate_timezone(cls, value):
+        if value.tzinfo is None:
+            raise ValueError('time must have a timezone')
+        return value
 
 def get_insitu_secchi_metadata(filesystem):
     folder = os.path.join(filesystem, "media", "insitu", "secchi")
@@ -22,9 +40,9 @@ def get_insitu_secchi_metadata(filesystem):
             out.append({
                 "key": file.split(".")[0],
                 "measurements": len(df),
-                "first": df["Time"].min(),
-                "latest": df["Time"].max(),
-                "months": months
+                "start_date": df["Time"].min().strftime("%Y-%m-%d"),
+                "end_date": df["Time"].max().strftime("%Y-%m-%d"),
+                "month_coverage": months
             })
         except:
             print("Failed to parse: {}".format(file))
@@ -41,5 +59,5 @@ def get_insitu_secchi_lake(filesystem, lake):
     out = {"time": df["Time"].to_list(),
            "lat": df["Latitude"].to_list(),
            "lng": df["Longitude"].to_list(),
-           "secchi": {"data": df["Secchi depth [m]"].to_list(), "unit": "m", "description": "Secchi depth"}}
+           "variables": {"secchi": {"data": df["Secchi depth [m]"].to_list(), "unit": "m", "description": "Secchi depth"}}}
     return out

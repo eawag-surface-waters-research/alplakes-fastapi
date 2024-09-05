@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Query, Request, Depends, Path, BackgroundTasks, Response
-from fastapi.responses import RedirectResponse, PlainTextResponse, JSONResponse
+from fastapi.responses import RedirectResponse, PlainTextResponse, JSONResponse, FileResponse
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, List, Union, Any
@@ -28,7 +28,7 @@ app = FastAPI(
                 "historical and forecasted simulation data from lakes across the alpine region. The API supports both "
                 "geospatial and temporal queries. It is the backend for the website www.alplakes.eawag.ch. For bug "
                 "reports, collaborations, requests or to join the mailing list for updates please get in touch.",
-    version="1.0.0",
+    version="2.0.0",
     contact={
         "name": "James Runnalls",
         "email": "james.runnalls@eawag.ch",
@@ -297,11 +297,13 @@ if internal:
     async def bafu_hydrodata_metadata():
         """
         Metadata for all the available BAFU hydrodata.
+
+        Accessed from https://www.geocat.ch/geonetwork/srv/ger/catalog.search#/metadata/bd377507-c61d-4fe2-bf81-9605b405d8ad
         """
         return RedirectResponse("https://alplakes-eawag.s3.eu-central-1.amazonaws.com/static/bafu/bafu_hydrodata.json")
 
 
-    @app.get("/bafu/hydrodata/metadata/{station_id}", tags=["Bafu"])
+    @app.get("/bafu/hydrodata/metadata/{station_id}", tags=["Bafu"], response_model=bafu.ResponseModelMeta)
     async def bafu_hydrodata_station_metadata(station_id: str = Path(..., regex=r"^\d{4}$", title="Station ID", example=2009, description="4 digit station identification code")):
         """
         Hydrological data from the automatic measuring network of Bafu.
@@ -310,7 +312,7 @@ if internal:
         """
         return bafu.get_hydrodata_station_metadata(filesystem, station_id)
 
-    @app.get("/bafu/hydrodata/measured/{station_id}/{parameter}/{start_date}/{end_date}", tags=["Bafu"])
+    @app.get("/bafu/hydrodata/measured/{station_id}/{parameter}/{start_date}/{end_date}", tags=["Bafu"], response_model=bafu.ResponseModel)
     async def bafu_hydrodata_measured(station_id: str = Path(..., regex=r"^\d{4}$", title="Station ID", example=2009, description="4 digit station identification code"),
                                       parameter: str = Path(..., title="Parameter", example="AbflussPneumatikunten", description="Parameter"),
                                       start_date: str = validate.path_date(description="The start date in YYYYmmdd format"),
@@ -327,7 +329,7 @@ if internal:
         return bafu.get_hydrodata_measured(filesystem, station_id, parameter, start_date, end_date, resample)
 
 if internal:
-    @app.get("/insitu/secchi/metadata", tags=["Insitu"])
+    @app.get("/insitu/secchi/metadata", tags=["Insitu"], response_model=List[insitu.Metadata])
     async def insitu_secchi_metadata():
         """
         Insitu Secchi depth measurements from assorted monitoring programs
@@ -337,7 +339,7 @@ if internal:
         return insitu.get_insitu_secchi_metadata(filesystem)
 
 
-    @app.get("/insitu/secchi/{lake}", tags=["Insitu"])
+    @app.get("/insitu/secchi/{lake}", tags=["Insitu"], response_model=insitu.ResponseModel)
     async def insitu_secchi_lake(lake: str = Path(..., title="Lake", example="geneva", description="Lake name")):
         """
         Insitu Secchi depth measurements from assorted monitoring programs
@@ -347,34 +349,46 @@ if internal:
         return insitu.get_insitu_secchi_lake(filesystem, lake)
 
 
-@app.get("/simulations/metadata", tags=["3D Simulations"])
+@app.get("/simulations/metadata", tags=["3D Simulations"], response_model=List[simulations.Metadata])
 async def simulations_metadata():
     """
-    JSON of all the available 3D simulation data.
+    Metadata for all available 3D simulations.
     """
     return simulations.get_metadata(filesystem)
 
 
-@app.get("/simulations/metadata/{model}/{lake}", tags=["3D Simulations"])
+@app.get("/simulations/metadata/{model}/{lake}", tags=["3D Simulations"], response_model=simulations.MetadataLake)
 async def simulations_metadata_lake(model: simulations.Models = Path(..., title="Model", description="Model name"),
                                     lake: simulations.Lakes = Path(..., title="Lake", description="Lake name")):
     """
-    JSON of the available simulation data for a specific lake and 3D model.
+    Metadata for a specific 3D model and lake.
     """
     return simulations.get_metadata_lake(filesystem, model, lake)
 
 
-@app.get("/simulations/file/{model}/{lake}/{sunday}", tags=["3D Simulations"])
+@app.get("/simulations/file/{model}/{lake}/{sunday}", tags=["3D Simulations"], response_class=FileResponse)
 async def simulations_file(model: simulations.Models = Path(..., title="Model", description="Model name"),
                            lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
                            sunday: str = validate.path_date(description="The Sunday in YYYYmmdd format", example="20230402")):
     """
     NetCDF simulation results for a one-week period.
 
-    ⚠️ **Warning:** Trying to run this endpoint in the docs is likely to crash your browser due to the size of the files. Call the url directly for downloading.
+    Simulation results are in their native format from the simulations see below for guides describing the output files.
+
+    | Model        | Link                                                                                                                                                                                                                               |
+    |--------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+    | delft3d-flow | [https://github.com/eawag-surface-waters-research/alplakes-simulations/blob/master/static/delft3d-flow/OUTPUT.md](https://github.com/eawag-surface-waters-research/alplakes-simulations/blob/master/static/delft3d-flow/OUTPUT.md) |
+
+    ⚠️ **Warning:** Trying to run this endpoint in the docs is likely to crash your browser due to the size of the files.
+    Call the url directly for downloading.
+
+    For example: [https://alplakes-api.eawag.ch/simulations/file/delft3d-flow/geneva/20230101](https://alplakes-api.eawag.ch/simulations/file/delft3d-flow/geneva/20230101)
     """
     validate.sunday(sunday)
-    return simulations.get_simulations_file(filesystem, model, lake, sunday)
+    path = os.path.join(filesystem, "media/simulations", model, "results", lake, "{}.nc".format(sunday))
+    if not os.path.isfile(path):
+        raise HTTPException(status_code=400, detail="Apologies data is not available for {} on the week beginning {}".format(model, sunday))
+    return FileResponse(path, media_type="application/nc", filename="{}_{}_{}.nc".format(model, lake, sunday))
 
 
 @app.get("/simulations/point/{model}/{lake}/{start_time}/{end_time}/{depth}/{lat}/{lng}", tags=["3D Simulations"])

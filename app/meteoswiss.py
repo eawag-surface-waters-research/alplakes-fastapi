@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from enum import Enum
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 from fastapi import HTTPException
 from typing import Dict, List, Union, Any
 from pydantic import BaseModel, validator
@@ -55,9 +55,9 @@ class ResponseModel1D(BaseModel):
 class Metadata(BaseModel):
     model: str
     description: str
-    start_date: str
-    end_date: str
-    missing_dates: List[str]
+    start_date: date
+    end_date: date
+    missing_dates: List[date]
 
 
 def get_cosmo_metadata(filesystem):
@@ -627,8 +627,8 @@ class VariableKeyModelMeteoMeta(BaseModel):
     period: str
     unit: str
     description: str
-    start_date: str
-    end_date: str
+    start_date: date
+    end_date: date
 
 class ResponseModelMeteoMeta(BaseModel):
     id: str

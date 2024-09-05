@@ -121,7 +121,7 @@ def test_bafu_hydrodata_measured():
     response = client.get("/bafu/hydrodata/measured/2009/{}/20210207/20230201".format(parameter))
     assert response.status_code == 200
     data = response.json()
-    assert isinstance(data[parameter]["data"][0], float)
+    assert isinstance(data["variables"][parameter]["data"][0], float)
     assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
 
 
@@ -130,7 +130,7 @@ def test_bafu_hydrodata_measured_resample():
     response = client.get("/bafu/hydrodata/measured/2009/{}/20210207/20230201?resample=hourly".format(parameter))
     assert response.status_code == 200
     data = response.json()
-    assert isinstance(data[parameter]["data"][0], float)
+    assert isinstance(data["variables"][parameter]["data"][0], float)
     assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
     assert (datetime.strptime(data["time"][1], "%Y-%m-%dT%H:%M:%S%z") -
             datetime.strptime(data["time"][0], "%Y-%m-%dT""%H:%M:%S%z")).total_seconds() == 3600
@@ -148,7 +148,7 @@ def test_insitu_secchi_lake():
     response = client.get("/insitu/secchi/{}".format(lake))
     assert response.status_code == 200
     data = response.json()
-    assert isinstance(data["secchi"]["data"][0], float)
+    assert isinstance(data["variables"]["secchi"]["data"][0], float)
     assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
 
 

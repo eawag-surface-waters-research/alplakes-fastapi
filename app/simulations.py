@@ -5,12 +5,27 @@ import numpy as np
 import xarray as xr
 import pandas as pd
 from enum import Enum
+from typing import Dict, List
+from pydantic import BaseModel, validator
 from fastapi import HTTPException
 from fastapi.responses import FileResponse
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 from dateutil.relativedelta import relativedelta, SU
 
 from app import functions
+
+class MetadataLake(BaseModel):
+    name: str
+    depths: List[float]
+    start_date: date
+    end_date: date
+    missing_dates: List[date]
+    height: int
+    width: int
+
+class Metadata(BaseModel):
+    model: str
+    lakes: List[MetadataLake]
 
 
 def get_metadata(filesystem):
@@ -57,11 +72,7 @@ def get_metadata(filesystem):
                 else:
                     raise ValueError("Model not recognised.")
             except:
-                m["lakes"].append({"name": lake,
-                                   "depths": [],
-                                   "start_date": "NA",
-                                   "end_date": "NA",
-                                   "missing_dates": []})
+                print("Failed for {}".format(lake))
         metadata.append(m)
     return metadata
 
@@ -95,7 +106,7 @@ def get_metadata_lake(filesystem, model, lake):
                 "depths": depths,
                 "start_date": start_date.strftime("%Y-%m-%d"),
                 "end_date": end_date.strftime("%Y-%m-%d"),
-                "missing_weeks": missing_dates,
+                "missing_dates": missing_dates,
                 "height": height,
                 "width": width}
     else:
@@ -126,16 +137,6 @@ class Parameters(str, Enum):
     velocity = "velocity"
     geometry = "geometry"
     thermocline = "thermocline"
-
-
-def get_simulations_file(filesystem, model, lake, sunday):
-    path = os.path.join(filesystem, "media/simulations", model, "results", lake, "{}.nc".format(sunday))
-    if os.path.isfile(path):
-        return FileResponse(path, media_type="application/nc", filename="{}_{}_{}.nc".format(model, lake, sunday))
-    else:
-        raise HTTPException(status_code=400,
-                            detail="Apologies data is not available for {} on the week beginning {}".format(model,
-                                                                                                            sunday))
 
 
 def get_simulations_layer(filesystem, model, lake, time, depth):
@@ -188,6 +189,7 @@ def get_simulations_layer_delft3dflow(filesystem, lake, time, depth):
                          "data": depth},
                "lat": functions.filter_parameter(lat_grid, decimals=5, nodata=np.nan),
                "lng": functions.filter_parameter(lng_grid, decimals=5, nodata=np.nan),
+               "variables": {
                "temperature": {"description": "Water temperature",
                      "units": "degC",
                      "data": t},
@@ -196,7 +198,7 @@ def get_simulations_layer_delft3dflow(filesystem, lake, time, depth):
                      "data": functions.filter_parameter(u, decimals=5)},
                "v": {"description": "Northward flow velocity",
                      "units": "m/s",
-                     "data": functions.filter_parameter(v, decimals=5)}
+                     "data": functions.filter_parameter(v, decimals=5)}}
                }
     return out
 
