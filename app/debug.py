@@ -13,7 +13,7 @@ import simulations
 
 filesystem = "../filesystem"
 
-function = "meteoswiss.get_cosmo_point_forecast"
+function = "simulations.get_simulations_transect_period"
 
 if function == "meteoswiss.get_cosmo_metadata":
     data = meteoswiss.get_cosmo_metadata(filesystem)
@@ -25,16 +25,18 @@ if function == "meteoswiss.get_cosmo_area_reanalysis":
 
 if function == "meteoswiss.get_cosmo_area_forecast":
     data = meteoswiss.get_cosmo_area_forecast(filesystem, "VNXZ32", ["T_2M"], "20230101", 46.156, 6.134, 46.54, 6.957)
+    plt.plot(data["time"], data["variables"]["T_2M"]["data"])
+    plt.show()
     print(data)
 
 if function == "meteoswiss.get_cosmo_point_reanalysis":
     data = meteoswiss.get_cosmo_point_reanalysis(filesystem, "VNXQ34", ["T_2M"], "20221231", "20230101", 46.5, 6.67)
-    plt.plot(data["time"], data["T_2M"]["data"])
+    plt.plot(data["time"], data["variables"]["T_2M"]["data"])
     plt.show()
 
 if function == "meteoswiss.get_cosmo_point_forecast":
     data = meteoswiss.get_cosmo_point_forecast(filesystem, "VNXZ32", ["T_2M"], "20230101", 46.5, 6.67)
-    plt.plot(data["time"], data["T_2M"]["data"])
+    plt.plot(data["time"], data["variables"]["T_2M"]["data"])
     plt.show()
 
 if function == "meteoswiss.get_icon_metadata":
@@ -93,44 +95,50 @@ if function == "simulations.get_metadata_lake":
     print(data)
 
 if function == "simulations.get_simulations_point":
-    data = simulations.get_simulations_point(filesystem, "delft3d-flow", "geneva", "202304050300", "202304112300", 1, 46.5, 6.67)
-    plt.plot([datetime.fromisoformat(t) for t in data["time"]], data["temperature"]["data"])
+    data = simulations.get_simulations_point(filesystem, "delft3d-flow", "geneva", "202304050300", "202304172300", 1, 46.5, 6.67, ["temperature", "velocity"])
+    plt.plot(data["time"], data["variables"]["temperature"]["data"])
     plt.show()
 
 if function == "simulations.get_simulations_layer":
-    data = simulations.get_simulations_layer(filesystem, "delft3d-flow", "geneva", "202304050300", 1)
-    temperature = pd.DataFrame(data["temperature"]["data"]).apply(pd.to_numeric, errors='coerce').to_numpy()
+    data = simulations.get_simulations_layer(filesystem, "delft3d-flow", "geneva", "202304050300", 1, ["temperature"])
+    temperature = pd.DataFrame(data["variables"]["temperature"]["data"]).apply(pd.to_numeric, errors='coerce').to_numpy()
     plt.imshow(temperature, cmap='viridis', interpolation='none')
     plt.show()
 
 if function == "simulations.get_simulations_layer_average_temperature":
     data = simulations.get_simulations_layer_average_temperature(filesystem, "delft3d-flow", "geneva", "202304050300", "202304112300", 1)
-    plt.plot([datetime.fromisoformat(t) for t in data["time"]], data["temperature"]["data"])
+    plt.plot(data["time"], data["variables"]["temperature"]["data"])
     plt.show()
 
 if function == "simulations.get_simulations_profile":
-    data = simulations.get_simulations_profile(filesystem, "delft3d-flow", "geneva", "202304050300", 46.5, 6.67)
-    plt.plot(data["temperature"]["data"], np.array(data["depth"]["data"])*-1)
-    plt.show()
-
-if function == "simulations.get_simulations_transect":
-    data = simulations.get_simulations_transect(filesystem, "delft3d-flow", "geneva", "202304050300", "46.37,46.54", "6.56,6.54")
-    temperature = pd.DataFrame(data["temperature"]["data"]).apply(pd.to_numeric, errors='coerce').to_numpy()
-    plt.imshow(temperature, cmap='viridis', interpolation='none')
-    plt.show()
-
-if function == "simulations.get_simulations_transect_period":
-    data = simulations.get_simulations_transect_period(filesystem, "delft3d-flow", "geneva", "202304050300", "202304051200", "46.37,46.54", "6.56,6.54")
-    temperature = pd.DataFrame(data["temperature"]["data"][0]).apply(pd.to_numeric, errors='coerce').to_numpy()
-    plt.imshow(temperature, cmap='viridis', interpolation='none')
+    data = simulations.get_simulations_profile(filesystem, "delft3d-flow", "geneva", "202304050300", 46.5, 6.67, ["temperature"])
+    plt.plot(data["variables"]["temperature"]["data"], np.array(data["depth"]["data"])*-1)
     plt.show()
 
 if function == "simulations.get_simulations_depthtime":
-    data = simulations.get_simulations_depthtime(filesystem, "delft3d-flow", "geneva", "202304050300", "202304112300", 46.5, 6.67)
-    temperature = pd.DataFrame(data["temperature"]["data"]).apply(pd.to_numeric, errors='coerce').to_numpy()
+    data = simulations.get_simulations_depthtime(filesystem, "delft3d-flow", "geneva", "202304050300", "202304112300", 46.5, 6.67, ["temperature", "velocity"])
+    temperature = pd.DataFrame(data["variables"]["temperature"]["data"]).apply(pd.to_numeric, errors='coerce').to_numpy()
     plt.imshow(temperature, cmap='viridis', interpolation='none')
     plt.colorbar()
     plt.show()
+    plt.plot(np.array(data["variables"]["temperature"]["data"])[:, 0], np.array(data["depth"]["data"]) * -1)
+    plt.show()
+
+if function == "simulations.get_simulations_transect":
+    data = simulations.get_simulations_transect(filesystem, "delft3d-flow", "geneva", "202304050300", "46.37,46.54", "6.56,6.54", ["temperature", "velocity"])
+    temperature = pd.DataFrame(data["variables"]["temperature"]["data"]).apply(pd.to_numeric, errors='coerce').to_numpy()
+    plt.imshow(temperature, cmap='viridis', interpolation='none')
+    plt.colorbar()
+    plt.show()
+
+if function == "simulations.get_simulations_transect_period":
+    data = simulations.get_simulations_transect_period(filesystem, "delft3d-flow", "garda", "202312050000", "202312150000", "45.435,45.589,45.719", "10.687,10.635,10.673", ["temperature", "velocity"])
+    for i in range(len(data["variables"]["temperature"]["data"])):
+        temperature = pd.DataFrame(data["variables"]["temperature"]["data"][i]).apply(pd.to_numeric, errors='coerce').to_numpy()
+        plt.imshow(temperature, cmap='viridis', interpolation='none')
+        plt.colorbar()
+        plt.title(data["time"][i])
+        plt.show()
 
 if function == "simulations.get_one_dimensional_metadata":
     data = simulations.get_one_dimensional_metadata(filesystem)

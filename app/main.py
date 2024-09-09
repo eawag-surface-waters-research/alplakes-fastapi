@@ -22,12 +22,27 @@ origins = [
     "https://pr-28.d21l70hd8m002c.amplifyapp.com"
 ]
 
+description = """
+Alplakes API connects you to lake products produced by the [SURF](https://www.eawag.ch/en/department/surf/) deparement at [EAWAG](https://www.eawag.ch).
+
+This includes terabytes of simulation data and remote sensing products. The API supports geospatial and temporal queries, allowing access to subsets of the data for easier handling.
+
+This API serves as the backend for the website [www.alplakes.eawag.ch](http://www.alplakes.eawag.ch).
+
+### Disclaimer
+
+The **Alplakes API** is provided "as is," without any guarantees regarding the accuracy, completeness, or timeliness of the data. While we strive to ensure data quality, users are responsible for verifying information before making any decisions based on it.
+
+Additionally, we cannot guarantee continuous availability of the API. Service disruptions or maintenance periods may occur, and users should expect intermittent downtime.
+
+### Get in Touch
+
+For bug reports, collaboration requests, or to join our mailing list for updates, feel free to [get in touch](mailto:james.runnalls@eawag.ch).
+"""
+
 app = FastAPI(
     title="Alplakes API",
-    description="Alplakes API provides researchers and the public programmatic access to "
-                "historical and forecasted simulation data from lakes across the alpine region. The API supports both "
-                "geospatial and temporal queries. It is the backend for the website www.alplakes.eawag.ch. For bug "
-                "reports, collaborations, requests or to join the mailing list for updates please get in touch.",
+    description=description,
     version="2.0.0",
     contact={
         "name": "James Runnalls",
@@ -59,6 +74,7 @@ if os.getenv('EXTERNAL') is not None:
 @app.exception_handler(ValueError)
 async def value_error_exception_handler(request: Request, exc: ValueError):
     print(exc)
+    raise
     return JSONResponse(
         status_code=500,
         content={"message": "Server processing error - please check your inputs. The developer has been notified, for "
@@ -93,6 +109,9 @@ if internal:
 
         Available models:
         - VNXQ34 (reanalysis): Cosmo-1e 1 day deterministic
+
+        ⚠️ **Warning**: If your request returns a 502 timeout error reduce the period you are requesting.
+        For longer durations, it is recommended to make multiple requests with shorter intervals between them.
         """
         validate.date_range(start_date, end_date)
         return meteoswiss.get_cosmo_area_reanalysis(filesystem, model, variables, start_date, end_date, ll_lat, ll_lng, ur_lat, ur_lng)
@@ -127,6 +146,9 @@ if internal:
 
         Available models:
         - VNXQ34 (reanalysis): Cosmo-1e 1 day deterministic
+
+        ⚠️ **Warning**: If your request returns a 502 timeout error reduce the period you are requesting.
+        For longer durations, it is recommended to make multiple requests with shorter intervals between them.
         """
         validate.date_range(start_date, end_date)
         return meteoswiss.get_cosmo_point_reanalysis(filesystem, model, variables, start_date, end_date, lat, lng)
@@ -179,6 +201,9 @@ if internal:
 
         Available models:
         - kenda-ch1 (reanalysis): 1 day deterministic
+
+        ⚠️ **Warning**: If your request returns a 502 timeout error reduce the period you are requesting.
+        For longer durations, it is recommended to make multiple requests with shorter intervals between them.
         """
         validate.date_range(start_date, end_date)
         return meteoswiss.get_icon_area_reanalysis(filesystem, model, variables, start_date, end_date, ll_lat, ll_lng,
@@ -215,7 +240,7 @@ if internal:
                                                start_date: str = validate.path_date(
                                                    description="The start date in YYYYmmdd format", example="20240729"),
                                                end_date: str = validate.path_date(
-                                                   description="The end date in YYYYmmdd format", example="20240730"),
+                                                   description="The end date in YYYYmmdd format", example="20240729"),
                                                lat: float = validate.path_latitude(),
                                                lng: float = validate.path_longitude(),
                                                variables: list[str] = Query(
@@ -225,6 +250,9 @@ if internal:
 
         Available models:
         - kenda-ch1 (reanalysis): 1 day deterministic
+
+        ⚠️ **Warning**: If your request returns a 502 timeout error reduce the period you are requesting.
+        For longer durations, it is recommended to make multiple requests with shorter intervals between them.
         """
         validate.date_range(start_date, end_date)
         return meteoswiss.get_icon_point_reanalysis(filesystem, model, variables, start_date, end_date, lat, lng)
@@ -288,6 +316,9 @@ if internal:
         - fkl010h0 (m/s): Wind speed scalar; hourly mean
         - dkl010h0 (°): Wind direction; hourly mean
         - nto000d0 (%): Cloud cover; daily mean
+
+        ⚠️ **Warning**: If your request returns a 502 timeout error reduce the period you are requesting.
+        For longer durations, it is recommended to make multiple requests with shorter intervals between them.
         """
         validate.date_range(start_date, end_date)
         return meteoswiss.get_meteodata_measured(filesystem, station_id, parameter, start_date, end_date)
@@ -324,6 +355,9 @@ if internal:
         All station id's and the available parameters
         can be access from the metadata endpoint. Data is a mix of hourly data (pre-2022) and 5-min data and can be
         resampled to hourly or daily.
+
+        ⚠️ **Warning**: If your request returns a 502 timeout error reduce the period you are requesting.
+        For longer durations, it is recommended to make multiple requests with shorter intervals between them.
         """
         validate.date_range(start_date, end_date)
         return bafu.get_hydrodata_measured(filesystem, station_id, parameter, start_date, end_date, resample)
@@ -391,35 +425,36 @@ async def simulations_file(model: simulations.Models = Path(..., title="Model", 
     return FileResponse(path, media_type="application/nc", filename="{}_{}_{}.nc".format(model, lake, sunday))
 
 
-@app.get("/simulations/point/{model}/{lake}/{start_time}/{end_time}/{depth}/{lat}/{lng}", tags=["3D Simulations"])
+@app.get("/simulations/point/{model}/{lake}/{start_time}/{end_time}/{depth}/{lat}/{lng}", tags=["3D Simulations"], response_model=simulations.ResponseModel1D)
 async def simulations_point(model: simulations.Models = Path(..., title="Model", description="Model name"),
                             lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
                             start_time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202304050300"),
                             end_time: str = validate.path_time(description="The end time in YYYYmmddHHMM format (UTC)", example="202304112300"),
                             depth: float = validate.path_depth(),
                             lat: float = validate.path_latitude(),
-                            lng: float = validate.path_longitude()):
+                            lng: float = validate.path_longitude(),
+                            variables: list[str] = Query(default=["temperature", "velocity"])):
     """
-    Temperature and velocity timeseries for a given location and depth over a defined time period.
+    Simulation timeseries for a given location and depth over a defined time period.
 
-    ⚠️ **Warning**: Requests for periods longer than two weeks may lead to the server returning a 502 timeout error.
-    For requesting longer periods it is recommended to do multiple shorter period requests.
-
+    ⚠️ **Warning**: If your request returns a 502 timeout error reduce the period you are requesting.
+    For longer durations, it is recommended to make multiple requests with shorter intervals between them.
     """
     validate.time_range(start_time, end_time)
-    return simulations.get_simulations_point(filesystem, model, lake, start_time, end_time, depth, lat, lng)
+    return simulations.get_simulations_point(filesystem, model, lake, start_time, end_time, depth, lat, lng, variables)
 
 
 @app.get("/simulations/layer/{model}/{lake}/{time}/{depth}", tags=["3D Simulations"])
 async def simulations_layer(model: simulations.Models = Path(..., title="Model", description="Model name"),
                             lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
                             time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202304050300"),
-                            depth: float = validate.path_depth()):
+                            depth: float = validate.path_depth(),
+                            variables: list[str] = Query(default=["temperature", "velocity"])):
     """
-    Temperature and velocity for an entire depth layer at a specific time.
+    Simulation results for an entire depth layer at a specific time.
     """
     validate.time(time)
-    return simulations.get_simulations_layer(filesystem, model, lake, time, depth)
+    return simulations.get_simulations_layer(filesystem, model, lake, time, depth, variables)
 
 
 @app.get("/simulations/layer_alplakes/{model}/{lake}/{parameter}/{start_time}/{end_time}/{depth}", tags=["3D Simulations"],
@@ -431,7 +466,7 @@ async def simulations_layer_alplakes(model: simulations.Models = Path(..., title
                                      end_time: str = validate.path_time(description="The end time in YYYYmmddHHMM format (UTC)", example="202304112300"),
                                      depth: float = validate.path_depth()):
     """
-    Temperature and velocity for a depth layer over a specific time range.
+    Plain text formatted parameters for a depth layer over a specific time range. Reduces file size compared to layer outputs.
 
     ⚠️ **Warning:** This endpoint is designed for supplying data to the Alplakes website. The output is **not** self-explanatory.
     """
@@ -439,7 +474,7 @@ async def simulations_layer_alplakes(model: simulations.Models = Path(..., title
     return simulations.get_simulations_layer_alplakes(filesystem, model, lake, parameter, start_time, end_time, depth)
 
 
-@app.get("/simulations/layer/average_temperature/{model}/{lake}/{start_time}/{end_time}/{depth}", tags=["3D Simulations"])
+@app.get("/simulations/layer/average_temperature/{model}/{lake}/{start_time}/{end_time}/{depth}", tags=["3D Simulations"], response_model=simulations.ResponseModelAverageLayer)
 async def simulations_layer_average_temperature(model: simulations.Models = Path(..., title="Model", description="Model name"),
                                                 lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
                                                 start_time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202304050300"),
@@ -447,72 +482,85 @@ async def simulations_layer_average_temperature(model: simulations.Models = Path
                                                 depth: float = validate.path_depth()):
     """
     Mean temperature at a specified depth for a given time period.
+
+    ⚠️ **Warning**: If your request returns a 502 timeout error reduce the period you are requesting.
+    For longer durations, it is recommended to make multiple requests with shorter intervals between them.
     """
     validate.time_range(start_time, end_time)
     return simulations.get_simulations_layer_average_temperature(filesystem, model, lake, start_time, end_time, depth)
 
 
-@app.get("/simulations/profile/{model}/{lake}/{time}/{lat}/{lng}", tags=["3D Simulations"])
+@app.get("/simulations/profile/{model}/{lake}/{time}/{lat}/{lng}", tags=["3D Simulations"], response_model=simulations.ResponseModelProfile)
 async def simulations_profile(model: simulations.Models = Path(..., title="Model", description="Model name"),
                               lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
                               time: str = validate.path_time(),
                               lat: float = validate.path_latitude(),
-                              lng: float = validate.path_longitude()):
+                              lng: float = validate.path_longitude(),
+                              variables: list[str] = Query(default=["temperature", "velocity"])):
     """
     Vertical profile for a specific time and location.
     """
     validate.time(time)
-    return simulations.get_simulations_profile(filesystem, model, lake, time, lat, lng)
+    return simulations.get_simulations_profile(filesystem, model, lake, time, lat, lng, variables)
 
 
-@app.get("/simulations/transect/{model}/{lake}/{time}/{lats}/{lngs}", tags=["3D Simulations"])
-async def simulations_transect(model: simulations.Models = Path(..., title="Model", description="Model name"),
-                               lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
-                               time: str = validate.path_time(),
-                               lats: str = Path(..., title="Lats", description="Comma separated list of latitudes (WGS84), minimum 2", example="46.37,46.54"),
-                               lngs: str = Path(..., title="Lngs", description="Comma separated list of longitudes (WGS84), minimum 2", example="6.56,6.54")):
-    """
-    Transect for a specific time.
-    """
-    validate.latitude_list(lats)
-    validate.longitude_list(lngs)
-    return simulations.get_simulations_transect(filesystem, model, lake, time, lats, lngs)
-
-
-@app.get("/simulations/transect/{model}/{lake}/{start_time}/{end_time}/{lats}/{lngs}", tags=["3D Simulations"])
-async def simulations_transect_period(model: simulations.Models = Path(..., title="Model", description="Model name"),
-                                      lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
-                                      start_time: str = validate.path_time( description="The start time in YYYYmmddHHMM format (UTC)", example="202304050300"),
-                                      end_time: str = validate.path_time( description="The end time in YYYYmmddHHMM format (UTC)", example="202304051200"),
-                                      lats: str = Path(..., title="Lats", description="Comma separated list of latitudes (WGS84), minimum 2", example="46.37,46.54"),
-                                      lngs: str = Path(..., title="Lngs", description="Comma separated list of longitudes (WGS84), minimum 2", example="6.56,6.54")):
-    """
-    Transect for a specific period.
-    """
-    validate.latitude_list(lats)
-    validate.longitude_list(lngs)
-    validate.time_range(start_time, end_time)
-    return simulations.get_simulations_transect_period(filesystem, model, lake, start_time, end_time, lats, lngs)
-
-
-@app.get("/simulations/depthtime/{model}/{lake}/{start_time}/{end_time}/{lat}/{lng}", tags=["3D Simulations"])
+@app.get("/simulations/depthtime/{model}/{lake}/{start_time}/{end_time}/{lat}/{lng}", tags=["3D Simulations"], response_model=simulations.ResponseModelDepthTime)
 async def simulations_depth_time(model: simulations.Models = Path(..., title="Model", description="Model name"),
                                  lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
                                  start_time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202304050300"),
                                  end_time: str = validate.path_time(description="The end time in YYYYmmddHHMM format (UTC)", example="202304112300"),
                                  lat: float = validate.path_latitude(),
-                                 lng: float = validate.path_longitude()):
+                                 lng: float = validate.path_longitude(),
+                                 variables: list[str] = Query(default=["temperature", "velocity"])):
     """
     Vertical profile for a specific period and location.
+
+    ⚠️ **Warning**: If your request returns a 502 timeout error reduce the period you are requesting.
+    For longer durations, it is recommended to make multiple requests with shorter intervals between them.
     """
     validate.time_range(start_time, end_time)
-    return simulations.get_simulations_depthtime(filesystem, model, lake, start_time, end_time, lat, lng)
+    return simulations.get_simulations_depthtime(filesystem, model, lake, start_time, end_time, lat, lng, variables)
+
+
+@app.get("/simulations/transect/{model}/{lake}/{time}/{lats}/{lngs}", tags=["3D Simulations"], response_model=simulations.ResponseModelTransect)
+async def simulations_transect(model: simulations.Models = Path(..., title="Model", description="Model name"),
+                               lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
+                               time: str = validate.path_time(),
+                               lats: str = Path(..., title="Lats", description="Comma separated list of latitudes (WGS84), minimum 2", example="46.37,46.54"),
+                               lngs: str = Path(..., title="Lngs", description="Comma separated list of longitudes (WGS84), minimum 2", example="6.56,6.54"),
+                               variables: list[str] = Query(default=["temperature", "velocity"])):
+    """
+    Transect for a specific time.
+    """
+    validate.latitude_list(lats)
+    validate.longitude_list(lngs)
+    return simulations.get_simulations_transect(filesystem, model, lake, time, lats, lngs, variables)
+
+
+@app.get("/simulations/transect/{model}/{lake}/{start_time}/{end_time}/{lats}/{lngs}", tags=["3D Simulations"], response_model=simulations.ResponseModelTransectPeriod)
+async def simulations_transect_period(model: simulations.Models = Path(..., title="Model", description="Model name"),
+                                      lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
+                                      start_time: str = validate.path_time( description="The start time in YYYYmmddHHMM format (UTC)", example="202304050300"),
+                                      end_time: str = validate.path_time( description="The end time in YYYYmmddHHMM format (UTC)", example="202304051200"),
+                                      lats: str = Path(..., title="Lats", description="Comma separated list of latitudes (WGS84), minimum 2", example="46.37,46.54"),
+                                      lngs: str = Path(..., title="Lngs", description="Comma separated list of longitudes (WGS84), minimum 2", example="6.56,6.54"),
+                                      variables: list[str] = Query(default=["temperature", "velocity"])):
+    """
+    Transect for a specific period.
+
+    ⚠️ **Warning**: If your request returns a 502 timeout error reduce the period you are requesting.
+    For longer durations, it is recommended to make multiple requests with shorter intervals between them.
+    """
+    validate.latitude_list(lats)
+    validate.longitude_list(lngs)
+    validate.time_range(start_time, end_time)
+    return simulations.get_simulations_transect_period(filesystem, model, lake, start_time, end_time, lats, lngs, variables)
 
 
 @app.get("/simulations/1d/metadata", tags=["1D Simulations"])
 async def one_dimensional_simulations_metadata():
     """
-    Available 1D simulation data.
+    Metadata for all available 1D simulations.
     """
     return simulations.get_one_dimensional_metadata(filesystem)
 
@@ -602,15 +650,15 @@ if internal:
         return Response(status_code=202)
 
 
-@app.get("/remotesensing/metadata", tags=["Remote Sensing"])
+@app.get("/remotesensing/metadata", tags=["Remote Sensing"], response_class=RedirectResponse, response_description="Redirect to a GeoJSON file")
 async def remote_sensing_metadata():
     """
     Directory of remote sensing product types, organised by lake, satellite and parameter.
     """
-    return remotesensing.get_metadata()
+    return RedirectResponse("https://eawagrs.s3.eu-central-1.amazonaws.com/metadata/metadata.json")
 
 
-@app.get("/remotesensing/products/{lake}/{satellite}/{parameter}", tags=["Remote Sensing"])
+@app.get("/remotesensing/products/{lake}/{satellite}/{parameter}", tags=["Remote Sensing"], response_class=RedirectResponse, response_description="Redirect to a GeoJSON file")
 async def remote_sensing_products(lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
                                   satellite: remotesensing.Satellites = Path(..., title="Satellite", description="Satellite name"),
                                   parameter: str = Path(..., title="Parameter", description="Parameter", example="chla")):
@@ -618,4 +666,4 @@ async def remote_sensing_products(lake: simulations.Lakes = Path(..., title="Lak
     Metadata for full time series of remote sensing products for a given lake, satellite and parameter.
     See /remotesensing/metadata for input options.
     """
-    return remotesensing.get_lake_products(lake, satellite, parameter)
+    return RedirectResponse("https://eawagrs.s3.eu-central-1.amazonaws.com/metadata/{}/{}_{}_public.json".format(satellite, lake, parameter))

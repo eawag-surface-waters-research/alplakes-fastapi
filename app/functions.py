@@ -6,8 +6,21 @@ import requests
 import numpy as np
 import pandas as pd
 from fastapi import HTTPException
+from typing import Dict, List, Union, Any
+from pydantic import BaseModel
 from datetime import datetime, timedelta, timezone
 from dateutil.relativedelta import relativedelta, SU
+
+
+class VariableKeyModel1D(BaseModel):
+    data: Union[List[Any], float]
+    unit: Union[str, None] = None
+    description: Union[str, None] = None
+
+class VariableKeyModel2D(BaseModel):
+    data: List[List[Any]]
+    unit: Union[str, None] = None
+    description: Union[str, None] = None
 
 
 def convert_to_unit(time, units):
@@ -15,6 +28,8 @@ def convert_to_unit(time, units):
         return (time.replace(tzinfo=timezone.utc) - datetime(2008, 3, 1).replace(tzinfo=timezone.utc)).total_seconds()
     elif units == "seconds since 1970-01-01 00:00:00":
         return time.timestamp()
+    elif units == "nano":
+        return time.timestamp() * 1000000000
     else:
         raise HTTPException(status_code=400,
                             detail="Apologies unable to read NetCDF with time unit: {}".format(units))
@@ -159,9 +174,9 @@ def alplakes_velocity(u, v, alpha):
 
 def alplakes_time(t, units):
     try:
-        return np.array([convert_from_unit(x, units).replace(tzinfo=timezone.utc).isoformat() for x in t])
+        return np.array([convert_from_unit(x, units).replace(tzinfo=timezone.utc) for x in t])
     except:
-        return convert_from_unit(t, units).replace(tzinfo=timezone.utc).isoformat()
+        return convert_from_unit(t, units).replace(tzinfo=timezone.utc)
 
 
 def default_time(t, units):

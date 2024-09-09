@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone, date
 from fastapi import HTTPException
 from typing import Dict, List, Union, Any
 from pydantic import BaseModel, validator
-from app.functions import daterange, ch1903_plus_to_latlng
+from app import functions
 
 
 class CosmoForecast(str, Enum):
@@ -20,21 +20,11 @@ class IconForecast(str, Enum):
     icon_ch2_eps = "icon-ch2-eps"
     icon_ch1_eps = "icon-ch1-eps"
 
-class VariableKeyModel1D(BaseModel):
-    data: List[Any]
-    unit: Union[str, None] = None
-    description: Union[str, None] = None
-
-class VariableKeyModel2D(BaseModel):
-    data: List[List[Any]]
-    unit: Union[str, None] = None
-    description: Union[str, None] = None
-
 class ResponseModel2D(BaseModel):
     time: List[datetime]
     lat: List[List[float]]
     lng: List[List[float]]
-    variables: Dict[str, VariableKeyModel2D]
+    variables: Dict[str, functions.VariableKeyModel2D]
     @validator('time', each_item=True)
     def validate_timezone(cls, value):
         if value.tzinfo is None:
@@ -45,7 +35,8 @@ class ResponseModel1D(BaseModel):
     time: List[datetime]
     lat: float
     lng: float
-    variables: Dict[str, VariableKeyModel1D]
+    distance: functions.VariableKeyModel1D
+    variables: Dict[str, functions.VariableKeyModel1D]
     @validator('time', each_item=True)
     def validate_timezone(cls, value):
         if value.tzinfo is None:
@@ -75,7 +66,7 @@ def get_cosmo_metadata(filesystem):
             start_date = datetime.strptime(files[0].split(".")[1], '%Y%m%d%H%M')
             end_date = datetime.strptime(files[-1].split(".")[1], '%Y%m%d%H%M')
 
-            for d in daterange(start_date, end_date):
+            for d in functions.daterange(start_date, end_date):
                 if d.strftime('%Y%m%d%H%M') not in combined:
                     if model["model"] == "VNXQ34":
                         missing_dates.append((d - timedelta(days=1)).strftime("%Y-%m-%d"))
@@ -108,7 +99,7 @@ def get_icon_metadata(filesystem):
             start_date = datetime.strptime(files[0][:10], '%Y_%m_%d')
             end_date = datetime.strptime(files[-1][:10], '%Y_%m_%d')
 
-            for d in daterange(start_date, end_date):
+            for d in functions.daterange(start_date, end_date):
                 if d.strftime('%Y_%m_%d') not in combined:
                     if model["model"] == "kenda-ch1":
                         missing_dates.append((d - timedelta(days=1)).strftime("%Y-%m-%d"))
@@ -205,12 +196,14 @@ def get_cosmo_point_forecast(filesystem, model, input_variables, forecast_date, 
                                     ", ".join(bad_variables), model, ", ".join(ds.keys())))
 
         output["time"] = meteoswiss_time_iso(ds.variables["time"])
-
-        dist = ((ds.variables["lat_1"] - lat) ** 2 + (ds.variables["lon_1"] - lng) ** 2) ** 0.5
-        xy = np.unravel_index(np.argmin(dist.values), dist.shape)
-        x, y = xy[0], xy[1]
-        output["lat"] = float(ds.variables["lat_1"][x, y].values)
-        output["lng"] = float(ds.variables["lon_1"][x, y].values)
+        if len(ds.variables["lat_1"].shape) == 3:
+            lat_grid, lng_grid = ds.variables["lat_1"][0, :, :].values, ds.variables["lon_1"][0, :, :].values
+        else:
+            lat_grid, lng_grid = ds.variables["lat_1"].values, ds.variables["lon_1"].values
+        x, y, distance = functions.get_closest_location(lat, lng, lat_grid, lng_grid)
+        output["lat"] = float(lat_grid[x, y])
+        output["lng"] = float(lng_grid[x, y])
+        output["distance"] = {"data": distance, "unit": "m", "description": "Distance from requested location to center of closest grid point"}
         output["variables"] = {}
         for var in variables:
             if var in ds.variables.keys():
@@ -301,11 +294,15 @@ def get_icon_point_forecast(filesystem, model, input_variables, forecast_date, l
                                 detail="{} are bad variables for ICON {}. Please select from: {}".format(
                                     ", ".join(bad_variables), model, ", ".join(ds.keys())))
         output["time"] = meteoswiss_time_iso(ds.variables["time"])
-        dist = ((ds.variables["lat_1"] - lat) ** 2 + (ds.variables["lon_1"] - lng) ** 2) ** 0.5
-        xy = np.unravel_index(np.argmin(dist.values), dist.shape)
-        x, y = xy[0], xy[1]
-        output["lat"] = float(ds.variables["lat_1"][x, y].values)
-        output["lng"] = float(ds.variables["lon_1"][x, y].values)
+        if len(ds.variables["lat_1"].shape) == 3:
+            lat_grid, lng_grid = ds.variables["lat_1"][0, :, :].values, ds.variables["lon_1"][0, :, :].values
+        else:
+            lat_grid, lng_grid = ds.variables["lat_1"].values, ds.variables["lon_1"].values
+        x, y, distance = functions.get_closest_location(lat, lng, lat_grid, lng_grid)
+        output["lat"] = float(lat_grid[x, y])
+        output["lng"] = float(lng_grid[x, y])
+        output["distance"] = {"data": distance, "unit": "m",
+                              "description": "Distance from requested location to center of closest grid point"}
         output["variables"] = {}
         for var in variables:
             if var in ds.variables.keys():
@@ -437,16 +434,14 @@ def get_cosmo_point_reanalysis(filesystem, model, input_variables, start_date, e
                                     detail="{} are bad variables for COSMO {}. Please select from: {}".format(
                                         ", ".join(bad_variables), model, ", ".join(ds.keys())))
             output["time"] = meteoswiss_time_iso(ds.variables["time"])
-
-            dist = ((ds.variables["lat_1"] - lat) ** 2 + (ds.variables["lon_1"] - lng) ** 2) ** 0.5
-            xy = np.unravel_index(np.argmin(dist.values), dist.shape)
-            x, y = xy[0], xy[1]
             if len(ds.variables["lat_1"].shape) == 3:
-                output["lat"] = float(ds.variables["lat_1"][0, x, y].values)
-                output["lng"] = float(ds.variables["lon_1"][0, x, y].values)
+                lat_grid, lng_grid = ds.variables["lat_1"][0, :, :].values, ds.variables["lon_1"][0, :, :].values
             else:
-                output["lat"] = float(ds.variables["lat_1"][x, y].values)
-                output["lng"] = float(ds.variables["lon_1"][x, y].values)
+                lat_grid, lng_grid = ds.variables["lat_1"].values, ds.variables["lon_1"].values
+            x, y, distance = functions.get_closest_location(lat, lng, lat_grid, lng_grid)
+            output["lat"] = float(lat_grid[x, y])
+            output["lng"] = float(lng_grid[x, y])
+            output["distance"] = {"data": distance, "unit": "m", "description": "Distance from requested location to center of closest grid point"}
             output["variables"] = {}
             for var in variables:
                 if var in ds.variables.keys():
@@ -583,16 +578,14 @@ def get_icon_point_reanalysis(filesystem, model, input_variables, start_date, en
                                     detail="{} are bad variables for KENDA {}. Please select from: {}".format(
                                         ", ".join(bad_variables), model, ", ".join(ds.keys())))
             output["time"] = meteoswiss_time_iso(ds.variables["time"])
-
-            dist = ((ds.variables["lat_1"] - lat) ** 2 + (ds.variables["lon_1"] - lng) ** 2) ** 0.5
-            xy = np.unravel_index(np.argmin(dist.values), dist.shape)
-            x, y = xy[0], xy[1]
             if len(ds.variables["lat_1"].shape) == 3:
-                output["lat"] = float(ds.variables["lat_1"][0, x, y].values)
-                output["lng"] = float(ds.variables["lon_1"][0, x, y].values)
+                lat_grid, lng_grid = ds.variables["lat_1"][0, :, :].values, ds.variables["lon_1"][0, :, :].values
             else:
-                output["lat"] = float(ds.variables["lat_1"][x, y].values)
-                output["lng"] = float(ds.variables["lon_1"][x, y].values)
+                lat_grid, lng_grid = ds.variables["lat_1"].values, ds.variables["lon_1"].values
+            x, y, distance = functions.get_closest_location(lat, lng, lat_grid, lng_grid)
+            output["lat"] = float(lat_grid[x, y])
+            output["lng"] = float(lng_grid[x, y])
+            output["distance"] = {"data": distance, "unit": "m", "description": "Distance from requested location to center of closest grid point"}
             output["variables"] = {}
             for var in variables:
                 if var in ds.variables.keys():
@@ -713,7 +706,7 @@ def get_meteodata_station_metadata(filesystem, station_id):
     out["name"] = data["properties"]["station_name"]
     out["elevation"] = float(data["properties"]["altitude"])
     out["ch1903plus"] = data["geometry"]["coordinates"]
-    lat, lng = ch1903_plus_to_latlng(out["ch1903plus"][0], out["ch1903plus"][1])
+    lat, lng = functions.ch1903_plus_to_latlng(out["ch1903plus"][0], out["ch1903plus"][1])
     out["lat"] = lat
     out["lng"] = lng
     out["variables"] = {}

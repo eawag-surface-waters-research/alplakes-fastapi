@@ -9,6 +9,8 @@ from datetime import datetime, timedelta, timezone, date
 from fastapi import HTTPException
 from fastapi.responses import FileResponse
 
+from app import functions
+
 class VariableKeyModelMeta(BaseModel):
     unit: str
     description: str
@@ -25,14 +27,9 @@ class ResponseModelMeta(BaseModel):
     lng: float
     variables: Dict[str, VariableKeyModelMeta]
 
-class VariableKeyModel(BaseModel):
-    unit: str
-    description: str
-    data: List[float]
-
 class ResponseModel(BaseModel):
     time: List[datetime]
-    variables: Dict[str, VariableKeyModel]
+    variables: Dict[str, functions.VariableKeyModel1D]
     @validator('time', each_item=True)
     def validate_timezone(cls, value):
         if value.tzinfo is None:

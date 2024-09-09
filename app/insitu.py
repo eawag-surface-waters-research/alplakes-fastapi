@@ -6,6 +6,8 @@ from typing import Dict, List
 from pydantic import BaseModel, validator
 from fastapi import HTTPException
 
+from app import functions
+
 class Metadata(BaseModel):
     key: str
     measurements: int
@@ -13,14 +15,9 @@ class Metadata(BaseModel):
     end_date: date
     month_coverage: List[int]
 
-class VariableKeyModel(BaseModel):
-    unit: str
-    description: str
-    data: List[float]
-
 class ResponseModel(BaseModel):
     time: List[datetime]
-    variables: Dict[str, VariableKeyModel]
+    variables: Dict[str, functions.VariableKeyModel1D]
     @validator('time', each_item=True)
     def validate_timezone(cls, value):
         if value.tzinfo is None:
