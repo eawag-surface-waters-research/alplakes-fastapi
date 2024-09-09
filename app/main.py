@@ -425,7 +425,7 @@ async def simulations_file(model: simulations.Models = Path(..., title="Model", 
     return FileResponse(path, media_type="application/nc", filename="{}_{}_{}.nc".format(model, lake, sunday))
 
 
-@app.get("/simulations/point/{model}/{lake}/{start_time}/{end_time}/{depth}/{lat}/{lng}", tags=["3D Simulations"], response_model=simulations.ResponseModel1D)
+@app.get("/simulations/point/{model}/{lake}/{start_time}/{end_time}/{depth}/{lat}/{lng}", tags=["3D Simulations"], response_model=simulations.ResponseModelPoint)
 async def simulations_point(model: simulations.Models = Path(..., title="Model", description="Model name"),
                             lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
                             start_time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202304050300"),
@@ -498,7 +498,7 @@ async def simulations_profile(model: simulations.Models = Path(..., title="Model
                               lng: float = validate.path_longitude(),
                               variables: list[str] = Query(default=["temperature", "velocity"])):
     """
-    Vertical profile for a specific time and location.
+    Vertical profile for a specific **time** and location.
     """
     validate.time(time)
     return simulations.get_simulations_profile(filesystem, model, lake, time, lat, lng, variables)
@@ -513,7 +513,7 @@ async def simulations_depth_time(model: simulations.Models = Path(..., title="Mo
                                  lng: float = validate.path_longitude(),
                                  variables: list[str] = Query(default=["temperature", "velocity"])):
     """
-    Vertical profile for a specific period and location.
+    Vertical profile for a specific **period** and location.
 
     ⚠️ **Warning**: If your request returns a 502 timeout error reduce the period you are requesting.
     For longer durations, it is recommended to make multiple requests with shorter intervals between them.
@@ -557,65 +557,84 @@ async def simulations_transect_period(model: simulations.Models = Path(..., titl
     return simulations.get_simulations_transect_period(filesystem, model, lake, start_time, end_time, lats, lngs, variables)
 
 
-@app.get("/simulations/1d/metadata", tags=["1D Simulations"])
+@app.get("/simulations/1d/metadata", tags=["1D Simulations"], response_model=List[simulations.Metadata1D])
 async def one_dimensional_simulations_metadata():
     """
     Metadata for all available 1D simulations.
+
+    Doesn't include available variables, using the endpoint below for full variables list.
     """
     return simulations.get_one_dimensional_metadata(filesystem)
 
 
-@app.get("/simulations/1d/metadata/{model}/{lake}", tags=["1D Simulations"])
+@app.get("/simulations/1d/metadata/{model}/{lake}", tags=["1D Simulations"], response_model=simulations.MetadataLake1DDetail)
 async def one_dimensional_simulations_metadata_lake(
         model: simulations.OneDimensionalModels = Path(..., title="Model", description="Model name"),
         lake: str = Path(..., title="Lake", description="Lake key", example="aegeri")):
     """
-    Available 1D simulation data for a specific lake and model.
+    Available 1D simulation data for a specific lake and model. Includes information on available variables.
     """
     return simulations.get_one_dimensional_metadata_lake(filesystem, model, lake)
 
 
-@app.get("/simulations/1d/file/{model}/{lake}/{month}", tags=["1D Simulations"])
+@app.get("/simulations/1d/file/{model}/{lake}/{month}", tags=["1D Simulations"], response_class=FileResponse)
 async def one_dimensional_simulations_file(
         model: simulations.OneDimensionalModels = Path(..., title="Model", description="Model name"),
         lake: str = Path(..., title="Lake", description="Lake key", example="aegeri"),
         month: str = validate.path_month(description="The month in YYYYmm format")):
     """
-    Full model output in NetCDF for a given month
+    Full model output in NetCDF for a given month.
+
+    Metadata in the file describes the available variables.
     """
-    return simulations.get_one_dimensional_file(filesystem, model, lake, month)
+    path = os.path.join(filesystem, "media/1dsimulations", model, "results", lake, "{}.nc".format(month))
+    if not os.path.isfile(path):
+        raise HTTPException(status_code=400, detail="Apologies data is not available for {} on the month beginning {}".format(model,month))
+    return FileResponse(path, media_type="application/nc", filename="{}_{}_{}.nc".format(model, lake, month))
 
-
-@app.get("/simulations/1d/point/{model}/{lake}/{parameter}/{start_time}/{end_time}/{depth}", tags=["1D Simulations"])
+@app.get("/simulations/1d/point/{model}/{lake}/{start_time}/{end_time}/{depth}", tags=["1D Simulations"], response_model=simulations.ResponseModel1DPoint)
 async def one_dimensional_simulations_point(
         model: simulations.OneDimensionalModels = Path(..., title="Model", description="Model name"),
         lake: str = Path(..., title="Lake", description="Lake key", example="aegeri"),
-        parameter: str = Path(..., title="Parameter", description="Parameter", example="T"),
         start_time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202405050300"),
         end_time: str = validate.path_time(description="The end time in YYYYmmddHHMM format (UTC)", example="202406072300"),
         depth: float = validate.path_depth(),
-        resample: Union[simulations.SimstratResampleOptions, None] = None):
+        resample: Union[simulations.SimstratResampleOptions, None] = None,
+        variables: list[str] = Query(default=["T"])):
     """
-    Simulated timeseries of parameter for a given location and depth.
+    Timeseries for a given location and depth.
 
-    See the metadata endpoints for list of available parameters.
+    See the metadata endpoints for list of available variables.
     """
     validate.time_range(start_time, end_time)
-    return simulations.get_one_dimensional_point(filesystem, model, lake, parameter, start_time, end_time, depth, resample)
+    return simulations.get_one_dimensional_point(filesystem, model, lake, start_time, end_time, depth, variables, resample)
 
 
-@app.get("/simulations/1d/depthtime/{model}/{lake}/{parameter}/{start_time}/{end_time}", tags=["1D Simulations"])
+@app.get("/simulations/1d/profile/{model}/{lake}/{time}", tags=["1D Simulations"], response_model=simulations.ResponseModel1DProfile)
+async def one_dimensional_simulations_profile(
+        model: simulations.OneDimensionalModels = Path(..., title="Model", description="Model name"),
+        lake: str = Path(..., title="Lake", description="Lake key", example="aegeri"),
+        time: str = validate.path_time(description="The time in YYYYmmddHHMM format (UTC)", example="202405050300"),
+        variables: list[str] = Query(default=["T"])):
+    """
+    Vertical profile for a specific **time**.
+    """
+    validate.time(time)
+    return simulations.get_one_dimensional_profile(filesystem, model, lake, time, variables)
+
+
+@app.get("/simulations/1d/depthtime/{model}/{lake}/{start_time}/{end_time}", tags=["1D Simulations"], response_model=simulations.ResponseModel1DDepthTime)
 async def one_dimensional_simulations_depth_time(
         model: simulations.OneDimensionalModels = Path(..., title="Model", description="Model name"),
         lake: str = Path(..., title="Lake", description="Lake key", example="aegeri"),
-        parameter: str = Path(..., title="Parameter", description="Parameter", example="T"),
         start_time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202405050300"),
-        end_time: str = validate.path_time(description="The end time in YYYYmmddHHMM format (UTC)", example="202406072300")):
+        end_time: str = validate.path_time(description="The end time in YYYYmmddHHMM format (UTC)", example="202406072300"),
+        variables: list[str] = Query(default=["T"])):
     """
-    Vertical profile for a specific period.
+    Vertical profile for a specific **period**.
     """
     validate.time_range(start_time, end_time)
-    return simulations.get_one_dimensional_depth_time(filesystem, model, lake, parameter, start_time, end_time)
+    return simulations.get_one_dimensional_depth_time(filesystem, model, lake, start_time, end_time, variables)
 
 
 @app.get("/simulations/1d/doy/{model}/{lake}/{parameter}/{depth}", tags=["1D Simulations"])

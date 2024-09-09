@@ -13,7 +13,7 @@ import simulations
 
 filesystem = "../filesystem"
 
-function = "simulations.get_simulations_transect_period"
+function = "simulations.get_one_dimensional_point"
 
 if function == "meteoswiss.get_cosmo_metadata":
     data = meteoswiss.get_cosmo_metadata(filesystem)
@@ -149,13 +149,18 @@ if function == "simulations.get_one_dimensional_metadata_lake":
     print(data)
 
 if function == "simulations.get_one_dimensional_point":
-    data = simulations.get_one_dimensional_point(filesystem, "simstrat", "aegeri", "T", "202405050300","202406072300",1)
-    plt.plot([datetime.fromisoformat(t) for t in data["time"]], data["T"]["data"])
+    data = simulations.get_one_dimensional_point(filesystem, "simstrat", "aegeri", "202405050300","202406072300",1, ["T"])
+    plt.plot(data["time"], data["variables"]["T"]["data"])
+    plt.show()
+
+if function == "simulations.get_one_dimensional_profile":
+    data = simulations.get_one_dimensional_profile(filesystem, "simstrat", "aegeri", "202405050300",["T"])
+    plt.plot(data["variables"]["T"]["data"], np.array(data["depth"]["data"]) * -1)
     plt.show()
 
 if function == "simulations.get_one_dimensional_depth_time":
-    data = simulations.get_one_dimensional_depth_time(filesystem, "simstrat", "aegeri", "T", "202405050300","202406072300")
-    temperature = pd.DataFrame(data["T"]["data"]).apply(pd.to_numeric, errors='coerce').to_numpy()
+    data = simulations.get_one_dimensional_depth_time(filesystem, "simstrat", "aegeri", "202405050300","202406072300", ["T"])
+    temperature = pd.DataFrame(data["variables"]["T"]["data"]).apply(pd.to_numeric, errors='coerce').to_numpy()
     plt.imshow(temperature, cmap='viridis', interpolation='none')
     plt.colorbar()
     plt.show()

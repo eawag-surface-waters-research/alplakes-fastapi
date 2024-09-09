@@ -18,7 +18,7 @@ from app import functions
 
 class MetadataLake(BaseModel):
     name: str
-    depths: List[float]
+    depth: List[float]
     start_date: date
     end_date: date
     missing_dates: List[date]
@@ -29,7 +29,7 @@ class Metadata(BaseModel):
     model: str
     lakes: List[MetadataLake]
 
-class ResponseModel1D(BaseModel):
+class ResponseModelPoint(BaseModel):
     time: List[datetime]
     lat: float
     lng: float
@@ -154,7 +154,7 @@ def get_metadata(filesystem):
                             missing_dates.append(d.strftime("%Y-%m-%d"))
 
                     m["lakes"].append({"name": lake,
-                                       "depths": depths,
+                                       "depth": depths,
                                        "start_date": start_date.strftime("%Y-%m-%d"),
                                        "end_date": end_date.strftime("%Y-%m-%d"),
                                        "missing_dates": missing_dates,
@@ -194,7 +194,7 @@ def get_metadata_lake(filesystem, model, lake):
                 missing_dates.append([d.strftime("%Y-%m-%d"), (d + timedelta(days=7)).strftime("%Y-%m-%d")])
 
         return {"name": lake,
-                "depths": depths,
+                "depth": depths,
                 "start_date": start_date.strftime("%Y-%m-%d"),
                 "end_date": end_date.strftime("%Y-%m-%d"),
                 "missing_dates": missing_dates,
@@ -266,7 +266,7 @@ def get_simulations_point_delft3dflow(filesystem, lake, start, end, depth, latit
         depth = float(z[depth_index])
         lat_grid, lng_grid = functions.coordinates_to_latlng(ds.XZ[:].values, ds.YZ[:].values)
         x_index, y_index, distance = functions.get_closest_location(latitude, longitude, lat_grid, lng_grid)
-        time = functions.alplakes_time(ds.time.values, "nano").tolist()
+        time = functions.alplakes_time(ds.time.values, "nano")
         output = {"time": time,
                   "lat": lat_grid[x_index, y_index],
                   "lng": lng_grid[x_index, y_index],
@@ -468,7 +468,7 @@ def get_simulations_layer_average_temperature_delft3dflow(filesystem, lake, star
         z = ds.ZK_LYR[0, :].values * -1 if len(ds.ZK_LYR.shape) == 2 else ds.ZK_LYR[:].values * -1
         depth_index = functions.get_closest_index(depth, z)
         depth = float(z[depth_index])
-        time = functions.alplakes_time(ds.time.values, "nano").tolist()
+        time = functions.alplakes_time(ds.time.values, "nano")
         t_arr = ds.R1.isel(KMAXOUT_RESTR=depth_index, LSTSCI=0)
         t_arr = t_arr.where(t_arr != nodata, np.nan)
         t = t_arr.mean(dim=['M', 'N'], skipna=True).values
@@ -587,7 +587,7 @@ def get_simulations_depthtime_delft3dflow(filesystem, lake, start, end, latitude
         valid_depths = t != nodata
         depth = depth[valid_depths]
         ds = ds.sel(KMAXOUT_RESTR=valid_depths)
-        time = functions.alplakes_time(ds.time.values, "nano").tolist()
+        time = functions.alplakes_time(ds.time.values, "nano")
         output = {"time": time,
                   "lat": lat_grid[x_index, y_index],
                   "lng": lng_grid[x_index, y_index],
@@ -789,7 +789,7 @@ def get_simulations_transect_period_delft3dflow(filesystem, lake, start, end, la
         valid_depths = ~np.all(t == nodata, axis=1)
         depth = z[valid_depths]
         ds = ds.sel(KMAXOUT_RESTR=valid_depths)
-        output = {"time": functions.alplakes_time(ds.time[:].values, "nano").tolist(),
+        output = {"time": functions.alplakes_time(ds.time[:].values, "nano"),
                   "distance": {"data": functions.filter_parameter(sp_arr), "unit": "m",
                                "description": "Distance along transect"},
                   "depth": {"data": functions.filter_parameter(depth), "unit": "m",
@@ -824,6 +824,61 @@ class SimstratResampleOptions(str, Enum):
     monthly = "monthly"
     yearly = "yearly"
 
+class MetadataLake1D(BaseModel):
+    name: str
+    depth: List[float]
+    start_date: date
+    end_date: date
+    missing_dates: List[date]
+
+class Metadata1D(BaseModel):
+    model: str
+    lakes: List[MetadataLake1D]
+
+class MetadataKeyModel1D(BaseModel):
+    unit: Union[str, None] = None
+    description: Union[str, None] = None
+    dimensions: List[str]
+
+class MetadataLake1DDetail(BaseModel):
+    name: str
+    depth: List[float]
+    start_date: date
+    end_date: date
+    missing_dates: List[date]
+    variables: Dict[str, MetadataKeyModel1D]
+
+class ResponseModel1DPoint(BaseModel):
+    time: List[datetime]
+    depth: functions.VariableKeyModel1D
+    resample: Union[str, None]
+    variables: Dict[str, functions.VariableKeyModel1D]
+    @validator('time', each_item=True)
+    def validate_timezone(cls, value):
+        if value.tzinfo is None:
+            raise ValueError('time must have a timezone')
+        return value
+
+class ResponseModel1DProfile(BaseModel):
+    time: datetime
+    depth: functions.VariableKeyModel1D
+    variables: Dict[str, functions.VariableKeyModel1D]
+    @validator('time', each_item=True)
+    def validate_timezone(cls, value):
+        if value.tzinfo is None:
+            raise ValueError('time must have a timezone')
+        return value
+
+class ResponseModel1DDepthTime(BaseModel):
+    time: List[datetime]
+    depth: functions.VariableKeyModel1D
+    variables: Dict[str, functions.VariableKeyModel1D]
+    @validator('time', each_item=True)
+    def validate_timezone(cls, value):
+        if value.tzinfo is None:
+            raise ValueError('time must have a timezone')
+        return value
+
 
 def get_one_dimensional_metadata(filesystem):
     metadata = []
@@ -834,42 +889,35 @@ def get_one_dimensional_metadata(filesystem):
         m = {"model": model, "lakes": []}
 
         for lake in lakes:
-            try:
-                if model == "simstrat":
-                    path = os.path.join(os.path.join(filesystem, "media/1dsimulations", model, "results", lake))
-                    files = os.listdir(path)
-                    files = [file for file in files if len(file.split(".")[0]) == 6 and file.split(".")[1] == "nc"]
-                    files.sort()
-                    combined = '_'.join(files)
-                    missing_dates = []
+            if model == "simstrat":
+                path = os.path.join(os.path.join(filesystem, "media/1dsimulations", model, "results", lake))
+                files = os.listdir(path)
+                files = [file for file in files if len(file.split(".")[0]) == 6 and file.split(".")[1] == "nc"]
+                files.sort()
+                combined = '_'.join(files)
+                missing_dates = []
 
-                    with netCDF4.Dataset(os.path.join(path, files[0])) as nc:
-                        start_date = functions.convert_from_unit(nc.variables["time"][0], nc.variables["time"].units)
+                with netCDF4.Dataset(os.path.join(path, files[0])) as nc:
+                    start_date = functions.convert_from_unit(nc.variables["time"][0], nc.variables["time"].units)
 
-                    with netCDF4.Dataset(os.path.join(path, files[-1])) as nc:
-                        end_date = functions.convert_from_unit(nc.variables["time"][-1], nc.variables["time"].units)
-                        depths = np.array(nc.variables["depth"][:]) * -1
-                        depths = depths[depths > 0]
-                        depths.sort()
-                        depths = [float("%.2f" % d) for d in depths]
+                with netCDF4.Dataset(os.path.join(path, files[-1])) as nc:
+                    end_date = functions.convert_from_unit(nc.variables["time"][-1], nc.variables["time"].units)
+                    depths = np.array(nc.variables["depth"][:]) * -1
+                    depths = depths[depths > 0]
+                    depths.sort()
+                    depths = [float("%.2f" % d) for d in depths]
 
-                    for d in functions.monthrange(start_date, end_date, months=1):
-                        if d.strftime('%Y%m') not in combined:
-                            missing_dates.append(d.strftime("%Y-%m"))
+                for d in functions.monthrange(start_date, end_date, months=1):
+                    if d.strftime('%Y%m') not in combined:
+                        missing_dates.append(d.strftime("%Y-%m"))
 
-                    m["lakes"].append({"name": lake,
-                                       "depths": depths,
-                                       "start_date": start_date.strftime("%Y-%m-%d"),
-                                       "end_date": end_date.strftime("%Y-%m-%d"),
-                                       "missing_dates": missing_dates})
-                else:
-                    raise ValueError("Model not recognised.")
-            except:
                 m["lakes"].append({"name": lake,
-                                   "depths": [],
-                                   "start_date": "NA",
-                                   "end_date": "NA",
-                                   "missing_dates": []})
+                                   "depth": depths,
+                                   "start_date": start_date.strftime("%Y-%m-%d"),
+                                   "end_date": end_date.strftime("%Y-%m-%d"),
+                                   "missing_dates": missing_dates})
+            else:
+                print("Model not recognised.")
         metadata.append(m)
     return metadata
 
@@ -896,16 +944,17 @@ def get_one_dimensional_metadata_lake(filesystem, model, lake):
             depths = depths[depths > 0]
             depths.sort()
             depths = [float("%.2f" % d) for d in depths]
-            out["depths"] = depths
+            out["depth"] = depths
 
-            variables = []
+            variables = {}
             for var in nc.variables:
-                long_name = nc.variables[var].long_name if 'long_name' in nc.variables[var].ncattrs() else var
-                variables.append({
-                    "key": var,
-                    "name": long_name,
-                    "unit": nc.variables[var].units
-                })
+                if var not in ["time", "depth"]:
+                    long_name = nc.variables[var].long_name if 'long_name' in nc.variables[var].ncattrs() else var
+                    variables[var] = {
+                        "description": long_name,
+                        "unit": nc.variables[var].units,
+                        "dimensions": nc.variables[var].dimensions
+                    }
             out["variables"] = variables
 
         for d in functions.monthrange(start_date, end_date, months=1):
@@ -928,17 +977,17 @@ def get_one_dimensional_file(filesystem, model, lake, month):
                                                                                                              month))
 
 
-def get_one_dimensional_point(filesystem, model, lake, parameter, start_time, end_time, depth, resample=None):
+def get_one_dimensional_point(filesystem, model, lake, start_time, end_time, depth, variables, resample=None):
     if model == "simstrat":
-        return get_one_dimensional_point_simstrat(filesystem, lake, parameter, start_time, end_time, depth, resample)
+        return get_one_dimensional_point_simstrat(filesystem, lake, start_time, end_time, depth, variables, resample)
     else:
         raise HTTPException(status_code=400,
                             detail="Apologies not available for {}".format(model))
 
 
-def get_one_dimensional_point_simstrat(filesystem, lake, parameter, start, end, depth, resample):
+def get_one_dimensional_point_simstrat(filesystem, lake, start, end, depth, variables, resample):
     model = "simstrat"
-    out = {}
+    out = {"variables": {}}
     lakes = os.path.join(filesystem, "media/1dsimulations", model, "results")
     if not os.path.isdir(os.path.join(lakes, lake)):
         raise HTTPException(status_code=400,
@@ -960,37 +1009,88 @@ def get_one_dimensional_point_simstrat(filesystem, lake, parameter, start, end, 
     end_datetime = datetime.strptime(end, "%Y%m%d%H%M").replace(tzinfo=timezone.utc).astimezone().replace(tzinfo=None)
 
     with xr.open_mfdataset(files) as ds:
-        if parameter not in ds.variables:
-            raise HTTPException(status_code=400, detail="Parameter {} is not available".format(parameter))
+        dims = None
+        for v in variables:
+            if v not in ds.variables:
+                raise HTTPException(status_code=400, detail="Variable {} is not available".format(v))
+            if dims is not None and len(ds[v].shape) != dims:
+                raise HTTPException(status_code=400, detail="Variables do not have consistent dimensions".format(v))
+            dims = len(ds[v].shape)
         ds = ds.sel(time=slice(start_datetime, end_datetime))
-        if len(ds[parameter].shape) == 2:
+        out["depth"] = {"data": None, "unit": "m", "description": "Distance from the surface to the closest grid point to requested depth"}
+        if len(ds[variables[0]].shape) == 2:
             depths = ds.depth[:].values * - 1
             index = functions.get_closest_index(depth, depths)
-            out["depth"] = {"data": depths[index], "unit": "m", "description": "Distance from the surface to the closest grid point to requested depth"}
+            out["depth"]["data"] = depths[index]
             ds = ds.sel(depth=depths[index] * -1)
 
-        df = pd.DataFrame({'time': pd.to_datetime(ds['time'].values).tz_localize('UTC'), 'values': ds[parameter][:].values})
+        df_dict = {'time': pd.to_datetime(ds['time'].values).tz_localize('UTC')}
+        for v in variables:
+            df_dict[v] = ds[v][:].values
+        df = pd.DataFrame(df_dict)
         resample_options = {"hourly": "H", "daily": "D", "monthly": "M", "yearly": "Y"}
         if resample is not None:
             df.set_index('time', inplace=True)
             df = df.resample(resample_options[resample], label='left').mean(numeric_only=True)
             df = df.reset_index()
             out["resample"] = resample + " mean"
-        out["time"] = [x.replace(tzinfo=timezone.utc).isoformat() for x in df["time"].tolist()]
-        out[parameter] = {"data": functions.filter_parameter(df["values"]), "unit": ds[parameter].units, "description": ds[parameter].long_name}
+        else:
+            out["resample"] = None
+        out["time"] = [x.replace(tzinfo=timezone.utc) for x in df["time"].tolist()]
+        for v in variables:
+            out["variables"][v] = {"data": functions.filter_parameter(df[v]), "unit": ds[v].units, "description": ds[v].long_name}
         return out
 
 
-def get_one_dimensional_depth_time(filesystem, model, lake, parameter, start_time, end_time):
+def get_one_dimensional_profile(filesystem, model, lake, time, variables):
     if model == "simstrat":
-        return get_one_dimensional_depth_time_simstrat(filesystem, lake, parameter, start_time, end_time)
+        return get_one_dimensional_profile_simstrat(filesystem, lake, time, variables)
     else:
         raise HTTPException(status_code=400, detail="Apologies not available for {}".format(model))
 
 
-def get_one_dimensional_depth_time_simstrat(filesystem, lake, parameter, start, end):
+def get_one_dimensional_profile_simstrat(filesystem, lake, time, variables):
     model = "simstrat"
-    out = {}
+    out = {"variables":{}}
+    lakes = os.path.join(filesystem, "media/1dsimulations", model, "results")
+    origin = datetime.strptime(time, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
+
+    if not os.path.isdir(os.path.join(lakes, lake)):
+        raise HTTPException(status_code=400,
+                            detail="{} simulation results are not available for {} please select from: [{}]"
+                            .format(model, lake, ", ".join(os.listdir(lakes))))
+    file = os.path.join(lakes, lake, "{}.nc".format(origin.strftime("%Y%m")))
+    if not os.path.isfile(file):
+            raise HTTPException(status_code=400,
+                                detail="Apologies data is not available for {} month {}".format(lake,
+                                                                                                origin.strftime("%Y%m")))
+    with xr.open_mfdataset(file) as ds:
+        for v in variables:
+            if v not in ds.variables:
+                raise HTTPException(status_code=400, detail="Parameter {} is not available".format(v))
+            if len(ds[v].shape) == 1:
+                raise HTTPException(status_code=400, detail="Parameter {} exists but is not 2D".format(v))
+        ds['time'] = ds.indexes['time'].tz_localize('UTC')
+        time_index = functions.get_closest_index(functions.convert_to_unit(origin, "nano"), ds["time"].values)
+        ds = ds.isel(time=time_index)
+        depths = ds.depth[:].values * - 1
+        out["time"] = ds.time.values
+        out["depth"] = {"data": functions.filter_parameter(depths), "unit": "m", "description": "Distance from the surface to the closest grid point to requested depth"}
+        for v in variables:
+            out["variables"][v] = {"data": functions.filter_parameter(ds[v].values), "unit": ds[v].units, "description": ds[v].long_name}
+        return out
+
+
+def get_one_dimensional_depth_time(filesystem, model, lake, start_time, end_time, variables):
+    if model == "simstrat":
+        return get_one_dimensional_depth_time_simstrat(filesystem, lake, start_time, end_time, variables)
+    else:
+        raise HTTPException(status_code=400, detail="Apologies not available for {}".format(model))
+
+
+def get_one_dimensional_depth_time_simstrat(filesystem, lake, start, end, variables):
+    model = "simstrat"
+    out = {"variables":{}}
     lakes = os.path.join(filesystem, "media/1dsimulations", model, "results")
     if not os.path.isdir(os.path.join(lakes, lake)):
         raise HTTPException(status_code=400,
@@ -1010,17 +1110,18 @@ def get_one_dimensional_depth_time_simstrat(filesystem, lake, parameter, start, 
 
     files = [os.path.join(lakes, lake, "{}.nc".format(month.strftime("%Y%m"))) for month in months]
     with xr.open_mfdataset(files) as ds:
-        if parameter not in ds.variables:
-            raise HTTPException(status_code=400, detail="Parameter {} is not available".format(parameter))
+        for v in variables:
+            if v not in ds.variables:
+                raise HTTPException(status_code=400, detail="Parameter {} is not available".format(v))
+            if len(ds[v].shape) == 1:
+                raise HTTPException(status_code=400, detail="Parameter {} exists but is not 2D".format(v))
         ds['time'] = ds.indexes['time'].tz_localize('UTC')
         ds = ds.sel(time=slice(start_datetime, end_datetime))
-        if len(ds[parameter].shape) == 1:
-            raise HTTPException(status_code=400, detail="Parameter {} exists but is not 2D".format(parameter))
         depths = ds.depth[:].values * - 1
-        out["time"] = [x.replace(tzinfo=timezone.utc).isoformat() for x in
-                       functions.default_time(ds.time[:].values, "nano").tolist()]
-        out["depths"] = {"data": functions.filter_parameter(depths), "unit": "m", "description": "Distance from the surface to the closest grid point to requested depth"}
-        out[parameter] = {"data": functions.filter_parameter(ds[parameter][:].values), "unit": ds[parameter].units, "description": ds[parameter].long_name}
+        out["time"] = functions.alplakes_time(ds.time[:].values, "nano")
+        out["depth"] = {"data": functions.filter_parameter(depths), "unit": "m", "description": "Distance from the surface to the closest grid point to requested depth"}
+        for v in variables:
+            out["variables"][v] = {"data": functions.filter_parameter(ds[v][:].values), "unit": ds[v].units, "description": ds[v].long_name}
         return out
 
 

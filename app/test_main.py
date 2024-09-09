@@ -260,19 +260,26 @@ def test_one_dimensional_simulations_file():
 
 
 def test_one_dimensional_simulations_point():
-    response = client.get("/simulations/1d/point/simstrat/aegeri/T/202405050300/202406072300/1")
+    response = client.get("/simulations/1d/point/simstrat/aegeri/202405050300/202406072300/1")
     assert response.status_code == 200
     data = response.json()
     assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
-    assert isinstance(data["T"]["data"][0], float)
+    assert isinstance(data["variables"]["T"]["data"][0], float)
+
+def test_one_dimensional_simulations_profile():
+    response = client.get("/simulations/1d/profile/simstrat/aegeri/202405050300")
+    assert response.status_code == 200
+    data = response.json()
+    assert datetime.strptime(data["time"], "%Y-%m-%dT%H:%M:%S%z")
+    assert isinstance(data["variables"]["T"]["data"][0], float)
 
 
 def test_one_dimensional_simulations_depth_time():
-    response = client.get("/simulations/1d/depthtime/simstrat/aegeri/T/202405050300/202406072300")
+    response = client.get("/simulations/1d/depthtime/simstrat/aegeri/202405050300/202406072300")
     assert response.status_code == 200
     data = response.json()
     assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
-    assert isinstance(data["T"]["data"][0][0], float)
+    assert isinstance(data["variables"]["T"]["data"][0][0], float)
 
 
 def test_one_dimensional_simulations_day_of_year():

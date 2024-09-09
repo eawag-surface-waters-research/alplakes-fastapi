@@ -13,7 +13,7 @@ from dateutil.relativedelta import relativedelta, SU
 
 
 class VariableKeyModel1D(BaseModel):
-    data: Union[List[Any], float]
+    data: Union[List[Any], float, None]
     unit: Union[str, None] = None
     description: Union[str, None] = None
 
@@ -174,13 +174,9 @@ def alplakes_velocity(u, v, alpha):
 
 def alplakes_time(t, units):
     try:
-        return np.array([convert_from_unit(x, units).replace(tzinfo=timezone.utc) for x in t])
+        return [convert_from_unit(x, units).replace(tzinfo=timezone.utc) for x in t]
     except:
         return convert_from_unit(t, units).replace(tzinfo=timezone.utc)
-
-
-def default_time(t, units):
-    return np.array([convert_from_unit(x, units).replace(tzinfo=timezone.utc) for x in t])
 
 
 def unix_time(t, units):
