@@ -22,6 +22,10 @@ class VariableKeyModel2D(BaseModel):
     unit: Union[str, None] = None
     description: Union[str, None] = None
 
+class TaskResponseModel(BaseModel):
+    message: str
+    status_code: int
+
 
 def convert_to_unit(time, units):
     if units == "seconds since 2008-03-01 00:00:00":
@@ -123,7 +127,7 @@ def download_file(url, local):
         shutil.move(local, old)
 
 
-def filter_parameter(x, decimals=3, string=False, nodata=-999.0):
+def filter_variable(x, decimals=3, string=False, nodata=-999.0):
     x = np.asarray(x).astype(float)
     x[x == nodata] = None
     out = np.around(x, decimals=decimals)
@@ -150,7 +154,7 @@ def rotate_velocity(u, v, alpha):
     return u_n, v_e
 
 
-def alplakes_parameter(x):
+def alplakes_variable(x):
     x = np.asarray(x).astype(np.float64)
     x[x == -999.0] = np.nan
     return x

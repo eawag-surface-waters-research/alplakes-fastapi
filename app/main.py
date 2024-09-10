@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Query, Request, Depends, Path, BackgroundTasks, Response
+from fastapi import FastAPI, Query, Request, Depends, Path, BackgroundTasks, Response, HTTPException
 from fastapi.responses import RedirectResponse, PlainTextResponse, JSONResponse, FileResponse
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.cors import CORSMiddleware
@@ -300,15 +300,17 @@ if internal:
         """
         return meteoswiss.get_meteodata_station_metadata(filesystem, station_id)
 
-    @app.get("/meteoswiss/meteodata/measured/{station_id}/{parameter}/{start_date}/{end_date}", tags=["Meteoswiss"], response_model=meteoswiss.ResponseModelMeteo)
+    @app.get("/meteoswiss/meteodata/measured/{station_id}/{start_date}/{end_date}", tags=["Meteoswiss"], response_model=meteoswiss.ResponseModelMeteo)
     async def meteoswiss_meteodata_measured(station_id: str = Path(..., regex=r"^[a-zA-Z0-9]{3,6}$", title="Station ID", example="PUY", description="3 digit station identification code"),
-                                            parameter: meteoswiss.MeteodataParameters = Path(..., title="Parameter", description="Meteoswiss parameter"),
                                             start_date: str = validate.path_date(description="The start date in YYYYmmdd format"),
-                                            end_date: str = validate.path_date(description="The end date in YYYYmmdd format")):
+                                            end_date: str = validate.path_date(description="The end date in YYYYmmdd format"),
+                                            variables: list[str] = Query(
+                                                  default=["pva200h0", "gre000h0", "tre200h0", "rre150h0", "fkl010h0",
+                                                           "dkl010h0", "nto000d0"])):
         """
         Meteorological data from the automatic measuring network of MeteoSwiss.
 
-        Available parameters:
+        Available variables:
         - pva200h0 (hPa): Vapour pressure 2 m above ground; hourly mean
         - gre000h0 (W/m²): Global radiation; hourly mean
         - tre200h0 (°C): Air temperature 2 m above ground; hourly mean
@@ -321,7 +323,7 @@ if internal:
         For longer durations, it is recommended to make multiple requests with shorter intervals between them.
         """
         validate.date_range(start_date, end_date)
-        return meteoswiss.get_meteodata_measured(filesystem, station_id, parameter, start_date, end_date)
+        return meteoswiss.get_meteodata_measured(filesystem, station_id, variables, start_date, end_date)
 
 if internal:
     @app.get("/bafu/hydrodata/metadata", tags=["Bafu"], response_class=RedirectResponse, response_description="Redirect to a GeoJSON file")
@@ -343,16 +345,16 @@ if internal:
         """
         return bafu.get_hydrodata_station_metadata(filesystem, station_id)
 
-    @app.get("/bafu/hydrodata/measured/{station_id}/{parameter}/{start_date}/{end_date}", tags=["Bafu"], response_model=bafu.ResponseModel)
+    @app.get("/bafu/hydrodata/measured/{station_id}/{variable}/{start_date}/{end_date}", tags=["Bafu"], response_model=bafu.ResponseModel)
     async def bafu_hydrodata_measured(station_id: str = Path(..., regex=r"^\d{4}$", title="Station ID", example=2009, description="4 digit station identification code"),
-                                      parameter: str = Path(..., title="Parameter", example="AbflussPneumatikunten", description="Parameter"),
+                                      variable: str = Path(..., title="Variable", example="AbflussPneumatikunten", description="Variable"),
                                       start_date: str = validate.path_date(description="The start date in YYYYmmdd format"),
                                       end_date: str = validate.path_date(description="The end date in YYYYmmdd format"),
                                       resample: Union[bafu.ResampleOptions, None] = None):
         """
         Hydrological data from the automatic measuring network of Bafu.
 
-        All station id's and the available parameters
+        All station id's and the available variables
         can be access from the metadata endpoint. Data is a mix of hourly data (pre-2022) and 5-min data and can be
         resampled to hourly or daily.
 
@@ -360,7 +362,7 @@ if internal:
         For longer durations, it is recommended to make multiple requests with shorter intervals between them.
         """
         validate.date_range(start_date, end_date)
-        return bafu.get_hydrodata_measured(filesystem, station_id, parameter, start_date, end_date, resample)
+        return bafu.get_hydrodata_measured(filesystem, station_id, variable, start_date, end_date, resample)
 
 if internal:
     @app.get("/insitu/secchi/metadata", tags=["Insitu"], response_model=List[insitu.Metadata])
@@ -457,21 +459,21 @@ async def simulations_layer(model: simulations.Models = Path(..., title="Model",
     return simulations.get_simulations_layer(filesystem, model, lake, time, depth, variables)
 
 
-@app.get("/simulations/layer_alplakes/{model}/{lake}/{parameter}/{start_time}/{end_time}/{depth}", tags=["3D Simulations"],
+@app.get("/simulations/layer_alplakes/{model}/{lake}/{variable}/{start_time}/{end_time}/{depth}", tags=["3D Simulations"],
          response_class=PlainTextResponse, include_in_schema=internal)
 async def simulations_layer_alplakes(model: simulations.Models = Path(..., title="Model", description="Model name"),
                                      lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
-                                     parameter: simulations.Parameters = Path(..., title="Parameter", description="Parameter"),
+                                     variable: simulations.Variables = Path(..., title="Variable", description="Variable"),
                                      start_time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202304050300"),
                                      end_time: str = validate.path_time(description="The end time in YYYYmmddHHMM format (UTC)", example="202304112300"),
                                      depth: float = validate.path_depth()):
     """
-    Plain text formatted parameters for a depth layer over a specific time range. Reduces file size compared to layer outputs.
+    Plain text formatted variables for a depth layer over a specific time range. Reduces file size compared to layer outputs.
 
     ⚠️ **Warning:** This endpoint is designed for supplying data to the Alplakes website. The output is **not** self-explanatory.
     """
     validate.time_range(start_time, end_time)
-    return simulations.get_simulations_layer_alplakes(filesystem, model, lake, parameter, start_time, end_time, depth)
+    return simulations.get_simulations_layer_alplakes(filesystem, model, lake, variable, start_time, end_time, depth)
 
 
 @app.get("/simulations/layer/average_temperature/{model}/{lake}/{start_time}/{end_time}/{depth}", tags=["3D Simulations"], response_model=simulations.ResponseModelAverageLayer)
@@ -637,52 +639,60 @@ async def one_dimensional_simulations_depth_time(
     return simulations.get_one_dimensional_depth_time(filesystem, model, lake, start_time, end_time, variables)
 
 
-@app.get("/simulations/1d/doy/{model}/{lake}/{parameter}/{depth}", tags=["1D Simulations"])
+@app.get("/simulations/1d/doy/metadata", tags=["1D Simulations"], response_model=List[simulations.Metadata1DDOY])
+async def one_dimensional_simulations_day_of_year_metadata():
+    """
+    Metadata for all available DOY products
+    """
+    return simulations.get_one_dimensional_day_of_year_metadata(filesystem)
+
+
+@app.get("/simulations/1d/doy/{model}/{lake}/{variable}/{depth}", tags=["1D Simulations"], response_model=simulations.ResponseModel1DDOY)
 async def one_dimensional_simulations_day_of_year(
         model: simulations.OneDimensionalModels = Path(..., title="Model", description="Model name"),
         lake: str = Path(..., title="Lake", description="Lake key", example="aegeri"),
-        parameter: str = Path(..., title="Parameter", description="Parameter", example="T"),
-        depth: float = validate.path_depth()):
+        variable: str = Path(..., title="Variable", description="Variable", example="T"),
+        depth: float = validate.path_depth(example="1.0")):
     """
-    Day of year statistics for a given parameter.
+    Day of year statistics for a given variable.
 
-    ⚠️ **Warning:** Only available once computed using the write endpoint
+    ⚠️ **Warning:** Only available once computed using the write endpoint, see metadata for available products
     """
-    return simulations.get_one_dimensional_day_of_year(filesystem, model, lake, parameter, depth)
+    return simulations.get_one_dimensional_day_of_year(filesystem, model, lake, variable, depth)
 
 
 if internal:
-    @app.get("/simulations/1d/doy/write/{model}/{lake}/{parameter}/{depth}", tags=["1D Simulations"])
+    @app.get("/simulations/1d/doy/write/{model}/{lake}/{variable}/{depth}", tags=["1D Simulations"], responses={202: {"description": "Computing DOY"}})
     async def write_one_dimensional_simulations_day_of_year(
             background_tasks: BackgroundTasks,
             model: simulations.OneDimensionalModels = Path(..., title="Model", description="Model name"),
             lake: str = Path(..., title="Lake", description="Lake key", example="aegeri"),
-            parameter: str = Path(..., title="Parameter", description="Parameter", example="T"),
+            variable: str = Path(..., title="Variable", description="Variable", example="T"),
             depth: float = validate.path_depth()):
         """
-        Compute day of year statistics for a given parameter.
+        Compute day of year statistics for a given variable.
 
         ⚠️ **Warning:** Processing is slow due to the large volumes of data, once it has completed data is available from the doy
         endpoint.
         """
-        background_tasks.add_task(simulations.write_one_dimensional_day_of_year, filesystem, model, lake, parameter, depth)
-        return Response(status_code=202)
+        background_tasks.add_task(simulations.write_one_dimensional_day_of_year, filesystem, model, lake, variable, depth)
+        return Response(content="Computing DOY", status_code=202)
 
 
 @app.get("/remotesensing/metadata", tags=["Remote Sensing"], response_class=RedirectResponse, response_description="Redirect to a GeoJSON file")
 async def remote_sensing_metadata():
     """
-    Directory of remote sensing product types, organised by lake, satellite and parameter.
+    Directory of remote sensing product types, organised by lake, satellite and variable.
     """
     return RedirectResponse("https://eawagrs.s3.eu-central-1.amazonaws.com/metadata/metadata.json")
 
 
-@app.get("/remotesensing/products/{lake}/{satellite}/{parameter}", tags=["Remote Sensing"], response_class=RedirectResponse, response_description="Redirect to a GeoJSON file")
+@app.get("/remotesensing/products/{lake}/{satellite}/{variable}", tags=["Remote Sensing"], response_class=RedirectResponse, response_description="Redirect to a GeoJSON file")
 async def remote_sensing_products(lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
                                   satellite: remotesensing.Satellites = Path(..., title="Satellite", description="Satellite name"),
-                                  parameter: str = Path(..., title="Parameter", description="Parameter", example="chla")):
+                                  variable: str = Path(..., title="Variable", description="Variable", example="chla")):
     """
-    Metadata for full time series of remote sensing products for a given lake, satellite and parameter.
+    Metadata for full time series of remote sensing products for a given lake, satellite and variable.
     See /remotesensing/metadata for input options.
     """
-    return RedirectResponse("https://eawagrs.s3.eu-central-1.amazonaws.com/metadata/{}/{}_{}_public.json".format(satellite, lake, parameter))
+    return RedirectResponse("https://eawagrs.s3.eu-central-1.amazonaws.com/metadata/{}/{}_{}_public.json".format(satellite, lake, variable))

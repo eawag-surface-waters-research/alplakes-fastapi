@@ -13,7 +13,7 @@ import simulations
 
 filesystem = "../filesystem"
 
-function = "simulations.get_one_dimensional_point"
+function = "simulations.get_one_dimensional_day_of_year_metadata"
 
 if function == "meteoswiss.get_cosmo_metadata":
     data = meteoswiss.get_cosmo_metadata(filesystem)
@@ -64,8 +64,8 @@ if function == "meteoswiss.get_meteodata_station_metadata":
     print(data)
 
 if function == "meteoswiss.get_meteodata_measured":
-    data = meteoswiss.get_meteodata_measured(filesystem, "PUY", "pva200h0", "20230101", "20240210")
-    plt.plot(data["time"], data["pva200h0"])
+    data = meteoswiss.get_meteodata_measured(filesystem, "PUY", ["pva200h0"], "20230101", "20240210")
+    plt.plot(data["time"], data["variables"]["pva200h0"]["data"])
     plt.show()
 
 if function == "bafu.get_hydrodata_station_metadata":
@@ -74,7 +74,7 @@ if function == "bafu.get_hydrodata_station_metadata":
 
 if function == "bafu.get_hydrodata_measured":
     data = bafu.get_hydrodata_measured(filesystem, 2009, "AbflussPneumatikunten", "20210207", "20230201")
-    plt.plot(data["time"], data["AbflussPneumatikunten"])
+    plt.plot(data["time"], data["variable"]["data"])
     plt.show()
 
 if function == "insitu.get_insitu_secchi_metadata":
@@ -83,7 +83,7 @@ if function == "insitu.get_insitu_secchi_metadata":
 
 if function == "insitu.get_insitu_secchi_lake":
     data = insitu.get_insitu_secchi_lake(filesystem, "geneva")
-    plt.plot(data["time"], data["secchi"]["data"])
+    plt.plot(data["time"], data["variable"]["data"])
     plt.show()
 
 if function == "simulations.get_metadata":
@@ -165,14 +165,18 @@ if function == "simulations.get_one_dimensional_depth_time":
     plt.colorbar()
     plt.show()
 
+if function == "simulations.get_one_dimensional_day_of_year_metadata":
+    data = simulations.get_one_dimensional_day_of_year_metadata(filesystem)
+    print(data)
+
 if function == "simulations.get_one_dimensional_day_of_year":
-    simulations.write_one_dimensional_day_of_year_simstrat(filesystem, "aegeri", "T", 1)
-    out = simulations.get_one_dimensional_day_of_year_simstrat(filesystem, "aegeri", "T", 1)
-    plt.plot(out["mean"], label="mean")
-    plt.plot(out["max"], label="max")
-    plt.plot(out["min"], label="min")
-    plt.plot(out["lastyear"], label="last")
-    plt.fill_between(range(366), out["perc5"], out["perc95"], color='lightcoral', alpha=0.5)
-    plt.fill_between(range(366), out["perc25"], out["perc75"], color='skyblue', alpha=0.5)
+    simulations.write_one_dimensional_day_of_year_simstrat(filesystem, "aegeri", "T", 1.0)
+    data = simulations.get_one_dimensional_day_of_year_simstrat(filesystem, "aegeri", "T", 1.0)
+    plt.plot(data["variables"]["mean"]["data"], label="mean")
+    plt.plot(data["variables"]["max"]["data"], label="max")
+    plt.plot(data["variables"]["min"]["data"], label="min")
+    plt.plot(data["variables"]["lastyear"]["data"], label="last")
+    plt.fill_between(range(366), data["variables"]["perc5"]["data"], data["variables"]["perc95"]["data"], color='lightcoral', alpha=0.5)
+    plt.fill_between(range(366), data["variables"]["perc25"]["data"], data["variables"]["perc75"]["data"], color='skyblue', alpha=0.5)
     plt.legend()
     plt.show()

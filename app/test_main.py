@@ -102,11 +102,10 @@ def test_meteoswiss_meteodata_station_metadata_station():
 
 
 def test_meteoswiss_meteodata_measured():
-    variable = "pva200h0"
-    response = client.get("/meteoswiss/meteodata/measured/PUY/{}/20230101/20240210".format(variable))
+    response = client.get("/meteoswiss/meteodata/measured/PUY/20230101/20240210")
     assert response.status_code == 200
     data = response.json()
-    assert isinstance(data["variables"][variable]["data"][0], float)
+    assert isinstance(data["variables"]["pva200h0"]["data"][0], float)
     assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
 
 
@@ -117,20 +116,20 @@ def test_bafu_hydrodata_station_metadata():
 
 
 def test_bafu_hydrodata_measured():
-    parameter = "AbflussPneumatikunten"
-    response = client.get("/bafu/hydrodata/measured/2009/{}/20210207/20230201".format(parameter))
+    variable = "AbflussPneumatikunten"
+    response = client.get("/bafu/hydrodata/measured/2009/{}/20210207/20230201".format(variable))
     assert response.status_code == 200
     data = response.json()
-    assert isinstance(data["variables"][parameter]["data"][0], float)
+    assert isinstance(data["variable"]["data"][0], float)
     assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
 
 
 def test_bafu_hydrodata_measured_resample():
-    parameter = "AbflussPneumatikunten"
-    response = client.get("/bafu/hydrodata/measured/2009/{}/20210207/20230201?resample=hourly".format(parameter))
+    variable = "AbflussPneumatikunten"
+    response = client.get("/bafu/hydrodata/measured/2009/{}/20210207/20230201?resample=hourly".format(variable))
     assert response.status_code == 200
     data = response.json()
-    assert isinstance(data["variables"][parameter]["data"][0], float)
+    assert isinstance(data["variable"]["data"][0], float)
     assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
     assert (datetime.strptime(data["time"][1], "%Y-%m-%dT%H:%M:%S%z") -
             datetime.strptime(data["time"][0], "%Y-%m-%dT""%H:%M:%S%z")).total_seconds() == 3600
@@ -148,7 +147,7 @@ def test_insitu_secchi_lake():
     response = client.get("/insitu/secchi/{}".format(lake))
     assert response.status_code == 200
     data = response.json()
-    assert isinstance(data["variables"]["secchi"]["data"][0], float)
+    assert isinstance(data["variable"]["data"][0], float)
     assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
 
 
@@ -281,13 +280,18 @@ def test_one_dimensional_simulations_depth_time():
     assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
     assert isinstance(data["variables"]["T"]["data"][0][0], float)
 
+def test_one_dimensional_simulations_day_of_year_metadata():
+    response = client.get("/simulations/1d/doy/metadata")
+    assert response.status_code == 200
 
 def test_one_dimensional_simulations_day_of_year():
-    response = client.get("/simulations/1d/doy/simstrat/aegeri/T/0")
+    response = client.get("/simulations/1d/doy/simstrat/aegeri/T/1.0")
     assert response.status_code == 200
     data = response.json()
-    assert isinstance(data["doy"][0], int)
-    assert isinstance(data["mean"][0], float)
-    assert isinstance(data["max"][0], float)
-    assert isinstance(data["min"][0], float)
-    assert isinstance(data["std"][0], float)
+    assert datetime.strptime(data["start_time"], "%Y-%m-%dT%H:%M:%S%z")
+    assert datetime.strptime(data["end_time"], "%Y-%m-%dT%H:%M:%S%z")
+    assert isinstance(data["variables"]["doy"]["data"][0], int)
+    assert isinstance(data["variables"]["mean"]["data"][0], float)
+    assert isinstance(data["variables"]["max"]["data"][0], float)
+    assert isinstance(data["variables"]["min"]["data"][0], float)
+    assert isinstance(data["variables"]["std"]["data"][0], float)

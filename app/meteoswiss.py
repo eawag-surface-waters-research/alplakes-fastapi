@@ -606,16 +606,6 @@ def get_icon_point_reanalysis(filesystem, model, input_variables, start_date, en
     except Exception as e:
         raise
 
-
-class MeteodataParameters(str, Enum):
-    pva200h0 = "pva200h0"
-    gre000h0 = "gre000h0"
-    tre200h0 = "tre200h0"
-    rre150h0 = "rre150h0"
-    fkl010h0 = "fkl010h0"
-    dkl010h0 = "dkl010h0"
-    nto000d0 = "nto000d0"
-
 class VariableKeyModelMeteoMeta(BaseModel):
     period: str
     unit: str
@@ -638,7 +628,7 @@ class VariableKeyModelMeteo(BaseModel):
     period: str
     unit: str
     description: str
-    data: List[float]
+    data: List[Union[float, None]]
 
 class ResponseModelMeteo(BaseModel):
     time: List[datetime]
@@ -660,7 +650,7 @@ def get_meteodata_station_metadata(filesystem, station_id):
         "properties": {"station_name": "Homad", "altitude": 2115.0},
         "geometry": {"coordinates": [2665100, 1170100]}
     }]
-    parameters_dict = {
+    variables_dict = {
         "pva200h0": {"unit": "hPa", "description": "Vapour pressure 2 m above ground", "period": "hourly mean"},
         "gre000h0": {"unit": "W/m²", "description": "Global radiation", "period": "hourly mean"},
         "tre200h0": {"unit": "°C", "description": "Air temperature 2 m above ground", "period": "hourly mean"},
@@ -719,10 +709,10 @@ def get_meteodata_station_metadata(filesystem, station_id):
         df = pd.concat(map(pd.read_csv, files), ignore_index=True)
         df[df.columns[2:]] = df[df.columns[2:]].apply(pd.to_numeric, errors='coerce').notna()
         df = df.loc[:, df.any()]
-        parameters = list(df.columns[2:])
-        for p in parameters:
-            if p in parameters_dict:
-                d = parameters_dict[p]
+        variables = list(df.columns[2:])
+        for p in variables:
+            if p in variables_dict:
+                d = variables_dict[p]
                 d["start_date"] = datetime.strptime(str(min(df.loc[df[p], 'Date'])), "%Y%m%d%H").replace(
                     tzinfo=timezone.utc).strftime("%Y-%m-%d")
                 d["end_date"] = datetime.strptime(str(max(df.loc[df[p], 'Date'])), "%Y%m%d%H").replace(
@@ -731,8 +721,8 @@ def get_meteodata_station_metadata(filesystem, station_id):
     return out
 
 
-def get_meteodata_measured(filesystem, station_id, parameter, start_date, end_date):
-    parameters_dict = {
+def get_meteodata_measured(filesystem, station_id, variables, start_date, end_date):
+    variables_dict = {
         "pva200h0": {"unit": "hPa", "description": "Vapour pressure 2 m above ground", "period": "hourly mean"},
         "gre000h0": {"unit": "W/m²", "description": "Global radiation", "period": "hourly mean"},
         "tre200h0": {"unit": "°C", "description": "Air temperature 2 m above ground", "period": "hourly mean"},
@@ -750,23 +740,27 @@ def get_meteodata_measured(filesystem, station_id, parameter, start_date, end_da
     files = [os.path.join(station_dir, f) for f in files if
              int(start_date[:4]) <= int(f.split(".")[1]) <= int(end_date[:4]) and f.endswith(".csv")]
     df = pd.concat(map(pd.read_csv, files), ignore_index=True)
-    if parameter not in df.columns:
-        raise HTTPException(status_code=400,
-                            detail="Parameter {} not available at station {}".format(parameter, station_id))
+    for v in variables:
+        if v not in df.columns:
+            raise HTTPException(status_code=400,
+                                detail="Variable {} not available at station {}".format(v, station_id))
     df["time"] = pd.to_datetime(df['Date'], format='%Y%m%d%H', utc=True)
-    df[parameter] = pd.to_numeric(df[parameter], errors='coerce').round(1)
-    df.dropna(subset=[parameter], inplace=True)
+    df[variables] = df[variables].apply(lambda x: pd.to_numeric(x, errors='coerce').round(1))
+    df = df.dropna(how='all')
     start = datetime.strptime(start_date, '%Y%m%d').replace(tzinfo=timezone.utc).isoformat()
     end = (datetime.strptime(end_date, '%Y%m%d').replace(tzinfo=timezone.utc) + timedelta(days=1)).isoformat()
     selected = df[(df['time'] >= start) & (df['time'] < end)]
     if len(selected) == 0:
         raise HTTPException(status_code=400,
                             detail="No data available between {} and {}".format(start_date, end_date))
-    return {"time": list(selected["time"]),
-            "variables": {parameter: {"data": list(selected[parameter]),
-                                     "unit": parameters_dict[parameter]["unit"],
-                                     "description": parameters_dict[parameter]["description"],
-                                     "period": parameters_dict[parameter]["period"]}}}
+    output = {"time": list(selected["time"]), "variables": {}}
+    for v in variables:
+        output["variables"][v] = {"data": functions.filter_variable(list(selected[v])),
+                                  "unit": variables_dict[v]["unit"],
+                                  "description": variables_dict[v]["description"],
+                                  "period": variables_dict[v]["period"]}
+    return output
+
 
 def meteoswiss_time_iso(time_array):
     return [datetime.utcfromtimestamp(time.astype('datetime64[s]').astype('int')).replace(tzinfo=timezone.utc) for

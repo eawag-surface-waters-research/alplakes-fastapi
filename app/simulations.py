@@ -223,7 +223,7 @@ class Lakes(str, Enum):
     stmoritz = "stmoritz"
 
 
-class Parameters(str, Enum):
+class Variables(str, Enum):
     temperature = "temperature"
     velocity = "velocity"
     geometry = "geometry"
@@ -278,14 +278,14 @@ def get_simulations_point_delft3dflow(filesystem, lake, start, end, depth, latit
                   }
         if "temperature" in variables:
             t = ds.R1.isel(M=x_index, N=y_index, KMAXOUT_RESTR=depth_index, LSTSCI=0).values
-            output["variables"]["temperature"] = {"data": functions.filter_parameter(t), "unit": "degC", "description": "Water temperature"}
+            output["variables"]["temperature"] = {"data": functions.filter_variable(t), "unit": "degC", "description": "Water temperature"}
         if "velocity" in variables:
             u, v, = functions.rotate_velocity(
                 ds.U1.isel(MC=x_index, N=y_index, KMAXOUT_RESTR=depth_index).values,
                 ds.V1.isel(M=x_index, NC=y_index, KMAXOUT_RESTR=depth_index).values,
                 ds.ALFAS.isel(M=x_index, N=y_index).values)
-            output["variables"]["u"] = {"data": functions.filter_parameter(u, decimals=5), "unit": "m/s", "description": "Eastward flow velocity"}
-            output["variables"]["v"] = {"data": functions.filter_parameter(v, decimals=5), "unit": "m/s", "description": "Northward flow velocity"}
+            output["variables"]["u"] = {"data": functions.filter_variable(u, decimals=5), "unit": "m/s", "description": "Eastward flow velocity"}
+            output["variables"]["v"] = {"data": functions.filter_variable(v, decimals=5), "unit": "m/s", "description": "Northward flow velocity"}
     return output
 
 
@@ -326,34 +326,34 @@ def get_simulations_layer_delft3dflow(filesystem, lake, time, depth, variables):
                "depth": {"description": "Distance from the surface to the closest grid point to requested depth",
                          "units": nc.variables["ZK_LYR"].units,
                          "data": depth},
-               "lat": functions.filter_parameter(lat_grid, decimals=5, nodata=np.nan),
-               "lng": functions.filter_parameter(lng_grid, decimals=5, nodata=np.nan),
+               "lat": functions.filter_variable(lat_grid, decimals=5, nodata=np.nan),
+               "lng": functions.filter_variable(lng_grid, decimals=5, nodata=np.nan),
                "variables": {}
                }
         if "temperature" in variables:
-            t = functions.filter_parameter(nc.variables["R1"][time_index, 0, depth_index, :])
-            output["variables"]["temperature"] = {"data": functions.filter_parameter(t), "unit": "degC",
+            t = functions.filter_variable(nc.variables["R1"][time_index, 0, depth_index, :])
+            output["variables"]["temperature"] = {"data": functions.filter_variable(t), "unit": "degC",
                                                   "description": "Water temperature"}
         if "velocity" in variables:
             u, v, = functions.rotate_velocity(nc.variables["U1"][time_index, depth_index, :],
                                               nc.variables["V1"][time_index, depth_index, :],
                                               nc.variables["ALFAS"][:])
-            output["variables"]["u"] = {"data": functions.filter_parameter(u, decimals=5), "unit": "m/s",
+            output["variables"]["u"] = {"data": functions.filter_variable(u, decimals=5), "unit": "m/s",
                                         "description": "Eastward flow velocity"}
-            output["variables"]["v"] = {"data": functions.filter_parameter(v, decimals=5), "unit": "m/s",
+            output["variables"]["v"] = {"data": functions.filter_variable(v, decimals=5), "unit": "m/s",
                                         "description": "Northward flow velocity"}
     return output
 
 
-def get_simulations_layer_alplakes(filesystem, model, lake, parameter, start, end, depth):
+def get_simulations_layer_alplakes(filesystem, model, lake, variable, start, end, depth):
     if model == "delft3d-flow":
-        return get_simulations_layer_alplakes_delft3dflow(filesystem, lake, parameter, start, end, depth)
+        return get_simulations_layer_alplakes_delft3dflow(filesystem, lake, variable, start, end, depth)
     else:
         raise HTTPException(status_code=400,
                             detail="Apologies data is not available for {}".format(model))
 
 
-def get_simulations_layer_alplakes_delft3dflow(filesystem, lake, parameter, start, end, depth):
+def get_simulations_layer_alplakes_delft3dflow(filesystem, lake, variable, start, end, depth):
     model = "delft3d-flow"
     lakes = os.path.join(filesystem, "media/simulations", model, "results")
     if not os.path.isdir(os.path.join(lakes, lake)):
@@ -374,7 +374,7 @@ def get_simulations_layer_alplakes_delft3dflow(filesystem, lake, parameter, star
     times = None
     for week in weeks:
         with netCDF4.Dataset(os.path.join(lakes, lake, "{}.nc".format(week.strftime("%Y%m%d")))) as nc:
-            if parameter == "geometry":
+            if variable == "geometry":
                 lat_grid, lng_grid = functions.coordinates_to_latlng(nc.variables["XZ"][:], nc.variables["YZ"][:])
                 geometry = np.concatenate((lat_grid, lng_grid), axis=1)
                 return '\n'.join(','.join('%0.8f' % x for x in y) for y in geometry).replace("nan", "")
@@ -396,28 +396,28 @@ def get_simulations_layer_alplakes_delft3dflow(filesystem, lake, parameter, star
 
             depth_index = functions.get_closest_index(depth, np.array(nc.variables["ZK_LYR"][:]) * -1)
 
-            if parameter == "temperature":
+            if variable == "temperature":
                 f = '%0.2f'
-                p = functions.alplakes_parameter(
+                p = functions.alplakes_variable(
                     nc.variables["R1"][time_index_start:time_index_end, 0, depth_index, :])
-            elif parameter == "velocity":
+            elif variable == "velocity":
                 f = '%0.5f'
                 p = functions.alplakes_velocity(
                     nc.variables["U1"][time_index_start:time_index_end, depth_index, :],
                     nc.variables["V1"][time_index_start:time_index_end, depth_index, :],
                     nc.variables["ALFAS"][:])
-            elif parameter == "thermocline":
+            elif variable == "thermocline":
                 if "THERMOCLINE" in nc.variables.keys():
                     f = '%0.2f'
-                    p = functions.alplakes_parameter(
+                    p = functions.alplakes_variable(
                         nc.variables["THERMOCLINE"][time_index_start:time_index_end, :])
                 else:
                     raise HTTPException(status_code=400,
-                                        detail="Thermocline not available for this dataset. Please try another parameter.")
+                                        detail="Thermocline not available for this dataset. Please try another variable.")
             else:
                 raise HTTPException(status_code=400,
-                                    detail="Parameter {} not recognised, please select from: [geometry, temperature, "
-                                           "velocity, thermocline]".format(parameter))
+                                    detail="Variable {} not recognised, please select from: [geometry, temperature, "
+                                           "velocity, thermocline]".format(variable))
             t = np.array([functions.convert_from_unit(x, nc.variables["time"].units).strftime("%Y%m%d%H%M") for x in time[time_index_start:time_index_end]])
             if out is None:
                 out = p
@@ -476,7 +476,7 @@ def get_simulations_layer_average_temperature_delft3dflow(filesystem, lake, star
                   "depth": {"data": depth, "unit": "m",
                             "description": "Distance from the surface to the closest grid point to requested depth"},
                   "variables": {
-                      "temperature": {"data": functions.filter_parameter(t), "unit": "degC", "description": "Water temperature"}
+                      "temperature": {"data": functions.filter_variable(t), "unit": "degC", "description": "Water temperature"}
                   }
                   }
     return output
@@ -517,7 +517,7 @@ def get_simulations_profile_delft3dflow(filesystem, lake, dt, latitude, longitud
         lat_grid, lng_grid = functions.coordinates_to_latlng(nc.variables["XZ"][:], nc.variables["YZ"][:])
         x_index, y_index, distance = functions.get_closest_location(latitude, longitude, lat_grid, lng_grid)
 
-        t = functions.filter_parameter(nc.variables["R1"][time_index, 0, :, x_index, y_index])
+        t = functions.filter_variable(nc.variables["R1"][time_index, 0, :, x_index, y_index])
         u, v, = functions.rotate_velocity(nc.variables["U1"][time_index, :, x_index, y_index],
                                           nc.variables["V1"][time_index, :, x_index, y_index],
                                           nc.variables["ALFAS"][x_index, y_index])
@@ -537,14 +537,14 @@ def get_simulations_profile_delft3dflow(filesystem, lake, dt, latitude, longitud
                   "lat": lat_grid[x_index, y_index],
                   "lng": lng_grid[x_index, y_index],
                   "distance": {"data": distance, "unit": "m", "description": "Distance from requested location to center of closest grid point"},
-                  "depth": {"data": functions.filter_parameter(depth), "unit": "m", "description": "Distance from the surface to the closest grid point to requested depth"},
+                  "depth": {"data": functions.filter_variable(depth), "unit": "m", "description": "Distance from the surface to the closest grid point to requested depth"},
                   "variables": {}}
         if "temperature" in variables:
             output["variables"]["temperature"] = {"data": t, "unit": "degC", "description": "Water temperature"}
         if "velocity" in variables:
-            output["variables"]["u"] = {"data": functions.filter_parameter(u, decimals=5), "unit": nc.variables["U1"].units,
+            output["variables"]["u"] = {"data": functions.filter_variable(u, decimals=5), "unit": nc.variables["U1"].units,
                   "description": "Eastward flow velocity"}
-            output["variables"]["v"] = {"data": functions.filter_parameter(v, decimals=5), "unit": nc.variables["V1"].units,
+            output["variables"]["v"] = {"data": functions.filter_variable(v, decimals=5), "unit": nc.variables["V1"].units,
                   "description": "Northward flow velocity"}
     return output
 
@@ -591,7 +591,7 @@ def get_simulations_depthtime_delft3dflow(filesystem, lake, start, end, latitude
         output = {"time": time,
                   "lat": lat_grid[x_index, y_index],
                   "lng": lng_grid[x_index, y_index],
-                  "depth": {"data": functions.filter_parameter(depth), "unit": "m",
+                  "depth": {"data": functions.filter_variable(depth), "unit": "m",
                             "description": "Distance from the surface"},
                   "distance": {"data": distance, "unit": "m",
                                "description": "Distance from requested location to center of closest grid point"},
@@ -599,16 +599,16 @@ def get_simulations_depthtime_delft3dflow(filesystem, lake, start, end, latitude
                   }
         if "temperature" in variables:
             t = ds.R1.isel(M=x_index, N=y_index, LSTSCI=0).transpose('KMAXOUT_RESTR', 'time').values
-            output["variables"]["temperature"] = {"data": functions.filter_parameter(t), "unit": "degC",
+            output["variables"]["temperature"] = {"data": functions.filter_variable(t), "unit": "degC",
                                                   "description": "Water temperature"}
         if "velocity" in variables:
             u, v, = functions.rotate_velocity(
                 ds.U1.isel(MC=x_index, N=y_index).transpose('KMAXOUT_RESTR', 'time').values,
                 ds.V1.isel(M=x_index, NC=y_index).transpose('KMAXOUT_RESTR', 'time').values,
                 ds.ALFAS.isel(M=x_index, N=y_index).values[np.newaxis, :])
-            output["variables"]["u"] = {"data": functions.filter_parameter(u, decimals=5), "unit": "m/s",
+            output["variables"]["u"] = {"data": functions.filter_variable(u, decimals=5), "unit": "m/s",
                                         "description": "Eastward flow velocity"}
-            output["variables"]["v"] = {"data": functions.filter_parameter(v, decimals=5), "unit": "m/s",
+            output["variables"]["v"] = {"data": functions.filter_variable(v, decimals=5), "unit": "m/s",
                                         "description": "Northward flow velocity"}
     return output
 
@@ -689,26 +689,26 @@ def get_simulations_transect_delft3dflow(filesystem, lake, time, latitude_str, l
         depth = z[valid_depths]
         ds = ds.sel(KMAXOUT_RESTR=valid_depths)
         output = {"time": ds.time.values,
-                  "distance": {"data": functions.filter_parameter(sp_arr), "unit": "m",
+                  "distance": {"data": functions.filter_variable(sp_arr), "unit": "m",
                                "description": "Distance along transect"},
-                  "depth": {"data": functions.filter_parameter(depth), "unit": "m",
+                  "depth": {"data": functions.filter_variable(depth), "unit": "m",
                             "description": "Distance from the surface"},
-                  "lat": functions.filter_parameter(lat_arr, decimals=5),
-                  "lng": functions.filter_parameter(lng_arr, decimals=5),
+                  "lat": functions.filter_variable(lat_arr, decimals=5),
+                  "lng": functions.filter_variable(lng_arr, decimals=5),
                   "variables": {}
                   }
         if "temperature" in variables:
             t = ds.R1.isel(M=xi, N=yi, LSTSCI=0).transpose('KMAXOUT_RESTR', 'dim_0').values
-            output["variables"]["temperature"] = {"data": functions.filter_parameter(t), "unit": "degC",
+            output["variables"]["temperature"] = {"data": functions.filter_variable(t), "unit": "degC",
                                                   "description": "Water temperature"}
         if "velocity" in variables:
             u, v, = functions.rotate_velocity(
                 ds.U1.isel(MC=xi, N=yi).transpose('KMAXOUT_RESTR', 'dim_0').values,
                 ds.V1.isel(M=xi, NC=yi).transpose('KMAXOUT_RESTR', 'dim_0').values,
                 ds.ALFAS.isel(M=xi, N=yi).values[np.newaxis, :])
-            output["variables"]["u"] = {"data": functions.filter_parameter(u, decimals=5), "unit": "m/s",
+            output["variables"]["u"] = {"data": functions.filter_variable(u, decimals=5), "unit": "m/s",
                                         "description": "Eastward flow velocity"}
-            output["variables"]["v"] = {"data": functions.filter_parameter(u, decimals=5), "unit": "m/s",
+            output["variables"]["v"] = {"data": functions.filter_variable(u, decimals=5), "unit": "m/s",
                                         "description": "Northward flow velocity"}
     return output
 
@@ -790,17 +790,17 @@ def get_simulations_transect_period_delft3dflow(filesystem, lake, start, end, la
         depth = z[valid_depths]
         ds = ds.sel(KMAXOUT_RESTR=valid_depths)
         output = {"time": functions.alplakes_time(ds.time[:].values, "nano"),
-                  "distance": {"data": functions.filter_parameter(sp_arr), "unit": "m",
+                  "distance": {"data": functions.filter_variable(sp_arr), "unit": "m",
                                "description": "Distance along transect"},
-                  "depth": {"data": functions.filter_parameter(depth), "unit": "m",
+                  "depth": {"data": functions.filter_variable(depth), "unit": "m",
                            "description": "Distance from the surface"},
-                  "lat": functions.filter_parameter(lat_arr, decimals=5),
-                  "lng": functions.filter_parameter(lng_arr, decimals=5),
+                  "lat": functions.filter_variable(lat_arr, decimals=5),
+                  "lng": functions.filter_variable(lng_arr, decimals=5),
                   "variables": {}
                   }
         if "temperature" in variables:
             t = ds.R1.isel(M=xi, N=yi, LSTSCI=0).transpose('time', 'KMAXOUT_RESTR', 'dim_0').values
-            output["variables"]["temperature"] = {"data": functions.filter_parameter(t), "unit": "degC", "description": "Water temperature"}
+            output["variables"]["temperature"] = {"data": functions.filter_variable(t), "unit": "degC", "description": "Water temperature"}
         if "velocity" in variables:
             if "time" in ds.ALFAS.dims:
                 alfas = ds.ALFAS.isel(M=xi, N=yi).transpose('time', 'dim_0').values[:, np.newaxis, :]
@@ -810,8 +810,8 @@ def get_simulations_transect_period_delft3dflow(filesystem, lake, start, end, la
                 ds.U1.isel(MC=xi, N=yi).transpose('time', 'KMAXOUT_RESTR', 'dim_0').values,
                 ds.V1.isel(M=xi, NC=yi).transpose('time', 'KMAXOUT_RESTR', 'dim_0').values,
                 alfas)
-            output["variables"]["u"] = {"data": functions.filter_parameter(u, decimals=5), "unit": "m/s", "description": "Eastward flow velocity"}
-            output["variables"]["v"] = {"data": functions.filter_parameter(u, decimals=5), "unit": "m/s", "description": "Northward flow velocity"}
+            output["variables"]["u"] = {"data": functions.filter_variable(u, decimals=5), "unit": "m/s", "description": "Eastward flow velocity"}
+            output["variables"]["v"] = {"data": functions.filter_variable(u, decimals=5), "unit": "m/s", "description": "Northward flow velocity"}
     return output
 
 
@@ -874,6 +874,29 @@ class ResponseModel1DDepthTime(BaseModel):
     depth: functions.VariableKeyModel1D
     variables: Dict[str, functions.VariableKeyModel1D]
     @validator('time', each_item=True)
+    def validate_timezone(cls, value):
+        if value.tzinfo is None:
+            raise ValueError('time must have a timezone')
+        return value
+
+class ProductDOY(BaseModel):
+    depth: str
+    variable: str
+
+class MetadataLake1DDOY(BaseModel):
+    name: str
+    products: List[ProductDOY]
+
+class Metadata1DDOY(BaseModel):
+    model: str
+    lakes: List[MetadataLake1DDOY]
+
+class ResponseModel1DDOY(BaseModel):
+    start_time: datetime
+    end_time: datetime
+    depth: functions.VariableKeyModel1D
+    variables: Dict[str, functions.VariableKeyModel1D]
+    @validator('start_time', 'end_time', each_item=True)
     def validate_timezone(cls, value):
         if value.tzinfo is None:
             raise ValueError('time must have a timezone')
@@ -1038,7 +1061,7 @@ def get_one_dimensional_point_simstrat(filesystem, lake, start, end, depth, vari
             out["resample"] = None
         out["time"] = [x.replace(tzinfo=timezone.utc) for x in df["time"].tolist()]
         for v in variables:
-            out["variables"][v] = {"data": functions.filter_parameter(df[v]), "unit": ds[v].units, "description": ds[v].long_name}
+            out["variables"][v] = {"data": functions.filter_variable(df[v]), "unit": ds[v].units, "description": ds[v].long_name}
         return out
 
 
@@ -1067,17 +1090,17 @@ def get_one_dimensional_profile_simstrat(filesystem, lake, time, variables):
     with xr.open_mfdataset(file) as ds:
         for v in variables:
             if v not in ds.variables:
-                raise HTTPException(status_code=400, detail="Parameter {} is not available".format(v))
+                raise HTTPException(status_code=400, detail="Variable {} is not available".format(v))
             if len(ds[v].shape) == 1:
-                raise HTTPException(status_code=400, detail="Parameter {} exists but is not 2D".format(v))
+                raise HTTPException(status_code=400, detail="Variable {} exists but is not 2D".format(v))
         ds['time'] = ds.indexes['time'].tz_localize('UTC')
         time_index = functions.get_closest_index(functions.convert_to_unit(origin, "nano"), ds["time"].values)
         ds = ds.isel(time=time_index)
         depths = ds.depth[:].values * - 1
         out["time"] = ds.time.values
-        out["depth"] = {"data": functions.filter_parameter(depths), "unit": "m", "description": "Distance from the surface to the closest grid point to requested depth"}
+        out["depth"] = {"data": functions.filter_variable(depths), "unit": "m", "description": "Distance from the surface to the closest grid point to requested depth"}
         for v in variables:
-            out["variables"][v] = {"data": functions.filter_parameter(ds[v].values), "unit": ds[v].units, "description": ds[v].long_name}
+            out["variables"][v] = {"data": functions.filter_variable(ds[v].values), "unit": ds[v].units, "description": ds[v].long_name}
         return out
 
 
@@ -1112,42 +1135,57 @@ def get_one_dimensional_depth_time_simstrat(filesystem, lake, start, end, variab
     with xr.open_mfdataset(files) as ds:
         for v in variables:
             if v not in ds.variables:
-                raise HTTPException(status_code=400, detail="Parameter {} is not available".format(v))
+                raise HTTPException(status_code=400, detail="Variable {} is not available".format(v))
             if len(ds[v].shape) == 1:
-                raise HTTPException(status_code=400, detail="Parameter {} exists but is not 2D".format(v))
+                raise HTTPException(status_code=400, detail="Variable {} exists but is not 2D".format(v))
         ds['time'] = ds.indexes['time'].tz_localize('UTC')
         ds = ds.sel(time=slice(start_datetime, end_datetime))
         depths = ds.depth[:].values * - 1
         out["time"] = functions.alplakes_time(ds.time[:].values, "nano")
-        out["depth"] = {"data": functions.filter_parameter(depths), "unit": "m", "description": "Distance from the surface to the closest grid point to requested depth"}
+        out["depth"] = {"data": functions.filter_variable(depths), "unit": "m", "description": "Distance from the surface to the closest grid point to requested depth"}
         for v in variables:
-            out["variables"][v] = {"data": functions.filter_parameter(ds[v][:].values), "unit": ds[v].units, "description": ds[v].long_name}
+            out["variables"][v] = {"data": functions.filter_variable(ds[v][:].values), "unit": ds[v].units, "description": ds[v].long_name}
         return out
 
 
-def get_one_dimensional_day_of_year(filesystem, model, lake, parameter, depth):
+def get_one_dimensional_day_of_year_metadata(filesystem):
+    base_path = os.path.join(filesystem, "media/1dsimulations")
+    output = []
+    for model in os.listdir(base_path):
+        if os.path.exists(os.path.join(base_path, model, "doy")):
+            products = os.listdir(os.path.join(base_path, model, "doy"))
+            if len(products) > 0:
+                lakes = set([p.replace(".json", "").split("_")[0] for p in products])
+                lakes_dict = {l: [] for l in lakes}
+                for product in products:
+                    product_split = product.replace(".json", "").split("_")
+                    lake = product_split[0]
+                    variable = product_split[1]
+                    depth = product_split[2]
+                    lakes_dict[lake].append({"depth": depth, "variable": variable})
+                output.append({
+                    "model": model,
+                    "lakes": [{"name": l, "products": lakes_dict[l]} for l in lakes]
+                })
+    return output
+
+
+def get_one_dimensional_day_of_year(filesystem, model, lake, variable, depth):
     if model == "simstrat":
-        return get_one_dimensional_day_of_year_simstrat(filesystem, lake, parameter, depth)
+        return get_one_dimensional_day_of_year_simstrat(filesystem, lake, variable, depth)
     else:
         raise HTTPException(status_code=400, detail="Apologies not available for {}".format(model))
 
 
-def write_one_dimensional_day_of_year(filesystem, model, lake, parameter, depth):
-    if model == "simstrat":
-        return write_one_dimensional_day_of_year_simstrat(filesystem, lake, parameter, depth)
-    else:
-        raise HTTPException(status_code=400, detail="Apologies not available for {}".format(model))
-
-
-def get_one_dimensional_day_of_year_simstrat(filesystem, lake, parameter, depth):
+def get_one_dimensional_day_of_year_simstrat(filesystem, lake, variable, depth):
     model = "simstrat"
     lakes = os.path.join(filesystem, "media/1dsimulations", model, "results")
     if not os.path.isdir(os.path.join(lakes, lake)):
         raise HTTPException(status_code=400,
                             detail="{} simulation results are not available for {} please select from: [{}]"
                             .format(model, lake, ", ".join(os.listdir(lakes))))
-    doy_file = os.path.join(filesystem, "media/1dsimulations", model, "doy", "{}_{}_{}.json".format(lake, parameter, depth))
-    print(doy_file)
+
+    doy_file = os.path.join(filesystem, "media/1dsimulations", model, "doy", "{}_{}_{}.json".format(lake, variable, depth))
     if os.path.isfile(doy_file):
         with open(doy_file, "r") as f:
             out = json.load(f)
@@ -1156,31 +1194,35 @@ def get_one_dimensional_day_of_year_simstrat(filesystem, lake, parameter, depth)
         raise HTTPException(status_code=400, detail="Apologies DOY has not been computed for your request.")
 
 
-def write_one_dimensional_day_of_year_simstrat(filesystem, lake, parameter, depth):
+def write_one_dimensional_day_of_year(filesystem, model, lake, variable, depth):
+    if model == "simstrat":
+        return write_one_dimensional_day_of_year_simstrat(filesystem, lake, variable, depth)
+    else:
+        raise HTTPException(status_code=400, detail="Apologies not available for {}".format(model))
+
+
+def write_one_dimensional_day_of_year_simstrat(filesystem, lake, variable, depth):
     model = "simstrat"
-    out = {}
     lakes = os.path.join(filesystem, "media/1dsimulations", model, "results")
     if not os.path.isdir(os.path.join(lakes, lake)):
         raise HTTPException(status_code=400,
                             detail="{} simulation results are not available for {} please select from: [{}]"
                             .format(model, lake, ", ".join(os.listdir(lakes))))
-    doy_file = os.path.join(filesystem, "media/1dsimulations", model, "doy",
-                            "{}_{}_{}.json".format(lake, parameter, float(depth)))
     files = [os.path.join(lakes, lake, file) for file in os.listdir(os.path.join(lakes, lake)) if file.endswith(".nc")]
     files.sort()
-    if len(files) > 24:
+    if len(files) > 48:
         files = files[24:]  # Remove first two years as a warmup
     try:
-        for i, file in enumerate(files):
-            with netCDF4.Dataset(file) as nc:
-                if i == 0:
-                    index = functions.get_closest_index(depth, np.array(nc.variables["depth"][:]))
-                    df = pd.DataFrame({'time': nc.variables["time"][:], 'value': nc.variables[parameter][index, :]})
-                else:
-                    df_new = pd.DataFrame({'time': nc.variables["time"][:], 'value': nc.variables[parameter][index, :]})
-                    df = pd.concat([df, df_new])
+        with xr.open_mfdataset(files) as ds:
+            if variable not in ds.variables:
+                raise HTTPException(status_code=400, detail="Variable {} is not available".format(variable))
+            ds['time'] = ds.indexes['time'].tz_localize('UTC')
+            depths = ds.depth.values * -1
+            depth_index = functions.get_closest_index(depth, depths)
+            ds = ds.isel(depth=depth_index)
+            df = pd.DataFrame({'time': ds.time.values, 'value': ds[variable].values})
         last_year = pd.Timestamp.now().year - 1
-        df["time"] = pd.to_datetime(df['time'], unit='s', utc=True)
+        df["time"] = pd.to_datetime(df['time'], unit='ns', utc=True)
         df.set_index('time', inplace=True)
         df = df[:f'{last_year}-12-31']
         grouped = df.groupby(df.index.dayofyear)['value']
@@ -1194,23 +1236,40 @@ def write_one_dimensional_day_of_year_simstrat(filesystem, lake, parameter, dept
         percentile_95_doy = grouped.quantile(0.95)
         df_previous_year = df[f'{last_year}-01-01':f'{last_year}-12-31']
         daily_average_last_year = df_previous_year.groupby(df_previous_year.index.dayofyear)['value'].mean()
-        out["min_date"] = df.index.min().isoformat()
-        out["max_date"] = df.index.max().isoformat()
-        out["doy"] = list(range(1, 367))
-        out["mean"] = functions.filter_parameter(mean_values_doy.values)
-        out["max"] = functions.filter_parameter(max_values_doy.values)
-        out["min"] = functions.filter_parameter(min_values_doy.values)
-        out["std"] = functions.filter_parameter(std_values_doy.values)
-        out["perc5"] = functions.filter_parameter(percentile_5_doy.values)
-        out["perc25"] = functions.filter_parameter(percentile_25_doy.values)
-        out["perc75"] = functions.filter_parameter(percentile_75_doy.values)
-        out["perc95"] = functions.filter_parameter(percentile_95_doy.values)
-        out["lastyear"] = functions.filter_parameter(daily_average_last_year.values)
-
+        output = {
+            "start_time": df.index.min().isoformat(),
+            "end_time": df.index.max().isoformat(),
+            "depth": {"data": depths[depth_index], "unit": "m", "description": "Distance from the surface"},
+            "variables": {
+                "doy": {"data": list(range(1, 367)), "unit": ds[variable].units,
+                        "description": "Numeric day of year (leap year) where 1 = January 1st"},
+                "mean": {"data": functions.filter_variable(mean_values_doy.values), "unit": ds[variable].units,
+                         "description": "Mean daily value across reference period"},
+                "max": {"data": functions.filter_variable(max_values_doy.values), "unit": ds[variable].units,
+                        "description": "Max daily value across reference period"},
+                "min": {"data": functions.filter_variable(min_values_doy.values), "unit": ds[variable].units,
+                        "description": "Min daily value across reference period"},
+                "std": {"data": functions.filter_variable(std_values_doy.values), "unit": ds[variable].units,
+                        "description": "Standard deviation of daily value across reference period"},
+                "perc5": {"data": functions.filter_variable(percentile_5_doy.values), "unit": ds[variable].units,
+                          "description": "5 percent quantile of daily value across reference period"},
+                "perc25": {"data": functions.filter_variable(percentile_25_doy.values), "unit": ds[variable].units,
+                           "description": "25 percent quantile of daily value across reference period"},
+                "perc75": {"data": functions.filter_variable(percentile_75_doy.values), "unit": ds[variable].units,
+                           "description": "75 percent quantile of daily value across reference period"},
+                "perc95": {"data": functions.filter_variable(percentile_95_doy.values), "unit": ds[variable].units,
+                           "description": "95 percent quantile of daily value across reference period"},
+                "lastyear": {"data": functions.filter_variable(daily_average_last_year.values),
+                             "unit": ds[variable].units, "description": "Mean daily value for the last year only"}
+            }
+        }
+        doy_file = os.path.join(filesystem, "media/1dsimulations", model, "doy",
+                                "{}_{}_{}.json".format(lake, variable, float(depths[depth_index])))
         os.makedirs(os.path.dirname(doy_file), exist_ok=True)
         with open(doy_file, "w") as f:
-            json.dump(out, f)
+            json.dump(output, f)
         print("Succeeded in producing DOY for {}".format(lake))
     except Exception as e:
         print(e)
         print("Failed to produce DOY for {}".format(lake))
+        raise HTTPException(status_code=400, detail="Failed to produce DOY for {}_{}_{}".format(lake, variable, float(depths[depth_index])))

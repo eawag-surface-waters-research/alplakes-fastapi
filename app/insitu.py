@@ -17,7 +17,7 @@ class Metadata(BaseModel):
 
 class ResponseModel(BaseModel):
     time: List[datetime]
-    variables: Dict[str, functions.VariableKeyModel1D]
+    variable: functions.VariableKeyModel1D
     @validator('time', each_item=True)
     def validate_timezone(cls, value):
         if value.tzinfo is None:
@@ -56,5 +56,5 @@ def get_insitu_secchi_lake(filesystem, lake):
     out = {"time": df["Time"].to_list(),
            "lat": df["Latitude"].to_list(),
            "lng": df["Longitude"].to_list(),
-           "variables": {"secchi": {"data": df["Secchi depth [m]"].to_list(), "unit": "m", "description": "Secchi depth"}}}
+           "variable": {"data": df["Secchi depth [m]"].to_list(), "unit": "m", "description": "Secchi depth"}}
     return out
