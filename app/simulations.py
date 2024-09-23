@@ -12,8 +12,6 @@ from fastapi.responses import FileResponse
 from datetime import datetime, timedelta, timezone, date
 from dateutil.relativedelta import relativedelta, SU
 
-import matplotlib.pyplot as plt
-
 from app import functions
 
 class MetadataLake(BaseModel):
