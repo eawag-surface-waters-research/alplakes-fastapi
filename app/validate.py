@@ -10,7 +10,7 @@ def path_longitude(example="6.67", description="Longitude (WGS 84)"):
     return Path(..., title="Longitude", ge=-180, le=180, description=description, example=example)
 
 
-def path_time(description="The time in YYYYmmddHHMM format (UTC)", example="202309050300"):
+def path_time(description="The time in YYYYmmddHHMM format (UTC)", example="202304050300"):
     return Path(..., regex=r"^\d{12}$", title="Datetime", description=description, example=example)
 
 
@@ -18,7 +18,7 @@ def path_date(description="The date in YYYYmmdd format", example="20230101"):
     return Path(..., regex=r"^\d{8}$", title="Date", description=description, example=example)
 
 
-def path_month(description="The date in YYYYmm format", example="202301"):
+def path_month(description="The date in YYYYmm format", example="202405"):
     return Path(..., regex=r"^\d{6}$", title="Date", description=description, example=example)
 
 

@@ -6,8 +6,25 @@ import requests
 import numpy as np
 import pandas as pd
 from fastapi import HTTPException
+from typing import Dict, List, Union, Any
+from pydantic import BaseModel
 from datetime import datetime, timedelta, timezone
 from dateutil.relativedelta import relativedelta, SU
+
+
+class VariableKeyModel1D(BaseModel):
+    data: Union[List[Any], float, None]
+    unit: Union[str, None] = None
+    description: Union[str, None] = None
+
+class VariableKeyModel2D(BaseModel):
+    data: List[List[Any]]
+    unit: Union[str, None] = None
+    description: Union[str, None] = None
+
+class TaskResponseModel(BaseModel):
+    message: str
+    status_code: int
 
 
 def convert_to_unit(time, units):
@@ -15,6 +32,8 @@ def convert_to_unit(time, units):
         return (time.replace(tzinfo=timezone.utc) - datetime(2008, 3, 1).replace(tzinfo=timezone.utc)).total_seconds()
     elif units == "seconds since 1970-01-01 00:00:00":
         return time.timestamp()
+    elif units == "nano":
+        return time.timestamp() * 1000000000
     else:
         raise HTTPException(status_code=400,
                             detail="Apologies unable to read NetCDF with time unit: {}".format(units))
@@ -108,7 +127,7 @@ def download_file(url, local):
         shutil.move(local, old)
 
 
-def filter_parameter(x, decimals=3, string=False, nodata=-999.0):
+def filter_variable(x, decimals=3, string=False, nodata=-999.0):
     x = np.asarray(x).astype(float)
     x[x == nodata] = None
     out = np.around(x, decimals=decimals)
@@ -135,7 +154,7 @@ def rotate_velocity(u, v, alpha):
     return u_n, v_e
 
 
-def alplakes_parameter(x):
+def alplakes_variable(x):
     x = np.asarray(x).astype(np.float64)
     x[x == -999.0] = np.nan
     return x
@@ -158,11 +177,10 @@ def alplakes_velocity(u, v, alpha):
 
 
 def alplakes_time(t, units):
-    return np.array([convert_from_unit(x, units).strftime("%Y%m%d%H%M") for x in t])
-
-
-def default_time(t, units):
-    return np.array([convert_from_unit(x, units).replace(tzinfo=timezone.utc) for x in t])
+    try:
+        return [convert_from_unit(x, units).replace(tzinfo=timezone.utc) for x in t]
+    except:
+        return convert_from_unit(t, units).replace(tzinfo=timezone.utc)
 
 
 def unix_time(t, units):
