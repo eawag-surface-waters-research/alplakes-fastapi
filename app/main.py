@@ -446,7 +446,7 @@ async def simulations_point(model: simulations.Models = Path(..., title="Model",
     return simulations.get_simulations_point(filesystem, model, lake, start_time, end_time, depth, lat, lng, variables)
 
 
-@app.get("/simulations/layer/{model}/{lake}/{time}/{depth}", tags=["3D Simulations"])
+@app.get("/simulations/layer/{model}/{lake}/{time}/{depth}", tags=["3D Simulations"], response_model=simulations.ResponseModelLayer)
 async def simulations_layer(model: simulations.Models = Path(..., title="Model", description="Model name"),
                             lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
                             time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202304050300"),
