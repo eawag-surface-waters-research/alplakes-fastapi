@@ -57,7 +57,7 @@ class ResponseModelLayer(BaseModel):
 class ResponseModelAverageLayer(BaseModel):
     time: List[datetime]
     depth: functions.VariableKeyModel1D
-    variables: Dict[str, functions.VariableKeyModel1D]
+    variable: functions.VariableKeyModel1D
     @validator('time', each_item=True)
     def validate_timezone(cls, value):
         if value.tzinfo is None:
@@ -473,9 +473,7 @@ def get_simulations_layer_average_temperature_delft3dflow(filesystem, lake, star
         output = {"time": time,
                   "depth": {"data": depth, "unit": "m",
                             "description": "Distance from the surface to the closest grid point to requested depth"},
-                  "variables": {
-                      "temperature": {"data": functions.filter_variable(t), "unit": "degC", "description": "Water temperature"}
-                  }
+                  "variable": {"data": functions.filter_variable(t), "unit": "degC", "description": "Water temperature"}
                   }
     return output
 
