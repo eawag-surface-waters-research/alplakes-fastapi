@@ -189,7 +189,7 @@ def get_metadata_lake(filesystem, model, lake):
 
         for d in functions.daterange(start_date, end_date, days=7):
             if d.strftime('%Y%m%d') not in combined:
-                missing_dates.append([d.strftime("%Y-%m-%d"), (d + timedelta(days=7)).strftime("%Y-%m-%d")])
+                missing_dates.append(d.strftime("%Y-%m-%d"))
 
         return {"name": lake,
                 "depth": depths,
