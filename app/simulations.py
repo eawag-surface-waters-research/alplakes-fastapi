@@ -259,6 +259,9 @@ def get_simulations_point_delft3dflow(filesystem, lake, start, end, depth, latit
     with xr.open_mfdataset(files) as ds:
         ds['time'] = ds.indexes['time'].tz_localize('UTC')
         ds = ds.sel(time=slice(start_datetime, end_datetime))
+        if len(ds['time']) == 0:
+            raise HTTPException(status_code=400,
+                                detail="No timesteps available between {} and {}".format(start, end))
         z = ds.ZK_LYR[0, :].values * -1 if len(ds.ZK_LYR.shape) == 2 else ds.ZK_LYR[:].values * -1
         depth_index = functions.get_closest_index(depth, z)
         depth = float(z[depth_index])
@@ -463,6 +466,9 @@ def get_simulations_layer_average_temperature_delft3dflow(filesystem, lake, star
     with xr.open_mfdataset(files) as ds:
         ds['time'] = ds.indexes['time'].tz_localize('UTC')
         ds = ds.sel(time=slice(start_datetime, end_datetime))
+        if len(ds['time']) == 0:
+            raise HTTPException(status_code=400,
+                                detail="No timesteps available between {} and {}".format(start, end))
         z = ds.ZK_LYR[0, :].values * -1 if len(ds.ZK_LYR.shape) == 2 else ds.ZK_LYR[:].values * -1
         depth_index = functions.get_closest_index(depth, z)
         depth = float(z[depth_index])
@@ -576,6 +582,9 @@ def get_simulations_depthtime_delft3dflow(filesystem, lake, start, end, latitude
     with xr.open_mfdataset(files) as ds:
         ds['time'] = ds.indexes['time'].tz_localize('UTC')
         ds = ds.sel(time=slice(start_datetime, end_datetime))
+        if len(ds['time']) == 0:
+            raise HTTPException(status_code=400,
+                                detail="No timesteps available between {} and {}".format(start, end))
         lat_grid, lng_grid = functions.coordinates_to_latlng(ds.XZ[:].values, ds.YZ[:].values)
         x_index, y_index, distance = functions.get_closest_location(latitude, longitude, lat_grid, lng_grid)
         t = ds.R1.isel(time=0, M=x_index, N=y_index, LSTSCI=0).values
@@ -748,6 +757,9 @@ def get_simulations_transect_period_delft3dflow(filesystem, lake, start, end, la
     with xr.open_mfdataset(files) as ds:
         ds['time'] = ds.indexes['time'].tz_localize('UTC')
         ds = ds.sel(time=slice(start_datetime, end_datetime))
+        if len(ds['time']) == 0:
+            raise HTTPException(status_code=400,
+                                detail="No timesteps available between {} and {}".format(start, end))
         x = ds.XZ[:].values
         y = ds.YZ[:].values
         if len(ds.ZK_LYR.shape) == 2:
@@ -1036,6 +1048,9 @@ def get_one_dimensional_point_simstrat(filesystem, lake, start, end, depth, vari
                 raise HTTPException(status_code=400, detail="Variables do not have consistent dimensions".format(v))
             dims = len(ds[v].shape)
         ds = ds.sel(time=slice(start_datetime, end_datetime))
+        if len(ds['time']) == 0:
+            raise HTTPException(status_code=400,
+                                detail="No timesteps available between {} and {}".format(start, end))
         out["depth"] = {"data": None, "unit": "m", "description": "Distance from the surface to the closest grid point to requested depth"}
         if len(ds[variables[0]].shape) == 2:
             depths = ds.depth[:].values * - 1
@@ -1136,6 +1151,9 @@ def get_one_dimensional_depth_time_simstrat(filesystem, lake, start, end, variab
                 raise HTTPException(status_code=400, detail="Variable {} exists but is not 2D".format(v))
         ds['time'] = ds.indexes['time'].tz_localize('UTC')
         ds = ds.sel(time=slice(start_datetime, end_datetime))
+        if len(ds['time']) == 0:
+            raise HTTPException(status_code=400,
+                                detail="No timesteps available between {} and {}".format(start, end))
         depths = ds.depth[:].values * - 1
         out["time"] = functions.alplakes_time(ds.time[:].values, "nano")
         out["depth"] = {"data": functions.filter_variable(depths), "unit": "m", "description": "Distance from the surface to the closest grid point to requested depth"}
