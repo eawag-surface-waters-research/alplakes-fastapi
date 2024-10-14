@@ -607,10 +607,14 @@ def get_simulations_depthtime_delft3dflow(filesystem, lake, start, end, latitude
             output["variables"]["temperature"] = {"data": functions.filter_variable(t), "unit": "degC",
                                                   "description": "Water temperature"}
         if "velocity" in variables:
+            if 'time' in ds.ALFAS.coords:
+                alfas = ds.ALFAS.isel(M=x_index, N=y_index).values[np.newaxis, :]
+            else:
+                alfas = np.full(len(time), ds.ALFAS.isel(M=x_index, N=y_index).values)
             u, v, = functions.rotate_velocity(
                 ds.U1.isel(MC=x_index, N=y_index).transpose('KMAXOUT_RESTR', 'time').values,
                 ds.V1.isel(M=x_index, NC=y_index).transpose('KMAXOUT_RESTR', 'time').values,
-                ds.ALFAS.isel(M=x_index, N=y_index).values[np.newaxis, :])
+                alfas)
             output["variables"]["u"] = {"data": functions.filter_variable(u, decimals=5), "unit": "m/s",
                                         "description": "Eastward flow velocity"}
             output["variables"]["v"] = {"data": functions.filter_variable(v, decimals=5), "unit": "m/s",

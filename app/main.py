@@ -23,7 +23,7 @@ origins = [
 ]
 
 description = """
-Alplakes API connects you to lake products produced by the [SURF](https://www.eawag.ch/en/department/surf/) deparement at [EAWAG](https://www.eawag.ch).
+Alplakes API connects you to lake products produced by the [SURF](https://www.eawag.ch/en/department/surf/) department at [EAWAG](https://www.eawag.ch).
 
 This includes terabytes of simulation data and remote sensing products. The API supports geospatial and temporal queries, allowing access to subsets of the data for easier handling.
 
