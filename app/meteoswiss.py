@@ -607,7 +607,6 @@ def get_icon_point_reanalysis(filesystem, model, input_variables, start_date, en
         raise
 
 class VariableKeyModelMeteoMeta(BaseModel):
-    period: str
     unit: str
     description: str
     start_date: date
@@ -625,7 +624,6 @@ class ResponseModelMeteoMeta(BaseModel):
     data_available: bool
 
 class VariableKeyModelMeteo(BaseModel):
-    period: str
     unit: str
     description: str
     data: List[Union[float, None]]
@@ -650,14 +648,15 @@ def get_meteodata_station_metadata(filesystem, station_id):
         "properties": {"station_name": "Homad", "altitude": 2115.0},
         "geometry": {"coordinates": [2665100, 1170100]}
     }]
-    variables_dict = {
-        "pva200h0": {"unit": "hPa", "description": "Vapour pressure 2 m above ground", "period": "hourly mean"},
-        "gre000h0": {"unit": "W/m²", "description": "Global radiation", "period": "hourly mean"},
-        "tre200h0": {"unit": "°C", "description": "Air temperature 2 m above ground", "period": "hourly mean"},
-        "rre150h0": {"unit": "mm", "description": "Precipitation", "period": "hourly total"},
-        "fkl010h0": {"unit": "m/s", "description": "Wind speed scalar", "period": "hourly mean"},
-        "dkl010h0": {"unit": "°", "description": "Wind direction", "period": "hourly mean"},
-        "nto000d0": {"unit": "%", "description": "Cloud cover", "period": "daily mean"}}
+    variables_convert = {
+        "pva200h0": "vapour_pressure",
+        "gre000h0": "global_radiation",
+        "tre200h0": "air_temperature",
+        "rre150h0": "precipitation",
+        "fkl010h0": "wind_speed",
+        "dkl010h0": "wind_direction",
+        "nto000d0": "cloud_cover"}
+    variables_dict = functions.meteostation_variables()
     out = {"id": station_id}
     station_id = station_id.upper()
     station_dir = os.path.join(filesystem, "media/meteoswiss/meteodata", station_id)
@@ -711,25 +710,27 @@ def get_meteodata_station_metadata(filesystem, station_id):
         df = df.loc[:, df.any()]
         variables = list(df.columns[2:])
         for p in variables:
-            if p in variables_dict:
-                d = variables_dict[p]
+            if variables_convert[p] in variables_dict:
+                d = variables_dict[variables_convert[p]]
                 d["start_date"] = datetime.strptime(str(min(df.loc[df[p], 'Date'])), "%Y%m%d%H").replace(
                     tzinfo=timezone.utc).strftime("%Y-%m-%d")
                 d["end_date"] = datetime.strptime(str(max(df.loc[df[p], 'Date'])), "%Y%m%d%H").replace(
                     tzinfo=timezone.utc).strftime("%Y-%m-%d")
-                out["variables"][p] = d
+                out["variables"][variables_convert[p]] = d
     return out
 
 
 def get_meteodata_measured(filesystem, station_id, variables, start_date, end_date):
-    variables_dict = {
-        "pva200h0": {"unit": "hPa", "description": "Vapour pressure 2 m above ground", "period": "hourly mean"},
-        "gre000h0": {"unit": "W/m²", "description": "Global radiation", "period": "hourly mean"},
-        "tre200h0": {"unit": "°C", "description": "Air temperature 2 m above ground", "period": "hourly mean"},
-        "rre150h0": {"unit": "mm", "description": "Precipitation", "period": "hourly total"},
-        "fkl010h0": {"unit": "m/s", "description": "Wind speed scalar", "period": "hourly mean"},
-        "dkl010h0": {"unit": "°", "description": "Wind direction", "period": "hourly mean"},
-        "nto000d0": {"unit": "%", "description": "Cloud cover", "period": "daily mean"}}
+    variables_convert = {
+        "pva200h0": "vapour_pressure",
+        "gre000h0": "global_radiation",
+        "tre200h0": "air_temperature",
+        "rre150h0": "precipitation",
+        "fkl010h0": "wind_speed",
+        "dkl010h0": "wind_direction",
+        "nto000d0": "cloud_cover"}
+    variables_adjust = {}
+    variables_dict = functions.meteostation_variables()
     station_id = station_id.upper()
     station_dir = os.path.join(filesystem, "media/meteoswiss/meteodata", station_id)
     if not os.path.exists(station_dir):
@@ -740,6 +741,7 @@ def get_meteodata_measured(filesystem, station_id, variables, start_date, end_da
     files = [os.path.join(station_dir, f) for f in files if
              int(start_date[:4]) <= int(f.split(".")[1]) <= int(end_date[:4]) and f.endswith(".csv")]
     df = pd.concat(map(pd.read_csv, files), ignore_index=True)
+    df = df.rename(columns=variables_convert)
     for v in variables:
         if v not in df.columns:
             raise HTTPException(status_code=400,
@@ -747,6 +749,9 @@ def get_meteodata_measured(filesystem, station_id, variables, start_date, end_da
     df["time"] = pd.to_datetime(df['Date'], format='%Y%m%d%H', utc=True)
     df[variables] = df[variables].apply(lambda x: pd.to_numeric(x, errors='coerce').round(1))
     df = df.dropna(how='all')
+    for v in variables:
+        if v in variables_adjust:
+            df[v] = variables_adjust[v](df[v])
     start = datetime.strptime(start_date, '%Y%m%d').replace(tzinfo=timezone.utc).isoformat()
     end = (datetime.strptime(end_date, '%Y%m%d').replace(tzinfo=timezone.utc) + timedelta(days=1)).isoformat()
     selected = df[(df['time'] >= start) & (df['time'] < end)]
@@ -757,8 +762,7 @@ def get_meteodata_measured(filesystem, station_id, variables, start_date, end_da
     for v in variables:
         output["variables"][v] = {"data": functions.filter_variable(list(selected[v])),
                                   "unit": variables_dict[v]["unit"],
-                                  "description": variables_dict[v]["description"],
-                                  "period": variables_dict[v]["period"]}
+                                  "description": variables_dict[v]["description"]}
     return output
 
 

@@ -105,7 +105,63 @@ def test_meteoswiss_meteodata_measured():
     response = client.get("/meteoswiss/meteodata/measured/PUY/20230101/20240210")
     assert response.status_code == 200
     data = response.json()
-    assert isinstance(data["variables"]["pva200h0"]["data"][0], float)
+    assert isinstance(data["variables"]["air_temperature"]["data"][0], float)
+    assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
+
+
+def test_arso_meteodata_station_metadata_station():
+    response = client.get("/arso/meteodata/metadata/2213")
+    assert response.status_code == 200
+    assert isinstance(response.json(), dict)
+
+
+def test_arso_meteodata_measured():
+    response = client.get("/arso/meteodata/measured/2213/20230101/20240210")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data["variables"]["air_temperature"]["data"][0], float)
+    assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
+
+
+def test_thredds_meteodata_station_metadata_station():
+    response = client.get("/thredds/meteodata/metadata/73329001")
+    assert response.status_code == 200
+    assert isinstance(response.json(), dict)
+
+
+def test_thredds_meteodata_measured():
+    response = client.get("/thredds/meteodata/measured/73329001/20230101/20240210")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data["variables"]["air_temperature"]["data"][0], float)
+    assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
+
+
+def test_mistral_meteodata_station_metadata_station():
+    response = client.get("/mistral/meteodata/metadata/trn196")
+    assert response.status_code == 200
+    assert isinstance(response.json(), dict)
+
+
+def test_mistral_meteodata_measured():
+    response = client.get("/mistral/meteodata/measured/trn196/20230101/20240210")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data["variables"]["air_temperature"]["data"][0], float)
+    assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
+
+
+def test_geosphere_meteodata_station_metadata_station():
+    response = client.get("/geosphere/meteodata/metadata/6512")
+    assert response.status_code == 200
+    assert isinstance(response.json(), dict)
+
+
+def test_geosphere_meteodata_measured():
+    response = client.get("/geosphere/meteodata/measured/6512/20230101/20240210")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data["variables"]["air_temperature"]["data"][0], float)
     assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
 
 

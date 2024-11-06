@@ -51,6 +51,28 @@ def convert_from_unit(time, units):
                             detail="Apologies unable to read NetCDF with time unit: {}".format(units))
 
 
+def meteostation_variables():
+    return {
+        "air_pressure": {"unit": "hpa", "description": "Air pressure 2 m above ground", "agg": "mean"},
+        "relative_humidity": {"unit": "%", "description": "Relative humidity 2 m above ground", "agg": "mean"},
+        "vapour_pressure": {"unit": "hPa", "description": "Vapour pressure 2 m above ground", "agg": "mean"},
+        "global_radiation": {"unit": "W/m²", "description": "Global radiation", "agg": "mean"},
+        "air_temperature": {"unit": "°C", "description": "Air temperature 2 m above ground", "agg": "mean"},
+        "precipitation": {"unit": "mm", "description": "Precipitation", "agg": "sum"},
+        "wind_speed": {"unit": "m/s", "description": "Wind speed scalar", "agg": "mean"},
+        "wind_direction": {"unit": "°", "description": "Wind direction", "agg": "mean"},
+        "cloud_cover": {"unit": "%", "description": "Cloud cover", "agg": "mean"}
+    }
+
+def kelvin_to_celsius(x):
+    return x - 273.15
+
+def hourly_joules_to_watts(x):
+    return x / 3600
+
+def negative_to_zero(x):
+    return np.where(x < 0, 0, x)
+
 def get_closest_index(value, array):
     array = np.asarray(array)
     sorted_array = np.sort(array)

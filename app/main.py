@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, List, Union, Any
 import sentry_sdk
 
-from app import simulations, meteoswiss, bafu, remotesensing, insitu, validate
+from app import simulations, meteoswiss, bafu, remotesensing, insitu, validate, thredds, geosphere, arso, mistral
 
 import os
 
@@ -305,25 +305,199 @@ if internal:
                                             start_date: str = validate.path_date(description="The start date in YYYYmmdd format"),
                                             end_date: str = validate.path_date(description="The end date in YYYYmmdd format"),
                                             variables: list[str] = Query(
-                                                  default=["pva200h0", "gre000h0", "tre200h0", "rre150h0", "fkl010h0",
-                                                           "dkl010h0", "nto000d0"])):
+                                                  default=["vapour_pressure", "global_radiation", "air_temperature", "precipitation", "wind_speed",
+                                                           "wind_direction"])):
         """
         Meteorological data from the automatic measuring network of MeteoSwiss.
 
-        Available variables:
-        - pva200h0 (hPa): Vapour pressure 2 m above ground; hourly mean
-        - gre000h0 (W/m²): Global radiation; hourly mean
-        - tre200h0 (°C): Air temperature 2 m above ground; hourly mean
-        - rre150h0 (mm): Precipitation; hourly total
-        - fkl010h0 (m/s): Wind speed scalar; hourly mean
-        - dkl010h0 (°): Wind direction; hourly mean
-        - nto000d0 (%): Cloud cover; daily mean
+        See metadata endpoint for available variables.
 
         ⚠️ **Warning**: If your request returns a 502 timeout error reduce the period you are requesting.
         For longer durations, it is recommended to make multiple requests with shorter intervals between them.
         """
         validate.date_range(start_date, end_date)
         return meteoswiss.get_meteodata_measured(filesystem, station_id, variables, start_date, end_date)
+
+if internal:
+    @app.get("/thredds/meteodata/metadata", tags=["Thredds"], response_class=RedirectResponse,
+             response_description="Redirect to a GeoJSON file")
+    async def thredds_meteodata_metadata():
+        """
+        Metadata for all available Thredds metreological stations (France).
+        """
+        return RedirectResponse(
+            "https://alplakes-eawag.s3.eu-central-1.amazonaws.com/static/thredds/thredds_meteodata.json")
+
+
+    @app.get("/thredds/meteodata/metadata/{station_id}", tags=["Thredds"],
+             response_model=thredds.ResponseModelMeteoMeta)
+    async def thredds_meteodata_station_metadata(
+            station_id: str = Path(..., title="Station ID", example="73329001",
+                                   description="Station identification code")):
+        """
+        Meteorological data from the automatic measuring network of Thredds (France).
+
+        Metadata for a specific station.
+        """
+        return thredds.get_meteodata_station_metadata(filesystem, station_id)
+
+
+    @app.get("/thredds/meteodata/measured/{station_id}/{start_date}/{end_date}", tags=["Thredds"],
+             response_model=thredds.ResponseModelMeteo)
+    async def thredds_meteodata_measured(
+            station_id: str = Path(..., title="Station ID", example="73329001",
+                                   description="Station identification code"),
+            start_date: str = validate.path_date(description="The start date in YYYYmmdd format"),
+            end_date: str = validate.path_date(description="The end date in YYYYmmdd format"),
+            variables: list[str] = Query(
+                default=["air_temperature", "relative_humidity", "wind_speed", "wind_direction", "precipitation",
+                         "global_radiation"])):
+        """
+        Meteorological data from the automatic measuring network of Thredds (France).
+
+        See metadata endpoint for available variables.
+
+        ⚠️ **Warning**: If your request returns a 502 timeout error reduce the period you are requesting.
+        For longer durations, it is recommended to make multiple requests with shorter intervals between them.
+        """
+        validate.date_range(start_date, end_date)
+        return thredds.get_meteodata_measured(filesystem, station_id, variables, start_date, end_date)
+
+if internal:
+    @app.get("/arso/meteodata/metadata", tags=["ARSO"], response_class=RedirectResponse,
+             response_description="Redirect to a GeoJSON file")
+    async def arso_meteodata_metadata():
+        """
+        Metadata for all available ARSO metreological stations (Slovenia).
+        """
+        return RedirectResponse(
+            "https://alplakes-eawag.s3.eu-central-1.amazonaws.com/static/arso/arso_meteodata.json")
+
+
+    @app.get("/arso/meteodata/metadata/{station_id}", tags=["ARSO"],
+             response_model=arso.ResponseModelMeteoMeta)
+    async def arso_meteodata_station_metadata(
+            station_id: str = Path(..., title="Station ID", example="2213",
+                                   description="Station identification code")):
+        """
+        Meteorological data from the automatic measuring network of ARSO (Slovenia).
+
+        Metadata for a specific station.
+        """
+        return arso.get_meteodata_station_metadata(filesystem, station_id)
+
+
+    @app.get("/arso/meteodata/measured/{station_id}/{start_date}/{end_date}", tags=["ARSO"],
+             response_model=arso.ResponseModelMeteo)
+    async def arso_meteodata_measured(
+            station_id: str = Path(..., title="Station ID", example="2213",
+                                   description="Station identification code"),
+            start_date: str = validate.path_date(description="The start date in YYYYmmdd format"),
+            end_date: str = validate.path_date(description="The end date in YYYYmmdd format"),
+            variables: list[str] = Query(
+                default=["air_pressure", "air_temperature", "relative_humidity", "wind_speed", "wind_direction", "precipitation",
+                         "global_radiation"])):
+        """
+        Meteorological data from the automatic measuring network of ARSO (Slovenia).
+
+        See metadata endpoint for available variables.
+
+        ⚠️ **Warning**: If your request returns a 502 timeout error reduce the period you are requesting.
+        For longer durations, it is recommended to make multiple requests with shorter intervals between them.
+        """
+        validate.date_range(start_date, end_date)
+        return arso.get_meteodata_measured(filesystem, station_id, variables, start_date, end_date)
+
+if internal:
+    @app.get("/mistral/meteodata/metadata", tags=["Mistral"], response_class=RedirectResponse,
+             response_description="Redirect to a GeoJSON file")
+    async def mistral_meteodata_metadata():
+        """
+        Metadata for all available Mistral metreological stations (Italy).
+        """
+        return RedirectResponse(
+            "https://alplakes-eawag.s3.eu-central-1.amazonaws.com/static/mistral/mistral_meteodata.json")
+
+
+    @app.get("/mistral/meteodata/metadata/{station_id}", tags=["Mistral"],
+             response_model=mistral.ResponseModelMeteoMeta)
+    async def mistral_meteodata_station_metadata(
+            station_id: str = Path(..., title="Station ID", example="trn196",
+                                   description="Station identification code")):
+        """
+        Meteorological data from the automatic measuring network of Mistral (Italy).
+
+        Metadata for a specific station.
+        """
+        return mistral.get_meteodata_station_metadata(filesystem, station_id)
+
+
+    @app.get("/mistral/meteodata/measured/{station_id}/{start_date}/{end_date}", tags=["Mistral"],
+             response_model=mistral.ResponseModelMeteo)
+    async def mistral_meteodata_measured(
+            station_id: str = Path(..., title="Station ID", example="trn196",
+                                   description="Station identification code"),
+            start_date: str = validate.path_date(description="The start date in YYYYmmdd format"),
+            end_date: str = validate.path_date(description="The end date in YYYYmmdd format"),
+            variables: list[str] = Query(
+                default=["air_temperature", "relative_humidity", "wind_speed", "wind_direction", "global_radiation"])):
+        """
+        Meteorological data from the automatic measuring network of Mistral (Italy).
+
+        See metadata endpoint for available variables.
+
+        ⚠️ **Warning**: If your request returns a 502 timeout error reduce the period you are requesting.
+        For longer durations, it is recommended to make multiple requests with shorter intervals between them.
+        """
+        validate.date_range(start_date, end_date)
+        return mistral.get_meteodata_measured(filesystem, station_id, variables, start_date, end_date)
+
+
+if internal:
+    @app.get("/geosphere/meteodata/metadata", tags=["GeoSphere"], response_class=RedirectResponse,
+             response_description="Redirect to a GeoJSON file")
+    async def geosphere_meteodata_metadata():
+        """
+        Metadata for all available GeoSphere metreological stations (Austria).
+        """
+        return RedirectResponse(
+            "https://alplakes-eawag.s3.eu-central-1.amazonaws.com/static/geosphere/geosphere_meteodata.json")
+
+
+    @app.get("/geosphere/meteodata/metadata/{station_id}", tags=["GeoSphere"],
+             response_model=geosphere.ResponseModelMeteoMeta)
+    async def geosphere_meteodata_station_metadata(
+            station_id: str = Path(..., title="Station ID", example="6512",
+                                   description="Station identification code")):
+        """
+        Meteorological data from the automatic measuring network of GeoSphere (Austria).
+
+        Metadata for a specific station.
+        """
+        return geosphere.get_meteodata_station_metadata(filesystem, station_id)
+
+
+    @app.get("/geosphere/meteodata/measured/{station_id}/{start_date}/{end_date}", tags=["GeoSphere"],
+             response_model=geosphere.ResponseModelMeteo)
+    async def geosphere_meteodata_measured(
+            station_id: str = Path(..., title="Station ID", example="6512",
+                                   description="Station identification code"),
+            start_date: str = validate.path_date(description="The start date in YYYYmmdd format"),
+            end_date: str = validate.path_date(description="The end date in YYYYmmdd format"),
+            variables: list[str] = Query(
+                default=["air_temperature", "relative_humidity", "wind_speed", "wind_direction", "precipitation",
+                         "global_radiation", "air_pressure"]),
+            resample: Union[geosphere.ResampleOptions, None] = None):
+        """
+        Meteorological data from the automatic measuring network of GeoSphere (Austria).
+
+        See metadata endpoint for available variables.
+
+        ⚠️ **Warning**: If your request returns a 502 timeout error reduce the period you are requesting.
+        For longer durations, it is recommended to make multiple requests with shorter intervals between them.
+        """
+        validate.date_range(start_date, end_date)
+        return geosphere.get_meteodata_measured(filesystem, station_id, variables, start_date, end_date, resample)
 
 if internal:
     @app.get("/bafu/hydrodata/metadata", tags=["Bafu"], response_class=RedirectResponse, response_description="Redirect to a GeoJSON file")
@@ -607,6 +781,9 @@ async def one_dimensional_simulations_point(
     Timeseries for a given location and depth.
 
     See the metadata endpoints for list of available variables.
+
+     ⚠️ **Warning**: If your request returns a 502 timeout error reduce the period you are requesting.
+        For longer durations, it is recommended to make multiple requests with shorter intervals between them.
     """
     validate.time_range(start_time, end_time)
     return simulations.get_one_dimensional_point(filesystem, model, lake, start_time, end_time, depth, variables, resample)
@@ -634,6 +811,9 @@ async def one_dimensional_simulations_depth_time(
         variables: list[str] = Query(default=["T"])):
     """
     Vertical profile for a specific **period**.
+
+     ⚠️ **Warning**: If your request returns a 502 timeout error reduce the period you are requesting.
+        For longer durations, it is recommended to make multiple requests with shorter intervals between them.
     """
     validate.time_range(start_time, end_time)
     return simulations.get_one_dimensional_depth_time(filesystem, model, lake, start_time, end_time, variables)
