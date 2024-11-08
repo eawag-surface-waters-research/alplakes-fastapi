@@ -69,8 +69,8 @@ def get_meteodata_station_metadata(filesystem, station_id):
         raise HTTPException(status_code=400, detail="Station ID {} not recognised".format(station_id))
     out["name"] = data["properties"]["station_name"]
     out["elevation"] = float(data["properties"]["altitude"])
-    out["lat"] = data["geometry"]["coordinates"][0]
-    out["lng"] = data["geometry"]["coordinates"][1]
+    out["lat"] = data["geometry"]["coordinates"][1]
+    out["lng"] = data["geometry"]["coordinates"][0]
     out["variables"] = {}
     out["data_available"] = False
     if os.path.exists(station_dir):
