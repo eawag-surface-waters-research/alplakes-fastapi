@@ -53,7 +53,7 @@ def get_insitu_secchi_lake(filesystem, lake):
                                                     "the metadata endpoint".format(lake))
     df = pd.read_csv(file_path)
     df["Time"] = pd.to_datetime(df["Time"], utc=True).dt.to_pydatetime()
-    df = df.dropna()
+    df = df.dropna(subset=['Secchi depth [m]'])
     out = {"time": df["Time"].to_list(),
            "lat": df["Latitude"].to_list(),
            "lng": df["Longitude"].to_list(),
