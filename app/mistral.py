@@ -99,7 +99,8 @@ def get_meteodata_measured(filesystem, station_id, variables, start_date, end_da
         "B12101": "air_temperature",
         "B13003": "relative_humidity",
         "B11001": "wind_direction",
-        "B11002": "wind_speed"}
+        "B11002": "wind_speed",
+        "B13011": "precipitation"}
     variables_adjust = {
         "air_temperature": functions.kelvin_to_celsius,
         "global_radiation": functions.negative_to_zero
