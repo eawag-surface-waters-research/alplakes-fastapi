@@ -48,7 +48,8 @@ def get_meteodata_station_metadata(filesystem, station_id):
         "B12101": "air_temperature",
         "B13003": "relative_humidity",
         "B11001": "wind_direction",
-        "B11002": "wind_speed"}
+        "B11002": "wind_speed",
+        "B13011": "precipitation"}
     variables_dict = functions.meteostation_variables()
     out = {"id": station_id}
     station_dir = os.path.join(filesystem, "media/mistral/meteodata", station_id)
