@@ -1203,9 +1203,13 @@ def get_one_dimensional_day_of_year_simstrat(filesystem, lake, variable, depth):
                             detail="{} simulation results are not available for {} please select from: [{}]"
                             .format(model, lake, ", ".join(os.listdir(lakes))))
 
-    doy_file = os.path.join(filesystem, "media/1dsimulations", model, "doy", "{}_{}_{}.json".format(lake, variable, depth))
-    if os.path.isfile(doy_file):
-        with open(doy_file, "r") as f:
+    doy_files = os.listdir(os.path.join(filesystem, "media/1dsimulations", model, "doy"))
+    filtered_doy_files = [f for f in doy_files
+                          if "{}_{}_".format(lake, variable) in f
+                          and abs(float(f.replace(".json", "").split("_")[-1]) - float(depth)) < 0.1]
+
+    if len(filtered_doy_files) > 0:
+        with open(os.path.join(filesystem, "media/1dsimulations", model, "doy", filtered_doy_files[0]), "r") as f:
             out = json.load(f)
         return out
     else:
