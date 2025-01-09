@@ -864,7 +864,7 @@ async def remote_sensing_metadata():
     """
     Directory of remote sensing product types, organised by lake, satellite and variable.
     """
-    return RedirectResponse("https://eawagrs.s3.eu-central-1.amazonaws.com/metadata/metadata.json")
+    return RedirectResponse("https://eawagrs.s3.eu-central-1.amazonaws.com/alplakes/metadata/summary.json")
 
 
 @app.get("/remotesensing/products/{lake}/{satellite}/{variable}", tags=["Remote Sensing"], response_class=RedirectResponse, response_description="Redirect to a GeoJSON file")
@@ -875,4 +875,4 @@ async def remote_sensing_products(lake: simulations.Lakes = Path(..., title="Lak
     Metadata for full time series of remote sensing products for a given lake, satellite and variable.
     See /remotesensing/metadata for input options.
     """
-    return RedirectResponse("https://eawagrs.s3.eu-central-1.amazonaws.com/metadata/{}/{}_{}_public.json".format(satellite, lake, variable))
+    return RedirectResponse("https://eawagrs.s3.eu-central-1.amazonaws.com/alplakes/metadata/{}/{}/{}_public.json".format(satellite, lake, variable))
