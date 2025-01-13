@@ -666,6 +666,21 @@ async def simulations_layer_average_temperature(model: simulations.Models = Path
     return simulations.get_simulations_layer_average_temperature(filesystem, model, lake, start_time, end_time, depth)
 
 
+@app.get("/simulations/layer/average_bottom_temperature/{model}/{lake}/{start_time}/{end_time}", tags=["3D Simulations"], response_model=simulations.ResponseModelAverageBottom)
+async def simulations_layer_average_temperature(model: simulations.Models = Path(..., title="Model", description="Model name"),
+                                                lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
+                                                start_time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202304050300"),
+                                                end_time: str = validate.path_time(description="The end time in YYYYmmddHHMM format (UTC)", example="202304112300")):
+    """
+    Mean bottom temperature for a given time period.
+
+    ⚠️ **Warning**: If your request returns a 502 timeout error reduce the period you are requesting.
+    For longer durations, it is recommended to make multiple requests with shorter intervals between them.
+    """
+    validate.time_range(start_time, end_time)
+    return simulations.get_simulations_average_bottom_temperature(filesystem, model, lake, start_time, end_time)
+
+
 @app.get("/simulations/profile/{model}/{lake}/{time}/{lat}/{lng}", tags=["3D Simulations"], response_model=simulations.ResponseModelProfile)
 async def simulations_profile(model: simulations.Models = Path(..., title="Model", description="Model name"),
                               lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),

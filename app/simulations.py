@@ -65,6 +65,12 @@ class ResponseModelAverageLayer(BaseModel):
         return value
 
 
+class ResponseModelAverageBottom(BaseModel):
+    lat: List[List[Any]]
+    lng: List[List[Any]]
+    variable: functions.VariableKeyModel1D
+
+
 class ResponseModelProfile(BaseModel):
     time: datetime
     lat: float
@@ -480,6 +486,60 @@ def get_simulations_layer_average_temperature_delft3dflow(filesystem, lake, star
                   "depth": {"data": depth, "unit": "m",
                             "description": "Distance from the surface to the closest grid point to requested depth"},
                   "variable": {"data": functions.filter_variable(t), "unit": "degC", "description": "Water temperature"}
+                  }
+    return output
+
+
+def get_simulations_average_bottom_temperature(filesystem, model, lake, start, end):
+    if model == "delft3d-flow":
+        return get_simulations_average_bottom_temperature_delft3dflow(filesystem, lake, start, end)
+    else:
+        raise HTTPException(status_code=400,
+                            detail="Apologies data is not available for {}".format(model))
+
+
+def get_simulations_average_bottom_temperature_delft3dflow(filesystem, lake, start, end, nodata=-999.0):
+    model = "delft3d-flow"
+    lakes = os.path.join(filesystem, "media/simulations", model, "results")
+    if not os.path.isdir(os.path.join(lakes, lake)):
+        raise HTTPException(status_code=400,
+                            detail="{} simulation results are not available for {} please select from: [{}]"
+                            .format(model, lake, ", ".join(os.listdir(lakes))))
+    weeks = functions.sundays_between_dates(datetime.strptime(start[0:8], "%Y%m%d").replace(tzinfo=timezone.utc),
+                                            datetime.strptime(end[0:8], "%Y%m%d").replace(tzinfo=timezone.utc))
+    files = [os.path.join(lakes, lake, "{}.nc".format(week.strftime("%Y%m%d"))) for week in weeks]
+
+    for i, file in enumerate(files):
+        if not os.path.isfile(file):
+            raise HTTPException(status_code=400,
+                                detail="Apologies data is not available for {} week starting {}".format(lake, weeks[i]))
+
+    start_datetime = datetime.strptime(start[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
+    end_datetime = datetime.strptime(end[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
+
+    with xr.open_mfdataset(files) as ds:
+        ds['time'] = ds.indexes['time'].tz_localize('UTC')
+        ds = ds.sel(time=slice(start_datetime, end_datetime))
+        if len(ds['time']) == 0:
+            raise HTTPException(status_code=400,
+                                detail="No timesteps available between {} and {}".format(start, end))
+
+        t = ds["R1"].values[:, 0, :]
+        t[t == nodata] = np.nan
+        valid_mask = ~np.isnan(t[0])
+        bottom_indices = np.argmax(valid_mask, axis=0)
+        no_valid_data_mask = ds["KCS"].values == 0
+        if len(no_valid_data_mask.shape) > 2:
+            no_valid_data_mask = no_valid_data_mask[0]
+        bottom_indices[no_valid_data_mask] = -1
+        rows, cols = np.meshgrid(np.arange(t.shape[2]), np.arange(t.shape[3]), indexing='ij')
+        result = np.nanmean(t[:, bottom_indices, rows, cols], axis=0)
+
+        lat_grid, lng_grid = functions.coordinates_to_latlng(ds["XZ"].values, ds["YZ"].values)
+
+        output = {"variable": {"data": functions.filter_variable(result), "unit": "degC", "description": "Average bottom temperature"},
+                  "lat": functions.filter_variable(lat_grid, decimals=5, nodata=np.nan),
+                  "lng": functions.filter_variable(lng_grid, decimals=5, nodata=np.nan),
                   }
     return output
 

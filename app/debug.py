@@ -13,7 +13,7 @@ import simulations
 
 filesystem = "../filesystem"
 
-function = "simulations.get_one_dimensional_day_of_year_metadata"
+function = "simulations.get_simulations_average_bottom_temperature"
 
 if function == "meteoswiss.get_cosmo_metadata":
     data = meteoswiss.get_cosmo_metadata(filesystem)
@@ -108,6 +108,14 @@ if function == "simulations.get_simulations_layer":
 if function == "simulations.get_simulations_layer_average_temperature":
     data = simulations.get_simulations_layer_average_temperature(filesystem, "delft3d-flow", "geneva", "202304050300", "202304112300", 1)
     plt.plot(data["time"], data["variables"]["temperature"]["data"])
+    plt.show()
+
+if function == "simulations.get_simulations_average_bottom_temperature":
+    data = simulations.get_simulations_average_bottom_temperature(filesystem, "delft3d-flow", "geneva",
+                                                                 "202304050300", "202304112300")
+    temperature = np.array(data["variable"]["data"], dtype=float)
+    plt.imshow(temperature, cmap='viridis', interpolation='none')
+    plt.colorbar()
     plt.show()
 
 if function == "simulations.get_simulations_profile":

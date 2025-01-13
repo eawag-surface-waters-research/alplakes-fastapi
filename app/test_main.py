@@ -251,6 +251,15 @@ def test_simulations_layer_average_temperature():
     assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
 
 
+def test_simulations_average_bottom_temperature():
+    response = client.get("/simulations/layer/average_bottom_temperature/delft3d-flow/geneva/202304050300/202304112300")
+    assert response.status_code == 200
+    data = response.json()
+    assert "lat" in data
+    assert "lng" in data
+    assert "variable" in data
+
+
 def test_simulations_simulations_profile():
     response = client.get("/simulations/profile/delft3d-flow/geneva/202304050300/46.5/6.67")
     assert response.status_code == 200
