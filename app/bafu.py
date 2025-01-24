@@ -76,7 +76,10 @@ def get_hydrodata_station_metadata(filesystem, station_id):
     for variable in os.listdir(station_dir):
         d = {}
         properties = next((p for p in variable_types if p["substring"] in variable.lower()), None)
-        if not properties == None:
+        if properties == None:
+            d["unit"] = "NA"
+            d["description"] = "NA"
+        else:
             d["unit"] = properties["unit"]
             d["description"] = properties["description"]
         files = os.listdir(os.path.join(station_dir, variable))
@@ -138,7 +141,10 @@ def get_hydrodata_measured(filesystem, station_id, variable, start_date, end_dat
                             detail="Not data available between {} and {}".format(start_date, end_date))
     properties = next((p for p in variable_types if p["substring"] in variable.lower()), None)
     d = {"data": list(df[variable_column_name])}
-    if not properties == None:
+    if properties == None:
+        d["unit"] = "NA"
+        d["description"] = "NA"
+    else:
         d["unit"] = properties["unit"]
         d["description"] = properties["description"]
     return {"time": list(df["time"]), "variable": d}
