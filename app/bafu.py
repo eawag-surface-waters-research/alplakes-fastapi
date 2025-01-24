@@ -39,7 +39,7 @@ class ResponseModel(BaseModel):
 def get_hydrodata_station_metadata(filesystem, station_id):
     variable_types = [
         {"substring": "pegel", "unit": "m a.s.l", "description": "Water level above sea level"},
-        {"substring": "abfluss", "unit": "m3", "description": "Water discharge"},
+        {"substring": "abfluss", "unit": "m3/s", "description": "Water discharge"},
         {"substring": "phwert", "unit": "", "description": "Water pH"},
         {"substring": "wassertemperatur", "unit": "degC", "description": "Water temperature"},
         {"substring": "sauerstoff", "unit": "mg/l", "description": "Dissolved oxygen concentration"},
@@ -103,7 +103,7 @@ class ResampleOptions(str, Enum):
 def get_hydrodata_measured(filesystem, station_id, variable, start_date, end_date, resample=None):
     variable_types = [
         {"substring": "pegel", "unit": "m a.s.l", "description": "Water level above sea level"},
-        {"substring": "abfluss", "unit": "m3", "description": "Water discharge"},
+        {"substring": "abfluss", "unit": "m3/s", "description": "Water discharge"},
         {"substring": "phwert", "unit": "", "description": "Water pH"},
         {"substring": "wassertemperatur", "unit": "degC", "description": "Water temperature"},
         {"substring": "sauerstoff", "unit": "mg/l", "description": "Dissolved oxygen concentration"},
