@@ -883,7 +883,7 @@ async def remote_sensing_metadata():
 
 
 @app.get("/remotesensing/products/{lake}/{satellite}/{variable}", tags=["Remote Sensing"], response_class=RedirectResponse, response_description="Redirect to a GeoJSON file")
-async def remote_sensing_products(lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
+async def remote_sensing_products(lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
                                   satellite: remotesensing.Satellites = Path(..., title="Satellite", description="Satellite name"),
                                   variable: str = Path(..., title="Variable", description="Variable", example="chla")):
     """
