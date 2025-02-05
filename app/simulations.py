@@ -896,17 +896,6 @@ class SimstratResampleOptions(str, Enum):
     monthly = "monthly"
     yearly = "yearly"
 
-class MetadataLake1D(BaseModel):
-    name: str
-    depth: List[float]
-    start_date: date
-    end_date: date
-    missing_dates: List[date]
-
-class Metadata1D(BaseModel):
-    model: str
-    lakes: List[MetadataLake1D]
-
 class MetadataKeyModel1D(BaseModel):
     unit: Union[str, None] = None
     description: Union[str, None] = None
@@ -919,6 +908,10 @@ class MetadataLake1DDetail(BaseModel):
     end_date: date
     missing_dates: List[date]
     variables: Dict[str, MetadataKeyModel1D]
+
+class Metadata1D(BaseModel):
+    model: str
+    lakes: List[MetadataLake1DDetail]
 
 class ResponseModel1DPoint(BaseModel):
     time: List[datetime]
@@ -1002,6 +995,17 @@ def get_one_dimensional_metadata(filesystem):
                     depths.sort()
                     depths = [float("%.2f" % d) for d in depths]
 
+                    variables = {}
+                    for var in nc.variables:
+                        if var not in ["time", "depth"]:
+                            long_name = nc.variables[var].long_name if 'long_name' in nc.variables[
+                                var].ncattrs() else var
+                            variables[var] = {
+                                "description": long_name,
+                                "unit": nc.variables[var].units,
+                                "dimensions": nc.variables[var].dimensions
+                            }
+
                 for d in functions.monthrange(start_date, end_date, months=1):
                     if d.strftime('%Y%m') not in combined:
                         missing_dates.append(d.strftime("%Y-%m"))
@@ -1010,7 +1014,8 @@ def get_one_dimensional_metadata(filesystem):
                                    "depth": depths,
                                    "start_date": start_date.strftime("%Y-%m-%d"),
                                    "end_date": end_date.strftime("%Y-%m-%d"),
-                                   "missing_dates": missing_dates})
+                                   "missing_dates": missing_dates,
+                                   "variables": variables})
             else:
                 print("Model not recognised.")
         metadata.append(m)
