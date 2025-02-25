@@ -271,6 +271,11 @@ def line_segments(x1, y1, x2, y2, x, y, indexes, start, grid_spacing):
         dists.append(distances[x_i, y_i])
 
     df = pd.DataFrame(list(zip(x_index, y_index, dists, spacing)), columns=['xi', 'yi', 'dist', 'spacing'])
+    df["valid"] = True
+    df.loc[df['dist'] > grid_spacing, 'valid'] = False
+
+    border_idx = false_indices_near_true(df["valid"])
+
     df_temp = df.sort_values(['xi', 'yi', 'dist'])
     df_temp = df_temp.drop_duplicates(['xi', 'yi'], keep='first')
 
@@ -279,11 +284,21 @@ def line_segments(x1, y1, x2, y2, x, y, indexes, start, grid_spacing):
 
     if not df.iloc[-1].equals(df_temp.iloc[-1]):
         df_temp = pd.concat([df.iloc[[-1]], df_temp], ignore_index=True)
-    df = df_temp.sort_values(['spacing'])
-    df["valid"] = True
-    df.loc[df['dist'] > grid_spacing, 'valid'] = False
 
+    for idx in border_idx:
+        if df.loc[idx, "spacing"] not in df_temp["spacing"].values:
+            df_temp = pd.concat([df.loc[[idx]], df_temp], ignore_index=True)
+
+    df = df_temp.sort_values(['spacing'])
+    
     return np.array(df["xi"]), np.array(df["yi"]), np.array(df["spacing"]), np.array(df["valid"]), distance
+
+
+def false_indices_near_true(arr):
+    arr = np.array(arr)
+    false_indices = np.where(arr == False)[0]
+    adjacent_true = np.roll(arr, 1) | np.roll(arr, -1)
+    return false_indices[adjacent_true[false_indices]]
 
 
 def haversine(lat1, lon1, lat2, lon2):
