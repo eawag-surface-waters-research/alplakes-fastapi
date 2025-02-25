@@ -768,6 +768,7 @@ def get_simulations_transect_delft3dflow(filesystem, lake, time, latitude_str, l
                   }
         if "temperature" in variables:
             t = ds.R1.isel(M=xi, N=yi, LSTSCI=0).transpose('KMAXOUT_RESTR', 'dim_0').values
+            t[:, ~vd_arr.astype(bool)] = np.nan
             output["variables"]["temperature"] = {"data": functions.filter_variable(t), "unit": "degC",
                                                   "description": "Water temperature"}
         if "velocity" in variables:
@@ -775,6 +776,8 @@ def get_simulations_transect_delft3dflow(filesystem, lake, time, latitude_str, l
                 ds.U1.isel(MC=xi, N=yi).transpose('KMAXOUT_RESTR', 'dim_0').values,
                 ds.V1.isel(M=xi, NC=yi).transpose('KMAXOUT_RESTR', 'dim_0').values,
                 ds.ALFAS.isel(M=xi, N=yi).values[np.newaxis, :])
+            u[:, ~vd_arr.astype(bool)] = np.nan
+            v[:, ~vd_arr.astype(bool)] = np.nan
             output["variables"]["u"] = {"data": functions.filter_variable(u, decimals=5), "unit": "m/s",
                                         "description": "Eastward flow velocity"}
             output["variables"]["v"] = {"data": functions.filter_variable(u, decimals=5), "unit": "m/s",
@@ -872,6 +875,7 @@ def get_simulations_transect_period_delft3dflow(filesystem, lake, start, end, la
                   }
         if "temperature" in variables:
             t = ds.R1.isel(M=xi, N=yi, LSTSCI=0).transpose('time', 'KMAXOUT_RESTR', 'dim_0').values
+            t[:, :, ~vd_arr.astype(bool)] = np.nan
             output["variables"]["temperature"] = {"data": functions.filter_variable(t), "unit": "degC", "description": "Water temperature"}
         if "velocity" in variables:
             if "time" in ds.ALFAS.dims:
@@ -882,6 +886,8 @@ def get_simulations_transect_period_delft3dflow(filesystem, lake, start, end, la
                 ds.U1.isel(MC=xi, N=yi).transpose('time', 'KMAXOUT_RESTR', 'dim_0').values,
                 ds.V1.isel(M=xi, NC=yi).transpose('time', 'KMAXOUT_RESTR', 'dim_0').values,
                 alfas)
+            u[:, :, ~vd_arr.astype(bool)] = np.nan
+            v[:, :, ~vd_arr.astype(bool)] = np.nan
             output["variables"]["u"] = {"data": functions.filter_variable(u, decimals=5), "unit": "m/s", "description": "Eastward flow velocity"}
             output["variables"]["v"] = {"data": functions.filter_variable(u, decimals=5), "unit": "m/s", "description": "Northward flow velocity"}
     return output
