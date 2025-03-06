@@ -290,7 +290,7 @@ def line_segments(x1, y1, x2, y2, x, y, indexes, start, grid_spacing):
             df_temp = pd.concat([df.loc[[idx]], df_temp], ignore_index=True)
 
     df = df_temp.sort_values(['spacing'])
-    
+
     return np.array(df["xi"]), np.array(df["yi"]), np.array(df["spacing"]), np.array(df["valid"]), distance
 
 

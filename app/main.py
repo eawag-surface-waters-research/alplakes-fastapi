@@ -18,9 +18,9 @@ origins = [
     "https://www.alplakes.eawag.ch",
     "https://www.datalakes-eawag.ch",
     "https://www.datalakes.eawag.ch",
-    "https://master.d1x767yafo35xy.amplifyapp.com",
-    "https://pr-55.d21l70hd8m002c.amplifyapp.com"
 ]
+allowed_prefix = "https://pr-"
+allowed_suffix = ".d21l70hd8m002c.amplifyapp.com"
 
 description = """
 Alplakes API connects you to lake products produced by the [SURF](https://www.eawag.ch/en/department/surf/) department at [EAWAG](https://www.eawag.ch).
@@ -54,13 +54,21 @@ app = FastAPI(
     }
 )
 
+class DynamicCORSMiddleware(CORSMiddleware):
+    def is_allowed_origin(self, origin: str) -> bool:
+        return (
+            origin in origins or
+            (origin.startswith(allowed_prefix) and origin.endswith(allowed_suffix))
+        )
+
 app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
+    DynamicCORSMiddleware,
+    allow_origins=origins,  # Still allow the fixed ones
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 filesystem = "filesystem"
