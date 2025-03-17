@@ -388,7 +388,7 @@ if internal:
             station_id: str = Path(..., title="Station ID", example="2559",
                                    description="Station identification code")):
         """
-        Meteorological data from the automatic measuring network of DWD (France).
+        Meteorological data from the automatic measuring network of DWD (Germany).
 
         Metadata for a specific station.
         """
@@ -406,7 +406,7 @@ if internal:
                 default=["air_temperature", "relative_humidity", "wind_speed", "wind_direction", "precipitation",
                          "global_radiation"])):
         """
-        Meteorological data from the automatic measuring network of DWD (France).
+        Meteorological data from the automatic measuring network of DWD (Germany).
 
         See metadata endpoint for available variables.
 
