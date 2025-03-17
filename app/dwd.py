@@ -65,7 +65,7 @@ def get_meteodata_station_metadata(filesystem, station_id):
         with open(stations_file, 'r') as f:
             stations_data = json.load(f)
     data = next((s for s in stations_data["features"] if s.get('id') == station_id), None)
-    out["source"] = "Mistral"
+    out["source"] = "DWD"
     if data is None:
         raise HTTPException(status_code=400, detail="Station ID {} not recognised".format(station_id))
     out["name"] = data["properties"]["station_name"]
