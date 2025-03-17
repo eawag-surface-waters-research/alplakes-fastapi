@@ -165,6 +165,20 @@ def test_geosphere_meteodata_measured():
     assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
 
 
+def test_dwd_meteodata_station_metadata_station():
+    response = client.get("/dwd/meteodata/metadata/2559")
+    assert response.status_code == 200
+    assert isinstance(response.json(), dict)
+
+
+def test_dwd_meteodata_measured():
+    response = client.get("/dwd/meteodata/measured/2559/20230101/20240210")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data["variables"]["air_temperature"]["data"][0], float)
+    assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
+
+
 def test_bafu_hydrodata_station_metadata():
     response = client.get("/bafu/hydrodata/metadata/2009")
     assert response.status_code == 200

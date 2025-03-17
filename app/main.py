@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, List, Union, Any
 import sentry_sdk
 
-from app import simulations, meteoswiss, bafu, remotesensing, insitu, validate, thredds, geosphere, arso, mistral
+from app import simulations, meteoswiss, bafu, remotesensing, insitu, validate, thredds, geosphere, arso, mistral, dwd
 
 import os
 
@@ -370,6 +370,51 @@ if internal:
         """
         validate.date_range(start_date, end_date)
         return thredds.get_meteodata_measured(filesystem, station_id, variables, start_date, end_date)
+
+if internal:
+    @app.get("/dwd/meteodata/metadata", tags=["DWD"], response_class=RedirectResponse,
+             response_description="Redirect to a GeoJSON file")
+    async def dwd_meteodata_metadata():
+        """
+        Metadata for all available DWD metreological stations (Germany).
+        """
+        return RedirectResponse(
+            "https://alplakes-eawag.s3.eu-central-1.amazonaws.com/static/dwd/dwd_meteodata.json")
+
+
+    @app.get("/dwd/meteodata/metadata/{station_id}", tags=["DWD"],
+             response_model=dwd.ResponseModelMeteoMeta)
+    async def dwd_meteodata_station_metadata(
+            station_id: str = Path(..., title="Station ID", example="2559",
+                                   description="Station identification code")):
+        """
+        Meteorological data from the automatic measuring network of DWD (France).
+
+        Metadata for a specific station.
+        """
+        return dwd.get_meteodata_station_metadata(filesystem, station_id)
+
+
+    @app.get("/dwd/meteodata/measured/{station_id}/{start_date}/{end_date}", tags=["DWD"],
+             response_model=dwd.ResponseModelMeteo)
+    async def dwd_meteodata_measured(
+            station_id: str = Path(..., title="Station ID", example="2559",
+                                   description="Station identification code"),
+            start_date: str = validate.path_date(description="The start date in YYYYmmdd format"),
+            end_date: str = validate.path_date(description="The end date in YYYYmmdd format"),
+            variables: list[str] = Query(
+                default=["air_temperature", "relative_humidity", "wind_speed", "wind_direction", "precipitation",
+                         "global_radiation"])):
+        """
+        Meteorological data from the automatic measuring network of DWD (France).
+
+        See metadata endpoint for available variables.
+
+        ⚠️ **Warning**: If your request returns a 502 timeout error reduce the period you are requesting.
+        For longer durations, it is recommended to make multiple requests with shorter intervals between them.
+        """
+        validate.date_range(start_date, end_date)
+        return dwd.get_meteodata_measured(filesystem, station_id, variables, start_date, end_date)
 
 if internal:
     @app.get("/arso/meteodata/metadata", tags=["ARSO"], response_class=RedirectResponse,

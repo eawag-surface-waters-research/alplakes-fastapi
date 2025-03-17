@@ -70,6 +70,9 @@ def kelvin_to_celsius(x):
 def hourly_joules_to_watts(x):
     return x / 3600
 
+def ten_minute_joules_cm_to_watts_m(x):
+    return (x * 10 ** 4)/600
+
 def negative_to_zero(x):
     return np.where(x < 0, 0, x)
 
