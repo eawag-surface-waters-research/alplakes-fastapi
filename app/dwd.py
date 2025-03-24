@@ -11,6 +11,10 @@ from typing import Dict, List, Union, Any
 from pydantic import BaseModel, validator
 from app import functions
 
+
+class ResampleOptions(str, Enum):
+    hourly = "hourly"
+
 class VariableKeyModelMeteoMeta(BaseModel):
     unit: str
     description: str
@@ -93,7 +97,7 @@ def get_meteodata_station_metadata(filesystem, station_id):
                 out["variables"][variables_convert[p]] = d
     return out
 
-def get_meteodata_measured(filesystem, station_id, variables, start_date, end_date):
+def get_meteodata_measured(filesystem, station_id, variables, start_date, end_date, resample):
     variables_convert = {
         "GS_10": "global_radiation",
         "TT_10": "air_temperature",
@@ -122,7 +126,10 @@ def get_meteodata_measured(filesystem, station_id, variables, start_date, end_da
     df["time"] = pd.to_datetime(df['time'], utc=True)
     df[variables] = df[variables].apply(lambda x: pd.to_numeric(x, errors='coerce').round(1))
     df = df.dropna(how='all')
-
+    if resample == "hourly":
+        agg_dict = {outer_key: inner_dict["agg"] for outer_key, inner_dict in variables_dict.items() if outer_key in variables}
+        df.set_index('time', inplace=True)
+        df = df.resample('H').agg(agg_dict).reset_index()
     for v in variables:
         if v in variables_adjust:
             df[v] = variables_adjust[v](df[v])

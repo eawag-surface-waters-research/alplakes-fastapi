@@ -404,7 +404,8 @@ if internal:
             end_date: str = validate.path_date(description="The end date in YYYYmmdd format"),
             variables: list[str] = Query(
                 default=["air_temperature", "relative_humidity", "wind_speed", "wind_direction", "precipitation",
-                         "global_radiation"])):
+                         "global_radiation"]),
+            resample: Union[dwd.ResampleOptions, None] = None):
         """
         Meteorological data from the automatic measuring network of DWD (Germany).
 
@@ -414,7 +415,7 @@ if internal:
         For longer durations, it is recommended to make multiple requests with shorter intervals between them.
         """
         validate.date_range(start_date, end_date)
-        return dwd.get_meteodata_measured(filesystem, station_id, variables, start_date, end_date)
+        return dwd.get_meteodata_measured(filesystem, station_id, variables, start_date, end_date, resample)
 
 if internal:
     @app.get("/arso/meteodata/metadata", tags=["ARSO"], response_class=RedirectResponse,
