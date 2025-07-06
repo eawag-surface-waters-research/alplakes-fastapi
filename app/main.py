@@ -18,6 +18,7 @@ origins = [
     "https://www.alplakes.eawag.ch",
     "https://www.datalakes-eawag.ch",
     "https://www.datalakes.eawag.ch",
+    "https://master.d1x767yafo35xy.amplifyapp.com"
 ]
 allowed_prefix = "https://pr-"
 allowed_suffix = ".d21l70hd8m002c.amplifyapp.com"
