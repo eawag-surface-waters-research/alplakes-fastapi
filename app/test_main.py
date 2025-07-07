@@ -259,8 +259,17 @@ def test_simulations_point_mitgcm():
     assert "lng" in data
 
 
-def test_simulations_layer():
+def test_simulations_layer_delft3dflow():
     response = client.get("/simulations/layer/delft3d-flow/geneva/202304050300/1")
+    assert response.status_code == 200
+    data = response.json()
+    assert datetime.strptime(data["time"], "%Y-%m-%dT%H:%M:%S%z")
+    assert "lat" in data
+    assert "lng" in data
+
+
+def test_simulations_layer_mitgcm():
+    response = client.get("/simulations/layer/mitgcm/zurich/202506250300/1")
     assert response.status_code == 200
     data = response.json()
     assert datetime.strptime(data["time"], "%Y-%m-%dT%H:%M:%S%z")
