@@ -13,7 +13,7 @@ import simulations
 
 filesystem = "../filesystem"
 
-function = "simulations.get_simulations_average_bottom_temperature"
+function = "simulations.get_simulations_point_mitgcm"
 
 if function == "meteoswiss.get_cosmo_metadata":
     data = meteoswiss.get_cosmo_metadata(filesystem)
@@ -91,11 +91,16 @@ if function == "simulations.get_metadata":
     print(data)
 
 if function == "simulations.get_metadata_lake":
-    data = simulations.get_metadata_lake(filesystem, "delft3d-flow", "geneva")
+    data = simulations.get_metadata_lake(filesystem, "mitgcm", "zurich")
     print(data)
 
 if function == "simulations.get_simulations_point":
     data = simulations.get_simulations_point(filesystem, "delft3d-flow", "geneva", "202304050300", "202304172300", 1, 46.5, 6.67, ["temperature", "velocity"])
+    plt.plot(data["time"], data["variables"]["temperature"]["data"])
+    plt.show()
+
+if function == "simulations.get_simulations_point_mitgcm":
+    data = simulations.get_simulations_point(filesystem, "mitgcm", "zurich", "202506200300", "202507042300", 1, 47.22, 8.72, ["temperature", "velocity"])
     plt.plot(data["time"], data["variables"]["temperature"]["data"])
     plt.show()
 

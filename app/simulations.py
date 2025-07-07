@@ -125,47 +125,13 @@ class ResponseModelTransectPeriod(BaseModel):
 
 def get_metadata(filesystem):
     metadata = []
-    models = os.listdir(os.path.join(filesystem, "media/simulations"))
-
+    models = [m for m in os.listdir(os.path.join(filesystem, "media/simulations")) if m in ["delft3d-flow", "mitgcm"]]
     for model in models:
         lakes = os.listdir(os.path.join(filesystem, "media/simulations", model, "results"))
         m = {"model": model, "lakes": []}
-
         for lake in lakes:
             try:
-                if model == "delft3d-flow":
-                    path = os.path.join(os.path.join(filesystem, "media/simulations", model, "results", lake))
-                    files = os.listdir(path)
-                    files = [file for file in files if len(file.split(".")[0]) == 8 and file.split(".")[1] == "nc"]
-                    files.sort()
-                    combined = '_'.join(files)
-                    missing_dates = []
-
-                    with netCDF4.Dataset(os.path.join(path, files[0])) as nc:
-                        height = len(nc.dimensions["M"])
-                        width = len(nc.dimensions["N"])
-                        start_date = functions.convert_from_unit(nc.variables["time"][0], nc.variables["time"].units)
-
-                    with netCDF4.Dataset(os.path.join(path, files[-1])) as nc:
-                        end_date = functions.convert_from_unit(nc.variables["time"][-1], nc.variables["time"].units)
-                        depths = np.array(nc.variables["ZK_LYR"][:]) * -1
-                        depths = depths[depths > 0]
-                        depths.sort()
-                        depths = [float("%.2f" % d) for d in depths]
-
-                    for d in functions.daterange(start_date, end_date, days=7):
-                        if d.strftime('%Y%m%d') not in combined:
-                            missing_dates.append(d.strftime("%Y-%m-%d"))
-
-                    m["lakes"].append({"name": lake,
-                                       "depth": depths,
-                                       "start_date": start_date.strftime("%Y-%m-%d"),
-                                       "end_date": end_date.strftime("%Y-%m-%d"),
-                                       "missing_dates": missing_dates,
-                                       "height": height,
-                                       "width": width})
-                else:
-                    raise ValueError("Model not recognised.")
+                m["lakes"].append(get_metadata_lake(filesystem, model, lake))
             except:
                 print("Failed for {}".format(lake))
         metadata.append(m)
@@ -192,24 +158,37 @@ def get_metadata_lake(filesystem, model, lake):
             depths = depths[depths > 0]
             depths.sort()
             depths = [float("%.2f" % d) for d in depths]
+    elif model == "mitgcm":
+        with netCDF4.Dataset(os.path.join(path, files[0])) as nc:
+            height = len(nc.dimensions["Y"])
+            width = len(nc.dimensions["X"])
+            start_date = functions.convert_from_unit(nc.variables["time"][0], nc.variables["time"].units)
 
-        for d in functions.daterange(start_date, end_date, days=7):
-            if d.strftime('%Y%m%d') not in combined:
-                missing_dates.append(d.strftime("%Y-%m-%d"))
-
-        return {"name": lake,
-                "depth": depths,
-                "start_date": start_date.strftime("%Y-%m-%d"),
-                "end_date": end_date.strftime("%Y-%m-%d"),
-                "missing_dates": missing_dates,
-                "height": height,
-                "width": width}
+        with netCDF4.Dataset(os.path.join(path, files[-1])) as nc:
+            end_date = functions.convert_from_unit(nc.variables["time"][-1], nc.variables["time"].units)
+            depths = np.array(nc.variables["depth"][:])
+            depths = depths[depths > 0]
+            depths.sort()
+            depths = [float("%.2f" % d) for d in depths]
     else:
         raise ValueError("Model not recognised.")
+
+    for d in functions.daterange(start_date, end_date, days=7):
+        if d.strftime('%Y%m%d') not in combined:
+            missing_dates.append(d.strftime("%Y-%m-%d"))
+
+    return {"name": lake,
+            "depth": depths,
+            "start_date": start_date.strftime("%Y-%m-%d"),
+            "end_date": end_date.strftime("%Y-%m-%d"),
+            "missing_dates": missing_dates,
+            "height": height,
+            "width": width}
 
 
 class Models(str, Enum):
     delft3dflow = "delft3d-flow"
+    mitgcm = "mitgcm"
 
 
 class Lakes(str, Enum):
@@ -237,6 +216,8 @@ class Variables(str, Enum):
 def get_simulations_point(filesystem, model, lake, start, end, depth, latitude, longitude, variables):
     if model == "delft3d-flow":
         return get_simulations_point_delft3dflow(filesystem, lake, start, end, depth, latitude, longitude, variables)
+    elif model == "mitgcm":
+        return get_simulations_point_mitgcm(filesystem, lake, start, end, depth, latitude, longitude, variables)
     else:
         raise HTTPException(status_code=400,
                             detail="Apologies profile extraction not available for {}".format(model))
@@ -291,6 +272,62 @@ def get_simulations_point_delft3dflow(filesystem, lake, start, end, depth, latit
                 ds.U1.isel(MC=x_index, N=y_index, KMAXOUT_RESTR=depth_index).values,
                 ds.V1.isel(M=x_index, NC=y_index, KMAXOUT_RESTR=depth_index).values,
                 ds.ALFAS.isel(M=x_index, N=y_index).values)
+            output["variables"]["u"] = {"data": functions.filter_variable(u, decimals=5), "unit": "m/s", "description": "Eastward flow velocity"}
+            output["variables"]["v"] = {"data": functions.filter_variable(v, decimals=5), "unit": "m/s", "description": "Northward flow velocity"}
+    return output
+
+
+def get_simulations_point_mitgcm(filesystem, lake, start, end, depth, latitude, longitude, variables, nodata=-999.0):
+    model = "mitgcm"
+    lakes = os.path.join(filesystem, "media/simulations", model, "results")
+    variables = [v.lower() for v in variables]
+    if not os.path.isdir(os.path.join(lakes, lake)):
+        raise HTTPException(status_code=400,
+                            detail="{} simulation results are not available for {} please select from: [{}]"
+                            .format(model, lake, ", ".join(os.listdir(lakes))))
+    weeks = functions.sundays_between_dates(datetime.strptime(start[0:8], "%Y%m%d").replace(tzinfo=timezone.utc),
+                                            datetime.strptime(end[0:8], "%Y%m%d").replace(tzinfo=timezone.utc))
+    files = [os.path.join(lakes, lake, "{}.nc".format(week.strftime("%Y%m%d"))) for week in weeks]
+
+    for i, file in enumerate(files):
+        if not os.path.isfile(file):
+            raise HTTPException(status_code=400,
+                                detail="Apologies data is not available for {} week starting {}".format(lake, weeks[i]))
+
+    start_datetime = datetime.strptime(start, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
+    end_datetime = datetime.strptime(end, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
+
+    with xr.open_mfdataset(files) as ds:
+        ds['time'] = ds.indexes['time'].tz_localize('UTC')
+        ds = ds.sel(time=slice(start_datetime, end_datetime))
+        if len(ds['time']) == 0:
+            raise HTTPException(status_code=400,
+                                detail="No timesteps available between {} and {}".format(start, end))
+        z = ds.depth[0, :].values if len(ds.depth.shape) == 2 else ds.depth[:].values
+        depth_index = functions.get_closest_index(depth, z)
+        depth = float(z[depth_index])
+        if len(ds.lat.shape) == 2:
+            lat_grid, lng_grid = ds.lat.values.T, ds.lng.values.T
+        else:
+            lat_grid, lng_grid = ds.lat.isel(time=0).values.T, ds.lng.isel(time=0).values.T
+        x_index, y_index, distance = functions.get_closest_location(latitude, longitude, lat_grid, lng_grid)
+        print(x_index, y_index)
+        time = functions.alplakes_time(ds.time.values, "nano")
+        output = {"time": time,
+                  "lat": lat_grid[x_index, y_index],
+                  "lng": lng_grid[x_index, y_index],
+                  "distance": {"data": distance, "unit": "m",
+                               "description": "Distance from requested location to center of closest grid point"},
+                  "depth": {"data": depth, "unit": "m",
+                            "description": "Distance from the surface to the closest grid point to requested depth"},
+                  "variables": {}
+                  }
+        if "temperature" in variables:
+            t = ds.t.isel(X=x_index, Y=y_index, depth=depth_index).values
+            output["variables"]["temperature"] = {"data": functions.filter_variable(t), "unit": "degC", "description": "Water temperature"}
+        if "velocity" in variables:
+            u = ds.u.isel(X=x_index, Y=y_index, depth=depth_index).values
+            v = ds.v.isel(X=x_index, Y=y_index, depth=depth_index).values
             output["variables"]["u"] = {"data": functions.filter_variable(u, decimals=5), "unit": "m/s", "description": "Eastward flow velocity"}
             output["variables"]["v"] = {"data": functions.filter_variable(v, decimals=5), "unit": "m/s", "description": "Northward flow velocity"}
     return output
