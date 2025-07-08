@@ -92,14 +92,17 @@ def get_closest_index(value, array):
     return (np.abs(array - value)).argmin()
 
 
-def get_closest_location(latitude, longitude, lat_grid, lon_grid):
+def get_closest_location(latitude, longitude, lat_grid, lon_grid, yx=False):
     lon1, lat1, lon2, lat2 = map(np.radians, [longitude, latitude, lon_grid, lat_grid])
     dlon = lon2 - lon1
     dlat = lat2 - lat1
     a = np.sin(dlat / 2) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2) ** 2
     c = 2 * np.arcsin(np.sqrt(a))
     distance = 6371000 * c
-    x_index, y_index = np.unravel_index(np.nanargmin(distance), distance.shape)
+    if yx:
+        y_index, x_index = np.unravel_index(np.nanargmin(distance), distance.shape)
+    else:
+        x_index, y_index = np.unravel_index(np.nanargmin(distance), distance.shape)
     return x_index, y_index, np.nanmin(distance)
 
 
@@ -154,7 +157,11 @@ def download_file(url, local):
 
 def filter_variable(x, decimals=3, string=False, nodata=-999.0):
     x = np.asarray(x).astype(float)
-    x[x == nodata] = None
+    if isinstance(nodata, list):
+        for nd in nodata:
+            x[x == nd] = None
+    else:
+        x[x == nodata] = None
     out = np.around(x, decimals=decimals)
     out = np.where(np.isnan(out), None, out)
     if string:

@@ -13,7 +13,7 @@ import simulations
 
 filesystem = "../filesystem"
 
-function = "simulations.get_simulations_average_bottom_temperature"
+function = "simulations.get_simulations_point_mitgcm"
 
 if function == "meteoswiss.get_cosmo_metadata":
     data = meteoswiss.get_cosmo_metadata(filesystem)
@@ -91,7 +91,7 @@ if function == "simulations.get_metadata":
     print(data)
 
 if function == "simulations.get_metadata_lake":
-    data = simulations.get_metadata_lake(filesystem, "delft3d-flow", "geneva")
+    data = simulations.get_metadata_lake(filesystem, "mitgcm", "zurich")
     print(data)
 
 if function == "simulations.get_simulations_point":
@@ -99,11 +99,27 @@ if function == "simulations.get_simulations_point":
     plt.plot(data["time"], data["variables"]["temperature"]["data"])
     plt.show()
 
-if function == "simulations.get_simulations_layer":
+if function == "simulations.get_simulations_point_mitgcm":
+    data = simulations.get_simulations_point(filesystem, "mitgcm", "zurich", "202506150300", "202507102300", 1, 47.22, 8.72, ["temperature", "velocity"])
+    print(data["variables"]["temperature"]["data"])
+    plt.plot(data["time"], data["variables"]["temperature"]["data"])
+    plt.show()
+
+if function == "simulations.get_simulations_layer_delft3d":
     data = simulations.get_simulations_layer(filesystem, "delft3d-flow", "geneva", "202304050300", 1, ["temperature"])
     temperature = pd.DataFrame(data["variables"]["temperature"]["data"]).apply(pd.to_numeric, errors='coerce').to_numpy()
     plt.imshow(temperature, cmap='viridis', interpolation='none')
     plt.show()
+
+if function == "simulations.get_simulations_layer_mitgcm":
+    data = simulations.get_simulations_layer(filesystem, "mitgcm", "zurich", "202507020300", 1, ["temperature"])
+    temperature = pd.DataFrame(data["variables"]["temperature"]["data"]).apply(pd.to_numeric, errors='coerce').to_numpy()
+    plt.imshow(temperature, cmap='viridis', interpolation='none')
+    plt.show()
+
+if function == "simulations.get_simulations_layer_alplakes_mitgcm":
+    data = simulations.get_simulations_layer_alplakes(filesystem, "mitgcm", "zurich", "temperature", "202507020300", "202507040300", 1)
+    print(data)
 
 if function == "simulations.get_simulations_layer_average_temperature":
     data = simulations.get_simulations_layer_average_temperature(filesystem, "delft3d-flow", "geneva", "202304050300", "202304112300", 1)

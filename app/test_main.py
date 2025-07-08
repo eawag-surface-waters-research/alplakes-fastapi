@@ -228,14 +228,21 @@ def test_simulations_metadata():
     assert isinstance(data, list)
 
 
-def test_simulations_metadata_lake():
+def test_simulations_metadata_lake_delft3dflow():
     response = client.get("/simulations/metadata/delft3d-flow/geneva")
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, dict)
 
 
-def test_simulations_point():
+def test_simulations_metadata_lake_mitgcm():
+    response = client.get("/simulations/metadata/mitgcm/zurich")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, dict)
+
+
+def test_simulations_point_delft3dflow():
     response = client.get("/simulations/point/delft3d-flow/geneva/202304050300/202304112300/1/46.5/6.67")
     assert response.status_code == 200
     data = response.json()
@@ -243,8 +250,16 @@ def test_simulations_point():
     assert "lat" in data
     assert "lng" in data
 
+def test_simulations_point_mitgcm():
+    response = client.get("/simulations/point/mitgcm/zurich/202506200300/202507042300/1/47.22/8.72")
+    assert response.status_code == 200
+    data = response.json()
+    assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
+    assert "lat" in data
+    assert "lng" in data
 
-def test_simulations_layer():
+
+def test_simulations_layer_delft3dflow():
     response = client.get("/simulations/layer/delft3d-flow/geneva/202304050300/1")
     assert response.status_code == 200
     data = response.json()
@@ -253,8 +268,22 @@ def test_simulations_layer():
     assert "lng" in data
 
 
-def test_simulations_layer_alplakes():
+def test_simulations_layer_mitgcm():
+    response = client.get("/simulations/layer/mitgcm/zurich/202506250300/1")
+    assert response.status_code == 200
+    data = response.json()
+    assert datetime.strptime(data["time"], "%Y-%m-%dT%H:%M:%S%z")
+    assert "lat" in data
+    assert "lng" in data
+
+
+def test_simulations_layer_alplakes_delft3dflow():
     response = client.get("/simulations/layer_alplakes/delft3d-flow/geneva/temperature/202304050300/202304112300/1")
+    assert response.status_code == 200
+
+
+def test_simulations_layer_alplakes_mitgcm():
+    response = client.get("/simulations/layer_alplakes/mitgcm/zurich/temperature/202506200300/202507042300/1")
     assert response.status_code == 200
 
 
