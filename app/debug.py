@@ -13,7 +13,7 @@ import simulations
 
 filesystem = "../filesystem"
 
-function = "simulations.get_simulations_layer_mitgcm"
+function = "simulations.get_simulations_point_mitgcm"
 
 if function == "meteoswiss.get_cosmo_metadata":
     data = meteoswiss.get_cosmo_metadata(filesystem)
@@ -100,7 +100,8 @@ if function == "simulations.get_simulations_point":
     plt.show()
 
 if function == "simulations.get_simulations_point_mitgcm":
-    data = simulations.get_simulations_point(filesystem, "mitgcm", "zurich", "202506200300", "202507042300", 1, 47.22, 8.72, ["temperature", "velocity"])
+    data = simulations.get_simulations_point(filesystem, "mitgcm", "zurich", "202506150300", "202507102300", 1, 47.22, 8.72, ["temperature", "velocity"])
+    print(data["variables"]["temperature"]["data"])
     plt.plot(data["time"], data["variables"]["temperature"]["data"])
     plt.show()
 
