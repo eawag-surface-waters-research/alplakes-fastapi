@@ -264,7 +264,7 @@ def exact_line_segments(lat1, lng1, lat2, lng2, lat_grid, lng_grid, start, grid)
     return np.array(df["xi"]), np.array(df["yi"]), np.array(df["spacing"]), np.array(df["valid"]), distance * 1000
 
 
-def line_segments(x1, y1, x2, y2, x, y, indexes, start, grid_spacing):
+def line_segments(x1, y1, x2, y2, x, y, indexes, start, grid_spacing, yx=False):
     distance = ((x1 - x2)**2 + (y1 - y2)**2)**0.5
     n = math.ceil(distance / (grid_spacing / 2))
     spacing = np.arange(n + 1) * (distance / n) + start
@@ -275,10 +275,14 @@ def line_segments(x1, y1, x2, y2, x, y, indexes, start, grid_spacing):
         yy = y1 + t * (y2 - y1)
         distances = np.full(x.shape, np.inf)
         distances[indexes] = ((x[indexes] - xx)**2 + (y[indexes] - yy)**2)**0.5
-        x_i, y_i = np.unravel_index(np.nanargmin(distances), distances.shape)
+        if yx:
+            y_i, x_i = np.unravel_index(np.nanargmin(distances), distances.shape)
+            dists.append(distances[y_i, x_i])
+        else:
+            x_i, y_i = np.unravel_index(np.nanargmin(distances), distances.shape)
+            dists.append(distances[x_i, y_i])
         x_index.append(x_i)
         y_index.append(y_i)
-        dists.append(distances[x_i, y_i])
 
     df = pd.DataFrame(list(zip(x_index, y_index, dists, spacing)), columns=['xi', 'yi', 'dist', 'spacing'])
     df["valid"] = True

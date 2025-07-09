@@ -13,7 +13,7 @@ import simulations
 
 filesystem = "../filesystem"
 
-function = "simulations.get_simulations_point_mitgcm"
+function = "simulations.get_simulations_transect_period_mitgcm"
 
 if function == "meteoswiss.get_cosmo_metadata":
     data = meteoswiss.get_cosmo_metadata(filesystem)
@@ -121,12 +121,17 @@ if function == "simulations.get_simulations_layer_alplakes_mitgcm":
     data = simulations.get_simulations_layer_alplakes(filesystem, "mitgcm", "zurich", "temperature", "202507020300", "202507040300", 1)
     print(data)
 
-if function == "simulations.get_simulations_layer_average_temperature":
+if function == "simulations.get_simulations_layer_average_temperature_delft3d":
     data = simulations.get_simulations_layer_average_temperature(filesystem, "delft3d-flow", "geneva", "202304050300", "202304112300", 1)
-    plt.plot(data["time"], data["variables"]["temperature"]["data"])
+    plt.plot(data["time"], data["variable"]["data"])
     plt.show()
 
-if function == "simulations.get_simulations_average_bottom_temperature":
+if function == "simulations.get_simulations_layer_average_temperature_mitgcm":
+    data = simulations.get_simulations_layer_average_temperature(filesystem, "mitgcm", "zurich", "202506150300", "202507102300", 1)
+    plt.plot(data["time"], data["variable"]["data"])
+    plt.show()
+
+if function == "simulations.get_simulations_average_bottom_temperature_delft3d":
     data = simulations.get_simulations_average_bottom_temperature(filesystem, "delft3d-flow", "geneva",
                                                                  "202304050300", "202304112300")
     temperature = np.array(data["variable"]["data"], dtype=float)
@@ -134,12 +139,25 @@ if function == "simulations.get_simulations_average_bottom_temperature":
     plt.colorbar()
     plt.show()
 
-if function == "simulations.get_simulations_profile":
+if function == "simulations.get_simulations_average_bottom_temperature_mitgcm":
+    data = simulations.get_simulations_average_bottom_temperature(filesystem, "mitgcm", "zurich",
+                                                                 "202506150300", "202507102300")
+    temperature = np.array(data["variable"]["data"], dtype=float)
+    plt.imshow(temperature, cmap='viridis', interpolation='none')
+    plt.colorbar()
+    plt.show()
+
+if function == "simulations.get_simulations_profile_delft3d":
     data = simulations.get_simulations_profile(filesystem, "delft3d-flow", "geneva", "202304050300", 46.5, 6.67, ["temperature"])
     plt.plot(data["variables"]["temperature"]["data"], np.array(data["depth"]["data"])*-1)
     plt.show()
 
-if function == "simulations.get_simulations_depthtime":
+if function == "simulations.get_simulations_profile_mitgcm":
+    data = simulations.get_simulations_profile(filesystem, "mitgcm", "zurich", "202506150300", 47.22, 8.73, ["temperature"])
+    plt.plot(data["variables"]["temperature"]["data"], np.array(data["depth"]["data"])*-1)
+    plt.show()
+
+if function == "simulations.get_simulations_depthtime_delft3d":
     data = simulations.get_simulations_depthtime(filesystem, "delft3d-flow", "geneva", "202304050300", "202304112300", 46.5, 6.67, ["temperature", "velocity"])
     temperature = pd.DataFrame(data["variables"]["temperature"]["data"]).apply(pd.to_numeric, errors='coerce').to_numpy()
     plt.imshow(temperature, cmap='viridis', interpolation='none')
@@ -148,15 +166,40 @@ if function == "simulations.get_simulations_depthtime":
     plt.plot(np.array(data["variables"]["temperature"]["data"])[:, 0], np.array(data["depth"]["data"]) * -1)
     plt.show()
 
-if function == "simulations.get_simulations_transect":
+if function == "simulations.get_simulations_depthtime_mitgcm":
+    data = simulations.get_simulations_depthtime(filesystem, "mitgcm", "zurich", "202506150300", "202506180300", 47.22, 8.73, ["temperature", "velocity"])
+    temperature = pd.DataFrame(data["variables"]["temperature"]["data"]).apply(pd.to_numeric, errors='coerce').to_numpy()
+    plt.imshow(temperature, cmap='viridis', interpolation='none')
+    plt.colorbar()
+    plt.show()
+    plt.plot(np.array(data["variables"]["temperature"]["data"])[:, 0], np.array(data["depth"]["data"]) * -1)
+    plt.show()
+
+if function == "simulations.get_simulations_transect_delft3d":
     data = simulations.get_simulations_transect(filesystem, "delft3d-flow", "geneva", "202304050300", "46.37,46.54", "6.56,6.54", ["temperature", "velocity"])
     temperature = pd.DataFrame(data["variables"]["temperature"]["data"]).apply(pd.to_numeric, errors='coerce').to_numpy()
     plt.imshow(temperature, cmap='viridis', interpolation='none')
     plt.colorbar()
     plt.show()
 
-if function == "simulations.get_simulations_transect_period":
+if function == "simulations.get_simulations_transect_mitgcm":
+    data = simulations.get_simulations_transect(filesystem, "mitgcm", "zurich", "202506150300", "47.25,47.22", "8.72,8.67", ["temperature", "velocity"])
+    temperature = pd.DataFrame(data["variables"]["temperature"]["data"]).apply(pd.to_numeric, errors='coerce').to_numpy()
+    plt.imshow(temperature, cmap='viridis', interpolation='none')
+    plt.colorbar()
+    plt.show()
+
+if function == "simulations.get_simulations_transect_period_delft3d":
     data = simulations.get_simulations_transect_period(filesystem, "delft3d-flow", "garda", "202312050000", "202312150000", "45.435,45.589,45.719", "10.687,10.635,10.673", ["temperature", "velocity"])
+    for i in range(len(data["variables"]["temperature"]["data"])):
+        temperature = pd.DataFrame(data["variables"]["temperature"]["data"][i]).apply(pd.to_numeric, errors='coerce').to_numpy()
+        plt.imshow(temperature, cmap='viridis', interpolation='none')
+        plt.colorbar()
+        plt.title(data["time"][i])
+        plt.show()
+
+if function == "simulations.get_simulations_transect_period_mitgcm":
+    data = simulations.get_simulations_transect_period(filesystem, "mitgcm", "zurich", "202506150300", "202506180300", "47.25,47.22", "8.72,8.67", ["temperature", "velocity"])
     for i in range(len(data["variables"]["temperature"]["data"])):
         temperature = pd.DataFrame(data["variables"]["temperature"]["data"][i]).apply(pd.to_numeric, errors='coerce').to_numpy()
         plt.imshow(temperature, cmap='viridis', interpolation='none')

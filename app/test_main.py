@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 from datetime import datetime
+import numpy as np
 import pytest
 from .main import app
 
@@ -287,36 +288,101 @@ def test_simulations_layer_alplakes_mitgcm():
     assert response.status_code == 200
 
 
-def test_simulations_layer_average_temperature():
+def test_simulations_layer_average_temperature_delft3dflow():
     response = client.get("/simulations/layer/average_temperature/delft3d-flow/geneva/202304050300/202304112300/1")
     assert response.status_code == 200
     data = response.json()
     assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
+    assert "variable" in data
+    assert "data" in data["variable"]
+    assert isinstance(data["variable"]["data"][0], float)
 
 
-def test_simulations_average_bottom_temperature():
+def test_simulations_layer_average_temperature_mitgcm():
+    response = client.get("/simulations/layer/average_temperature/mitgcm/zurich/202506200300/202507042300/1")
+    assert response.status_code == 200
+    data = response.json()
+    assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
+    assert "variable" in data
+    assert "data" in data["variable"]
+    assert isinstance(data["variable"]["data"][0], float)
+
+
+def test_simulations_average_bottom_temperature_delft3d():
     response = client.get("/simulations/layer/average_bottom_temperature/delft3d-flow/geneva/202304050300/202304112300")
     assert response.status_code == 200
     data = response.json()
     assert "lat" in data
     assert "lng" in data
     assert "variable" in data
+    assert "data" in data["variable"]
+    assert len(np.array(data["variable"]["data"]).shape) == 2
 
 
-def test_simulations_simulations_profile():
+def test_simulations_average_bottom_temperature_mitgcm():
+    response = client.get("/simulations/layer/average_bottom_temperature/mitgcm/zurich/202506200300/202507042300")
+    assert response.status_code == 200
+    data = response.json()
+    assert "lat" in data
+    assert "lng" in data
+    assert "variable" in data
+    assert "data" in data["variable"]
+    assert len(np.array(data["variable"]["data"]).shape) == 2
+
+
+def test_simulations_simulations_profile_delft3d():
     response = client.get("/simulations/profile/delft3d-flow/geneva/202304050300/46.5/6.67")
     assert response.status_code == 200
     data = response.json()
     assert datetime.strptime(data["time"], "%Y-%m-%dT%H:%M:%S%z")
+    assert "variables" in data
+    assert "temperature" in data["variables"]
+    assert "data" in data["variables"]["temperature"]
+    assert isinstance(data["variables"]["temperature"]["data"][0], float)
+
+
+def test_simulations_simulations_profile_mitgcm():
+    response = client.get("/simulations/profile/mitgcm/zurich/202506150300/47.22/8.73")
+    assert response.status_code == 200
+    data = response.json()
+    assert datetime.strptime(data["time"], "%Y-%m-%dT%H:%M:%S%z")
+    assert "variables" in data
+    assert "temperature" in data["variables"]
+    assert "data" in data["variables"]["temperature"]
+    assert isinstance(data["variables"]["temperature"]["data"][0], float)
+
+
+def test_simulations_depth_time_delft3d():
+    response = client.get("/simulations/depthtime/delft3d-flow/geneva/202304050300/202304112300/46.5/6.67")
+    assert response.status_code == 200
+    data = response.json()
+    assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
+    assert "variables" in data
+    assert "temperature" in data["variables"]
+    assert "data" in data["variables"]["temperature"]
+    assert len(np.array(data["variables"]["temperature"]["data"]).shape) == 2
+
+
+def test_simulations_depth_time_mitgcm():
+    response = client.get("/simulations/depthtime/mitgcm/zurich/202506150300/202506180300/47.22/8.73")
+    assert response.status_code == 200
+    data = response.json()
+    assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
+    assert "variables" in data
+    assert "temperature" in data["variables"]
+    assert "data" in data["variables"]["temperature"]
+    assert len(np.array(data["variables"]["temperature"]["data"]).shape) == 2
 
 
 @pytest.mark.parametrize("url", [
     "/simulations/transect/delft3d-flow/geneva/202304030400/46.351,46.294/6.177,6.277",
     "/simulations/transect/delft3d-flow/geneva/202304080400/46.351,46.294,46.351/6.177,6.277,6.177",
     "/simulations/transect/delft3d-flow/garda/202312050000/45.435,45.589,45.719/10.687,10.635,10.673",
+    "/simulations/transect/mitgcm/zurich/202506150300/47.25,47.22/8.72,8.67",
 ], ids=["delft3d-flow_single_file_single_segment_ch1903",
         "delft3d-flow_multiple_files_multiple_segments_ch1903",
-        "delft3d-flow_multiple_files_multiple_segments_utm"])
+        "delft3d-flow_multiple_files_multiple_segments_utm",
+        "mitgcm_single_segement"])
 def test_simulations_transect(url):
     response = client.get(url)
     assert response.status_code == 200
@@ -328,18 +394,13 @@ def test_simulations_transect(url):
     "/simulations/transect/delft3d-flow/geneva/202304030400/202304050400/46.351,46.294/6.177,6.277",
     "/simulations/transect/delft3d-flow/geneva/202304080400/202304110400/46.351,46.294,46.351/6.177,6.277,6.177",
     "/simulations/transect/delft3d-flow/garda/202312050000/202312150000/45.435,45.589,45.719/10.687,10.635,10.673",
+    "/simulations/transect/mitgcm/zurich/202506150300/202506180300/47.25,47.22/8.72,8.67",
 ], ids=["delft3d-flow_single_file_single_segment_ch1903_period",
         "delft3d-flow_multiple_files_multiple_segments_ch1903_period",
-        "delft3d-flow_multiple_files_multiple_segments_utm_period"])
+        "delft3d-flow_multiple_files_multiple_segments_utm_period",
+        "mitgcm_single_segement_period"])
 def test_simulations_transect_period(url):
     response = client.get(url)
-    assert response.status_code == 200
-    data = response.json()
-    assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
-
-
-def test_simulations_depth_time():
-    response = client.get("/simulations/depthtime/delft3d-flow/geneva/202304050300/202304112300/46.5/6.67")
     assert response.status_code == 200
     data = response.json()
     assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")

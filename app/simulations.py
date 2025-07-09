@@ -609,6 +609,8 @@ def get_simulations_layer_alplakes_mitgcm(filesystem, lake, variable, start, end
 def get_simulations_layer_average_temperature(filesystem, model, lake, start, end, depth):
     if model == "delft3d-flow":
         return get_simulations_layer_average_temperature_delft3dflow(filesystem, lake, start, end, depth)
+    elif model == "mitgcm":
+        return get_simulations_layer_average_temperature_mitgcm(filesystem, lake, start, end, depth)
     else:
         raise HTTPException(status_code=400,
                             detail="Apologies data is not available for {}".format(model))
@@ -654,9 +656,51 @@ def get_simulations_layer_average_temperature_delft3dflow(filesystem, lake, star
     return output
 
 
+def get_simulations_layer_average_temperature_mitgcm(filesystem, lake, start, end, depth, nodata=-999.0):
+    model = "mitgcm"
+    lakes = os.path.join(filesystem, "media/simulations", model, "results")
+    if not os.path.isdir(os.path.join(lakes, lake)):
+        raise HTTPException(status_code=400,
+                            detail="{} simulation results are not available for {} please select from: [{}]"
+                            .format(model, lake, ", ".join(os.listdir(lakes))))
+    weeks = functions.sundays_between_dates(datetime.strptime(start[0:8], "%Y%m%d").replace(tzinfo=timezone.utc),
+                                            datetime.strptime(end[0:8], "%Y%m%d").replace(tzinfo=timezone.utc))
+    files = [os.path.join(lakes, lake, "{}.nc".format(week.strftime("%Y%m%d"))) for week in weeks]
+
+    for i, file in enumerate(files):
+        if not os.path.isfile(file):
+            raise HTTPException(status_code=400,
+                                detail="Apologies data is not available for {} week starting {}".format(lake, weeks[i]))
+
+    start_datetime = datetime.strptime(start[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
+    end_datetime = datetime.strptime(end[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
+
+    with xr.open_mfdataset(files) as ds:
+        ds['time'] = ds.indexes['time'].tz_localize('UTC')
+        ds = ds.sel(time=slice(start_datetime, end_datetime))
+        if len(ds['time']) == 0:
+            raise HTTPException(status_code=400,
+                                detail="No timesteps available between {} and {}".format(start, end))
+        z = ds.depth[0, :].values if len(ds.depth.shape) == 2 else ds.depth[:].values
+        depth_index = functions.get_closest_index(depth, z)
+        depth = float(z[depth_index])
+        time = functions.alplakes_time(ds.time.values, "nano")
+        t_arr = ds.t.isel(depth=depth_index)
+        t_arr = t_arr.where(t_arr != nodata, np.nan)
+        t = t_arr.mean(dim=['X', 'Y'], skipna=True).values
+        output = {"time": time,
+                  "depth": {"data": depth, "unit": "m",
+                            "description": "Distance from the surface to the closest grid point to requested depth"},
+                  "variable": {"data": functions.filter_variable(t), "unit": "degC", "description": "Water temperature"}
+                  }
+    return output
+
+
 def get_simulations_average_bottom_temperature(filesystem, model, lake, start, end):
     if model == "delft3d-flow":
         return get_simulations_average_bottom_temperature_delft3dflow(filesystem, lake, start, end)
+    elif model == "mitgcm":
+        return get_simulations_average_bottom_temperature_mitgcm(filesystem, lake, start, end)
     else:
         raise HTTPException(status_code=400,
                             detail="Apologies data is not available for {}".format(model))
@@ -708,9 +752,57 @@ def get_simulations_average_bottom_temperature_delft3dflow(filesystem, lake, sta
     return output
 
 
+def get_simulations_average_bottom_temperature_mitgcm(filesystem, lake, start, end, nodata=-999.0):
+    model = "mitgcm"
+    lakes = os.path.join(filesystem, "media/simulations", model, "results")
+    if not os.path.isdir(os.path.join(lakes, lake)):
+        raise HTTPException(status_code=400,
+                            detail="{} simulation results are not available for {} please select from: [{}]"
+                            .format(model, lake, ", ".join(os.listdir(lakes))))
+    weeks = functions.sundays_between_dates(datetime.strptime(start[0:8], "%Y%m%d").replace(tzinfo=timezone.utc),
+                                            datetime.strptime(end[0:8], "%Y%m%d").replace(tzinfo=timezone.utc))
+    files = [os.path.join(lakes, lake, "{}.nc".format(week.strftime("%Y%m%d"))) for week in weeks]
+
+    for i, file in enumerate(files):
+        if not os.path.isfile(file):
+            raise HTTPException(status_code=400,
+                                detail="Apologies data is not available for {} week starting {}".format(lake, weeks[i]))
+
+    start_datetime = datetime.strptime(start[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
+    end_datetime = datetime.strptime(end[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
+
+    with xr.open_mfdataset(files) as ds:
+        ds['time'] = ds.indexes['time'].tz_localize('UTC')
+        ds = ds.sel(time=slice(start_datetime, end_datetime))
+        if len(ds['time']) == 0:
+            raise HTTPException(status_code=400,
+                                detail="No timesteps available between {} and {}".format(start, end))
+
+        t = ds["t"].values[:]
+        t[t == nodata] = np.nan
+        valid_mask = ~np.isnan(t[0])
+        reversed_valid_mask = valid_mask[::-1, :, :]
+        deepest_valid_indices_reversed = np.argmax(reversed_valid_mask, axis=0)
+        depth_size = t.shape[1]
+        deepest_valid_indices = depth_size - 1 - deepest_valid_indices_reversed
+        all_nan_mask = ~np.any(valid_mask, axis=0)
+        deepest_valid_indices[all_nan_mask] = -1
+        rows, cols = np.meshgrid(np.arange(t.shape[2]), np.arange(t.shape[3]), indexing='ij')
+        result = np.nanmean(t[:, deepest_valid_indices, rows, cols], axis=0)
+        lat_grid, lng_grid = ds["lat"].values, ds["lng"].values
+
+        output = {"variable": {"data": functions.filter_variable(result), "unit": "degC", "description": "Average bottom temperature"},
+                  "lat": functions.filter_variable(lat_grid, decimals=5, nodata=np.nan),
+                  "lng": functions.filter_variable(lng_grid, decimals=5, nodata=np.nan),
+                  }
+    return output
+
+
 def get_simulations_profile(filesystem, model, lake, dt, latitude, longitude, variables):
     if model == "delft3d-flow":
         return get_simulations_profile_delft3dflow(filesystem, lake, dt, latitude, longitude, variables)
+    elif model == "mitgcm":
+        return get_simulations_profile_mitgcm(filesystem, lake, dt, latitude, longitude, variables)
     else:
         raise HTTPException(status_code=400,
                             detail="Apologies profile extraction not available for {}".format(model))
@@ -775,9 +867,69 @@ def get_simulations_profile_delft3dflow(filesystem, lake, dt, latitude, longitud
     return output
 
 
+def get_simulations_profile_mitgcm(filesystem, lake, dt, latitude, longitude, variables):
+    model = "mitgcm"
+    lakes = os.path.join(filesystem, "media/simulations", model, "results")
+    variables = [v.lower() for v in variables]
+    if not os.path.isdir(os.path.join(lakes, lake)):
+        raise HTTPException(status_code=400,
+                            detail="{} simulation results are not available for {} please select from: [{}]"
+                            .format(model, lake, ", ".join(os.listdir(lakes))))
+    origin = datetime.strptime(dt, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
+    last_sunday = origin + relativedelta(weekday=SU(-1))
+    if os.path.isfile(os.path.join(lakes, lake, "{}.nc".format(last_sunday.strftime("%Y%m%d")))):
+        file = os.path.join(lakes, lake, "{}.nc".format(last_sunday.strftime("%Y%m%d")))
+    else:
+        raise HTTPException(status_code=400,
+                            detail="Apologies data is not available for {} at {}".format(lake, dt))
+    with netCDF4.Dataset(file) as nc:
+        converted_time = functions.convert_to_unit(origin, nc.variables["time"].units)
+        time = np.array(nc.variables["time"][:])
+        if converted_time > np.nanmax(time):
+            raise HTTPException(status_code=400,
+                                detail="Apologies data is not available for {} at {}".format(lake, dt))
+        time_index = functions.get_closest_index(converted_time, time)
+
+        depth = (np.array(nc.variables["depth"][:])).tolist()
+        lat_grid, lng_grid = nc.variables["lat"][:], nc.variables["lng"][:]
+        x_index, y_index, distance = functions.get_closest_location(latitude, longitude, lat_grid, lng_grid, yx=True)
+
+        t = functions.filter_variable(nc.variables["t"][time_index, :, y_index, x_index])
+        u = functions.filter_variable(nc.variables["u"][time_index, :, y_index, x_index])
+        v = functions.filter_variable(nc.variables["v"][time_index, :, y_index, x_index])
+
+        index = 0
+        for i in range(len(t)):
+            if not t[i] is None:
+                index = i
+                break
+
+        depth = depth[index:]
+        t = t[index:]
+        u = u[index:]
+        v = v[index:]
+
+        output = {"time": functions.alplakes_time(time[time_index], nc.variables["time"].units),
+                  "lat": lat_grid[y_index, x_index],
+                  "lng": lng_grid[y_index, x_index],
+                  "distance": {"data": distance, "unit": "m", "description": "Distance from requested location to center of closest grid point"},
+                  "depth": {"data": functions.filter_variable(depth), "unit": "m", "description": "Distance from the surface to the closest grid point to requested depth"},
+                  "variables": {}}
+        if "temperature" in variables:
+            output["variables"]["temperature"] = {"data": t, "unit": "degC", "description": "Water temperature"}
+        if "velocity" in variables:
+            output["variables"]["u"] = {"data": functions.filter_variable(u, decimals=5), "unit": nc.variables["u"].units,
+                  "description": "Eastward flow velocity"}
+            output["variables"]["v"] = {"data": functions.filter_variable(v, decimals=5), "unit": nc.variables["v"].units,
+                  "description": "Northward flow velocity"}
+    return output
+
+
 def get_simulations_depthtime(filesystem, model, lake, start, end, latitude, longitude, variables):
     if model == "delft3d-flow":
         return get_simulations_depthtime_delft3dflow(filesystem, lake, start, end, latitude, longitude, variables)
+    if model == "mitgcm":
+        return get_simulations_depthtime_mitgcm(filesystem, lake, start, end, latitude, longitude, variables)
     else:
         raise HTTPException(status_code=400,
                             detail="Apologies profile extraction not available for {}".format(model))
@@ -846,9 +998,68 @@ def get_simulations_depthtime_delft3dflow(filesystem, lake, start, end, latitude
     return output
 
 
+def get_simulations_depthtime_mitgcm(filesystem, lake, start, end, latitude, longitude, variables, nodata=-999.0):
+    model = "mitgcm"
+    lakes = os.path.join(filesystem, "media/simulations", model, "results")
+    variables = [v.lower() for v in variables]
+    if not os.path.isdir(os.path.join(lakes, lake)):
+        raise HTTPException(status_code=400,
+                            detail="{} simulation results are not available for {} please select from: [{}]"
+                            .format(model, lake, ", ".join(os.listdir(lakes))))
+    weeks = functions.sundays_between_dates(datetime.strptime(start[0:8], "%Y%m%d").replace(tzinfo=timezone.utc),
+                                            datetime.strptime(end[0:8], "%Y%m%d").replace(tzinfo=timezone.utc))
+    files = [os.path.join(lakes, lake, "{}.nc".format(week.strftime("%Y%m%d"))) for week in weeks]
+
+    for i, file in enumerate(files):
+        if not os.path.isfile(file):
+            raise HTTPException(status_code=400,
+                                detail="Apologies data is not available for {} week starting {}".format(lake, weeks[i]))
+
+    start_datetime = datetime.strptime(start, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
+    end_datetime = datetime.strptime(end, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
+
+    with xr.open_mfdataset(files) as ds:
+        ds['time'] = ds.indexes['time'].tz_localize('UTC')
+        ds = ds.sel(time=slice(start_datetime, end_datetime))
+        if len(ds['time']) == 0:
+            raise HTTPException(status_code=400,
+                                detail="No timesteps available between {} and {}".format(start, end))
+        lat_grid, lng_grid = ds.lat[:].values, ds.lng[:].values
+        x_index, y_index, distance = functions.get_closest_location(latitude, longitude, lat_grid, lng_grid, yx=True)
+        t = ds.t.isel(time=0, X=x_index, Y=y_index).values
+        depth = ds.depth[0, :].values if len(ds.depth.shape) == 2 else ds.depth[:].values
+        valid_depths = ~np.isnan(t)
+        depth = depth[valid_depths]
+        ds = ds.sel(depth=valid_depths)
+        time = functions.alplakes_time(ds.time.values, "nano")
+        output = {"time": time,
+                  "lat": lat_grid[y_index, x_index],
+                  "lng": lng_grid[y_index, x_index],
+                  "depth": {"data": functions.filter_variable(depth), "unit": "m",
+                            "description": "Distance from the surface"},
+                  "distance": {"data": distance, "unit": "m",
+                               "description": "Distance from requested location to center of closest grid point"},
+                  "variables": {}
+                  }
+        if "temperature" in variables:
+            t = ds.t.isel(X=x_index, Y=y_index).transpose('depth', 'time').values
+            output["variables"]["temperature"] = {"data": functions.filter_variable(t), "unit": "degC",
+                                                  "description": "Water temperature"}
+        if "velocity" in variables:
+            u = ds.u.isel(X=x_index, Y=y_index).transpose('depth', 'time').values
+            v = ds.v.isel(X=x_index, Y=y_index).transpose('depth', 'time').values
+            output["variables"]["u"] = {"data": functions.filter_variable(u, decimals=5), "unit": "m/s",
+                                        "description": "Eastward flow velocity"}
+            output["variables"]["v"] = {"data": functions.filter_variable(v, decimals=5), "unit": "m/s",
+                                        "description": "Northward flow velocity"}
+    return output
+
+
 def get_simulations_transect(filesystem, model, lake, dt, latitude_list, longitude_list, variables):
     if model == "delft3d-flow":
         return get_simulations_transect_delft3dflow(filesystem, lake, dt, latitude_list, longitude_list, variables)
+    if model == "mitgcm":
+        return get_simulations_transect_mitgcm(filesystem, lake, dt, latitude_list, longitude_list, variables)
     else:
         raise HTTPException(status_code=400,
                             detail="Apologies profile extraction not available for {}".format(model))
@@ -860,9 +1071,9 @@ def get_simulations_transect_delft3dflow(filesystem, lake, time, latitude_str, l
     latitude_list = [float(x) for x in latitude_str.replace(" ", "").split(",")]
     longitude_list = [float(x) for x in longitude_str.replace(" ", "").split(",")]
 
-    if len(latitude_list) != len(longitude_list):
+    if len(latitude_list) < 2 or len(latitude_list) != len(longitude_list):
         raise HTTPException(status_code=400,
-                            detail="Latitude list and longitude list are not the same length.")
+                            detail="At least two valid points should be provided.")
 
     origin = datetime.strptime(time, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
     last_sunday = origin + relativedelta(weekday=SU(-1))
@@ -949,9 +1160,98 @@ def get_simulations_transect_delft3dflow(filesystem, lake, time, latitude_str, l
     return output
 
 
+def get_simulations_transect_mitgcm(filesystem, lake, time, latitude_str, longitude_str, variables, nodata=-999.0):
+    model = "mitgcm"
+    variables = [v.lower() for v in variables]
+    y_list = [float(x) for x in latitude_str.replace(" ", "").split(",")]
+    x_list = [float(x) for x in longitude_str.replace(" ", "").split(",")]
+
+    if len(y_list) < 2 or len(y_list) != len(x_list):
+        raise HTTPException(status_code=400,
+                            detail="At least two valid points should be provided.")
+
+    origin = datetime.strptime(time, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
+    last_sunday = origin + relativedelta(weekday=SU(-1))
+    previous_sunday = last_sunday - timedelta(days=7)
+    lakes = os.path.join(filesystem, "media/simulations", model, "results")
+    if not os.path.isdir(os.path.join(lakes, lake)):
+        raise HTTPException(status_code=400,
+                            detail="{} simulation results are not available for {} please select from: [{}]"
+                            .format(model, lake, ", ".join(os.listdir(lakes))))
+    if os.path.isfile(os.path.join(lakes, lake, "{}.nc".format(last_sunday.strftime("%Y%m%d")))):
+        file = os.path.join(lakes, lake, "{}.nc".format(last_sunday.strftime("%Y%m%d")))
+    elif os.path.isfile(os.path.join(lakes, lake, "{}.nc".format(previous_sunday.strftime("%Y%m%d")))):
+        file = os.path.join(lakes, lake, "{}.nc".format(previous_sunday.strftime("%Y%m%d")))
+    else:
+        raise HTTPException(status_code=400,
+                            detail="Apologies data is not available for {} at {}".format(lake, time))
+
+    with xr.open_mfdataset(file) as ds:
+        ds['time'] = ds.indexes['time'].tz_localize('UTC')
+        time_index = functions.get_closest_index(functions.convert_to_unit(origin, "nano"), ds["time"].values)
+        ds = ds.isel(time=time_index)
+        x = ds.lng[:].values
+        y = ds.lat[:].values
+        z = ds.depth[0, :].values if len(ds.depth.shape) == 2 else ds.depth[:].values
+        grid_spacing = functions.center_grid_spacing(x, y)
+        indexes = np.where((x >= np.min(x_list) - 2 * grid_spacing) &
+                           (x <= np.max(x_list) + 2 * grid_spacing) &
+                           (y >= np.min(y_list) - 2 * grid_spacing) &
+                           (y <= np.max(y_list) + 2 * grid_spacing))
+
+        start = 0
+        xi_arr, yi_arr, sp_arr, vd_arr = np.array([]), np.array([]), np.array([]), np.array([])
+        for i in range(len(x_list) - 1):
+            xi, yi, sp, vd, distance = functions.line_segments(x_list[i], y_list[i], x_list[i + 1], y_list[i + 1], x, y,
+                                                               indexes, start, grid_spacing, yx=True)
+            start = start + distance
+            xi_arr = np.concatenate((xi_arr, xi), axis=0)
+            yi_arr = np.concatenate((yi_arr, yi), axis=0)
+            sp_arr = np.concatenate((sp_arr, sp), axis=0)
+            vd_arr = np.concatenate((vd_arr, vd), axis=0)
+
+        xi_arr = xi_arr.astype(int)
+        yi_arr = yi_arr.astype(int)
+        lat_arr, lng_arr = y[yi_arr, xi_arr], x[yi_arr, xi_arr]
+
+        xi = xr.DataArray(xi_arr)
+        yi = xr.DataArray(yi_arr)
+
+        t = ds.t.isel(X=xi, Y=yi).values
+        valid_depths = ~np.all(np.isnan(t), axis=1)
+        depth = z[valid_depths]
+        ds = ds.sel(depth=valid_depths)
+        output = {"time": ds.time.values,
+                  "distance": {"data": functions.filter_variable(sp_arr), "unit": "m",
+                               "description": "Distance along transect"},
+                  "depth": {"data": functions.filter_variable(depth), "unit": "m",
+                            "description": "Distance from the surface"},
+                  "lat": functions.filter_variable(lat_arr, decimals=5),
+                  "lng": functions.filter_variable(lng_arr, decimals=5),
+                  "variables": {}
+                  }
+        if "temperature" in variables:
+            t = ds.t.isel(X=xi, Y=yi).transpose('depth', 'dim_0').values
+            t[:, ~vd_arr.astype(bool)] = np.nan
+            output["variables"]["temperature"] = {"data": functions.filter_variable(t), "unit": "degC",
+                                                  "description": "Water temperature"}
+        if "velocity" in variables:
+            u = ds.u.isel(X=xi, Y=yi).transpose('depth', 'dim_0').values
+            v = ds.v.isel(X=xi, Y=yi).transpose('depth', 'dim_0').values
+            u[:, ~vd_arr.astype(bool)] = np.nan
+            v[:, ~vd_arr.astype(bool)] = np.nan
+            output["variables"]["u"] = {"data": functions.filter_variable(u, decimals=5), "unit": "m/s",
+                                        "description": "Eastward flow velocity"}
+            output["variables"]["v"] = {"data": functions.filter_variable(u, decimals=5), "unit": "m/s",
+                                        "description": "Northward flow velocity"}
+    return output
+
+
 def get_simulations_transect_period(filesystem, model, lake, start, end, latitude_list, longitude_list, variables):
     if model == "delft3d-flow":
         return get_simulations_transect_period_delft3dflow(filesystem, lake, start, end, latitude_list, longitude_list, variables)
+    if model == "mitgcm":
+        return get_simulations_transect_period_mitgcm(filesystem, lake, start, end, latitude_list, longitude_list, variables)
     else:
         raise HTTPException(status_code=400,
                             detail="Apologies profile extraction not available for {}".format(model))
@@ -1050,6 +1350,93 @@ def get_simulations_transect_period_delft3dflow(filesystem, lake, start, end, la
                 ds.U1.isel(MC=xi, N=yi).transpose('time', 'KMAXOUT_RESTR', 'dim_0').values,
                 ds.V1.isel(M=xi, NC=yi).transpose('time', 'KMAXOUT_RESTR', 'dim_0').values,
                 alfas)
+            u[:, :, ~vd_arr.astype(bool)] = np.nan
+            v[:, :, ~vd_arr.astype(bool)] = np.nan
+            output["variables"]["u"] = {"data": functions.filter_variable(u, decimals=5), "unit": "m/s", "description": "Eastward flow velocity"}
+            output["variables"]["v"] = {"data": functions.filter_variable(u, decimals=5), "unit": "m/s", "description": "Northward flow velocity"}
+    return output
+
+
+def get_simulations_transect_period_mitgcm(filesystem, lake, start, end, latitude_str, longitude_str, variables, nodata=-999.0):
+    model = "mitgcm"
+    variables = [v.lower() for v in variables]
+    y_list = [float(x) for x in latitude_str.replace(" ", "").split(",")]
+    x_list = [float(x) for x in longitude_str.replace(" ", "").split(",")]
+
+    if len(y_list) < 2 or len(y_list) != len(x_list):
+        raise HTTPException(status_code=400,
+                            detail="At least two valid points should be provided.")
+
+    lakes = os.path.join(filesystem, "media/simulations", model, "results")
+    if not os.path.isdir(os.path.join(lakes, lake)):
+        raise HTTPException(status_code=400,
+                            detail="{} simulation results are not available for {} please select from: [{}]"
+                            .format(model, lake, ", ".join(os.listdir(lakes))))
+
+    weeks = functions.sundays_between_dates(datetime.strptime(start[0:8], "%Y%m%d").replace(tzinfo=timezone.utc),
+                                            datetime.strptime(end[0:8], "%Y%m%d").replace(tzinfo=timezone.utc))
+    files = [os.path.join(lakes, lake, "{}.nc".format(week.strftime("%Y%m%d"))) for week in weeks]
+
+    for i, file in enumerate(files):
+        if not os.path.isfile(file):
+            raise HTTPException(status_code=400,
+                                detail="Apologies data is not available for {} week starting {}".format(lake, weeks[i]))
+
+    start_datetime = datetime.strptime(start[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
+    end_datetime = datetime.strptime(end[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
+
+    with xr.open_mfdataset(files) as ds:
+        ds['time'] = ds.indexes['time'].tz_localize('UTC')
+        ds = ds.sel(time=slice(start_datetime, end_datetime))
+        if len(ds['time']) == 0:
+            raise HTTPException(status_code=400,
+                                detail="No timesteps available between {} and {}".format(start, end))
+        x = ds.lng[:].values
+        y = ds.lat[:].values
+        z = ds.depth[0, :].values if len(ds.depth.shape) == 2 else ds.depth[:].values
+        grid_spacing = functions.center_grid_spacing(x, y)
+        indexes = np.where((x >= np.min(x_list) - 2 * grid_spacing) &
+                           (x <= np.max(x_list) + 2 * grid_spacing) &
+                           (y >= np.min(y_list) - 2 * grid_spacing) &
+                           (y <= np.max(y_list) + 2 * grid_spacing))
+        start = 0
+        xi_arr, yi_arr, sp_arr, vd_arr = np.array([]), np.array([]), np.array([]), np.array([])
+        for i in range(len(x_list) - 1):
+            xi, yi, sp, vd, distance = functions.line_segments(x_list[i], y_list[i], x_list[i + 1], y_list[i + 1], x, y,
+                                                               indexes, start, grid_spacing, yx=True)
+            start = start + distance
+            xi_arr = np.concatenate((xi_arr, xi), axis=0)
+            yi_arr = np.concatenate((yi_arr, yi), axis=0)
+            sp_arr = np.concatenate((sp_arr, sp), axis=0)
+            vd_arr = np.concatenate((vd_arr, vd), axis=0)
+
+        xi_arr = xi_arr.astype(int)
+        yi_arr = yi_arr.astype(int)
+        lat_arr, lng_arr = y[yi_arr, xi_arr], x[yi_arr, xi_arr]
+
+        xi = xr.DataArray(xi_arr)
+        yi = xr.DataArray(yi_arr)
+
+        t = ds.t.isel(time=0, X=xi, Y=yi).values
+        valid_depths = ~np.all(np.isnan(t), axis=1)
+        depth = z[valid_depths]
+        ds = ds.sel(depth=valid_depths)
+        output = {"time": functions.alplakes_time(ds.time[:].values, "nano"),
+                  "distance": {"data": functions.filter_variable(sp_arr), "unit": "m",
+                               "description": "Distance along transect"},
+                  "depth": {"data": functions.filter_variable(depth), "unit": "m",
+                           "description": "Distance from the surface"},
+                  "lat": functions.filter_variable(lat_arr, decimals=5),
+                  "lng": functions.filter_variable(lng_arr, decimals=5),
+                  "variables": {}
+                  }
+        if "temperature" in variables:
+            t = ds.t.isel(X=xi, Y=yi).transpose('time', 'depth', 'dim_0').values
+            t[:, :, ~vd_arr.astype(bool)] = np.nan
+            output["variables"]["temperature"] = {"data": functions.filter_variable(t), "unit": "degC", "description": "Water temperature"}
+        if "velocity" in variables:
+            u = ds.u.isel(X=xi, Y=yi).transpose('time', 'depth', 'dim_0').values
+            v = ds.v.isel(X=xi, Y=yi).transpose('time', 'depth', 'dim_0').values
             u[:, :, ~vd_arr.astype(bool)] = np.nan
             v[:, :, ~vd_arr.astype(bool)] = np.nan
             output["variables"]["u"] = {"data": functions.filter_variable(u, decimals=5), "unit": "m/s", "description": "Eastward flow velocity"}
