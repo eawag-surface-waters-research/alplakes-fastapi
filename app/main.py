@@ -628,7 +628,7 @@ if internal:
     @app.get("/insitu/temperature/metadata/{station_id}", tags=["Insitu"],
              response_model=insitu.ResponseModelTemperatureMeta)
     async def insitu_temperature_station_metadata(
-            station_id: str = Path(..., title="Station ID", example="6512",
+            station_id: str = Path(..., title="Station ID", example="zurich_police_mythenquai",
                                    description="Station identification code")):
         """
         Insitu temperature data from assorted sources.
@@ -641,10 +641,10 @@ if internal:
     @app.get("/insitu/temperature/measured/{station_id}/{start_date}/{end_date}", tags=["Insitu"],
              response_model=insitu.ResponseModel)
     async def insitu_temperature_measured(
-            station_id: str = Path(..., title="Station ID", example="gkd_pilsensee-16628055",
+            station_id: str = Path(..., title="Station ID", example="zurich_police_mythenquai",
                                    description="Station identification code"),
-            start_date: str = validate.path_date(description="The start date in YYYYmmdd format"),
-            end_date: str = validate.path_date(description="The end date in YYYYmmdd format")):
+            start_date: str = validate.path_date(description="The start date in YYYYmmdd format", example="20250715"),
+            end_date: str = validate.path_date(description="The end date in YYYYmmdd format", example="20250722")):
         """
         Insitu temperature data from assorted sources.
 
