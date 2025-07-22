@@ -13,7 +13,7 @@ import simulations
 
 filesystem = "../filesystem"
 
-function = "simulations.get_simulations_transect_period_mitgcm"
+function = "insitu.get_temperature_measured"
 
 if function == "meteoswiss.get_cosmo_metadata":
     data = meteoswiss.get_cosmo_metadata(filesystem)
@@ -83,6 +83,15 @@ if function == "insitu.get_insitu_secchi_metadata":
 
 if function == "insitu.get_insitu_secchi_lake":
     data = insitu.get_insitu_secchi_lake(filesystem, "geneva")
+    plt.plot(data["time"], data["variable"]["data"])
+    plt.show()
+
+if function == "insitu.get_temperature_metadata":
+    data = insitu.get_temperature_metadata(filesystem, "gkd_rottachsee-11444001")
+    print(data)
+
+if function == "insitu.get_temperature_measured":
+    data = insitu.get_temperature_measured(filesystem, "gkd_lindau-20001001", "20250715", "20250722")
     plt.plot(data["time"], data["variable"]["data"])
     plt.show()
 

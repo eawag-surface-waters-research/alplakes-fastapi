@@ -614,6 +614,47 @@ if internal:
         return insitu.get_insitu_secchi_lake(filesystem, lake)
 
 
+if internal:
+    @app.get("/insitu/temperature/metadata", tags=["Insitu"], response_class=RedirectResponse,
+             response_description="Redirect to a GeoJSON file")
+    async def insitu_temperature_metadata():
+        """
+        Metadata for all available insitu temperature measurements.
+        """
+        return RedirectResponse(
+            "https://alplakes-eawag.s3.eu-central-1.amazonaws.com/insitu/summary/water_temperature.geojson")
+
+
+    @app.get("/insitu/temperature/metadata/{station_id}", tags=["Insitu"],
+             response_model=insitu.ResponseModelTemperatureMeta)
+    async def insitu_temperature_station_metadata(
+            station_id: str = Path(..., title="Station ID", example="6512",
+                                   description="Station identification code")):
+        """
+        Insitu temperature data from assorted sources.
+
+        Metadata for a specific station.
+        """
+        return insitu.get_temperature_metadata(filesystem, station_id)
+
+
+    @app.get("/insitu/temperature/measured/{station_id}/{start_date}/{end_date}", tags=["Insitu"],
+             response_model=insitu.ResponseModel)
+    async def insitu_temperature_measured(
+            station_id: str = Path(..., title="Station ID", example="gkd_pilsensee-16628055",
+                                   description="Station identification code"),
+            start_date: str = validate.path_date(description="The start date in YYYYmmdd format"),
+            end_date: str = validate.path_date(description="The end date in YYYYmmdd format")):
+        """
+        Insitu temperature data from assorted sources.
+
+        ⚠️ **Warning**: If your request returns a 502 timeout error reduce the period you are requesting.
+        For longer durations, it is recommended to make multiple requests with shorter intervals between them.
+        """
+        validate.date_range(start_date, end_date)
+        return insitu.get_temperature_measured(filesystem, station_id, start_date, end_date)
+
+
 @app.get("/simulations/metadata", tags=["3D Simulations"], response_model=List[simulations.Metadata])
 async def simulations_metadata():
     """

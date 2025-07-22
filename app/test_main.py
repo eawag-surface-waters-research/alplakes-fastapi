@@ -222,6 +222,23 @@ def test_insitu_secchi_lake():
     assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
 
 
+def test_insitu_temperature_metadata():
+    station = "canton_zurich_547"
+    response = client.get("/insitu/temperature/metadata/{}".format(station))
+    assert response.status_code == 200
+    data = response.json()
+    assert datetime.strptime(data["start_date"], "%Y-%m-%d")
+
+
+def test_insitu_temperature_measurement():
+    station = "gkd_lindau-20001001"
+    response = client.get("/insitu/temperature/measured/{}/{}/{}".format(station, "20250715", "20250722"))
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data["variable"]["data"][0], float)
+    assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
+
+
 def test_simulations_metadata():
     response = client.get("/simulations/metadata")
     assert response.status_code == 200
