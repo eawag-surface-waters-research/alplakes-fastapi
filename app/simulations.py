@@ -310,6 +310,9 @@ def get_simulations_point_mitgcm(filesystem, lake, start, end, depth, latitude, 
             lat_grid, lng_grid = ds.lat.values, ds.lng.values
         else:
             lat_grid, lng_grid = ds.lat.isel(time=0).values, ds.lng.isel(time=0).values
+        mask = np.isnan(ds.t.isel(time=0, depth=0).values)
+        lat_grid[mask] = np.nan
+        lng_grid[mask] = np.nan
         x_index, y_index, distance = functions.get_closest_location(latitude, longitude, lat_grid, lng_grid, yx=True)
         time = functions.alplakes_time(ds.time.values, "nano")
         output = {"time": time,
@@ -892,6 +895,9 @@ def get_simulations_profile_mitgcm(filesystem, lake, dt, latitude, longitude, va
 
         depth = (np.array(nc.variables["depth"][:])).tolist()
         lat_grid, lng_grid = nc.variables["lat"][:], nc.variables["lng"][:]
+        mask = np.isnan(nc.variables["t"][0,0,:])
+        lat_grid[mask] = np.nan
+        lng_grid[mask] = np.nan
         x_index, y_index, distance = functions.get_closest_location(latitude, longitude, lat_grid, lng_grid, yx=True)
 
         t = functions.filter_variable(nc.variables["t"][time_index, :, y_index, x_index])
@@ -1024,7 +1030,13 @@ def get_simulations_depthtime_mitgcm(filesystem, lake, start, end, latitude, lon
         if len(ds['time']) == 0:
             raise HTTPException(status_code=400,
                                 detail="No timesteps available between {} and {}".format(start, end))
-        lat_grid, lng_grid = ds.lat[:].values, ds.lng[:].values
+        if len(ds.lat.shape) == 2:
+            lat_grid, lng_grid = ds.lat.values, ds.lng.values
+        else:
+            lat_grid, lng_grid = ds.lat.isel(time=0).values, ds.lng.isel(time=0).values
+        mask = np.isnan(ds.t.isel(time=0, depth=0).values)
+        lat_grid[mask] = np.nan
+        lng_grid[mask] = np.nan
         x_index, y_index, distance = functions.get_closest_location(latitude, longitude, lat_grid, lng_grid, yx=True)
         t = ds.t.isel(time=0, X=x_index, Y=y_index).values
         depth = ds.depth[0, :].values if len(ds.depth.shape) == 2 else ds.depth[:].values
