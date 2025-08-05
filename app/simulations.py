@@ -235,10 +235,9 @@ def get_simulations_point_delft3dflow(filesystem, lake, start, end, depth, latit
                                             datetime.strptime(end[0:8], "%Y%m%d").replace(tzinfo=timezone.utc))
     files = [os.path.join(lakes, lake, "{}.nc".format(week.strftime("%Y%m%d"))) for week in weeks]
 
-    for i, file in enumerate(files):
-        if not os.path.isfile(file):
-            raise HTTPException(status_code=400,
-                                detail="Apologies data is not available for {} week starting {}".format(lake, weeks[i]))
+    files = [file for file in files if os.path.isfile(file)]
+    if len(files) == 0:
+        raise HTTPException(status_code=400, detail="Apologies data is not available for your requested period")
 
     start_datetime = datetime.strptime(start, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
     end_datetime = datetime.strptime(end, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
@@ -289,10 +288,9 @@ def get_simulations_point_mitgcm(filesystem, lake, start, end, depth, latitude, 
                                             datetime.strptime(end[0:8], "%Y%m%d").replace(tzinfo=timezone.utc))
     files = [os.path.join(lakes, lake, "{}.nc".format(week.strftime("%Y%m%d"))) for week in weeks]
 
-    for i, file in enumerate(files):
-        if not os.path.isfile(file):
-            raise HTTPException(status_code=400,
-                                detail="Apologies data is not available for {} week starting {}".format(lake, weeks[i]))
+    files = [file for file in files if os.path.isfile(file)]
+    if len(files) == 0:
+        raise HTTPException(status_code=400, detail="Apologies data is not available for your requested period")
 
     start_datetime = datetime.strptime(start, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
     end_datetime = datetime.strptime(end, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
@@ -630,10 +628,9 @@ def get_simulations_layer_average_temperature_delft3dflow(filesystem, lake, star
                                             datetime.strptime(end[0:8], "%Y%m%d").replace(tzinfo=timezone.utc))
     files = [os.path.join(lakes, lake, "{}.nc".format(week.strftime("%Y%m%d"))) for week in weeks]
 
-    for i, file in enumerate(files):
-        if not os.path.isfile(file):
-            raise HTTPException(status_code=400,
-                                detail="Apologies data is not available for {} week starting {}".format(lake, weeks[i]))
+    files = [file for file in files if os.path.isfile(file)]
+    if len(files) == 0:
+        raise HTTPException(status_code=400, detail="Apologies data is not available for your requested period")
 
     start_datetime = datetime.strptime(start[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
     end_datetime = datetime.strptime(end[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
@@ -670,10 +667,9 @@ def get_simulations_layer_average_temperature_mitgcm(filesystem, lake, start, en
                                             datetime.strptime(end[0:8], "%Y%m%d").replace(tzinfo=timezone.utc))
     files = [os.path.join(lakes, lake, "{}.nc".format(week.strftime("%Y%m%d"))) for week in weeks]
 
-    for i, file in enumerate(files):
-        if not os.path.isfile(file):
-            raise HTTPException(status_code=400,
-                                detail="Apologies data is not available for {} week starting {}".format(lake, weeks[i]))
+    files = [file for file in files if os.path.isfile(file)]
+    if len(files) == 0:
+        raise HTTPException(status_code=400, detail="Apologies data is not available for your requested period")
 
     start_datetime = datetime.strptime(start[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
     end_datetime = datetime.strptime(end[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
@@ -720,10 +716,9 @@ def get_simulations_average_bottom_temperature_delft3dflow(filesystem, lake, sta
                                             datetime.strptime(end[0:8], "%Y%m%d").replace(tzinfo=timezone.utc))
     files = [os.path.join(lakes, lake, "{}.nc".format(week.strftime("%Y%m%d"))) for week in weeks]
 
-    for i, file in enumerate(files):
-        if not os.path.isfile(file):
-            raise HTTPException(status_code=400,
-                                detail="Apologies data is not available for {} week starting {}".format(lake, weeks[i]))
+    files = [file for file in files if os.path.isfile(file)]
+    if len(files) == 0:
+        raise HTTPException(status_code=400, detail="Apologies data is not available for your requested period")
 
     start_datetime = datetime.strptime(start[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
     end_datetime = datetime.strptime(end[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
@@ -766,10 +761,9 @@ def get_simulations_average_bottom_temperature_mitgcm(filesystem, lake, start, e
                                             datetime.strptime(end[0:8], "%Y%m%d").replace(tzinfo=timezone.utc))
     files = [os.path.join(lakes, lake, "{}.nc".format(week.strftime("%Y%m%d"))) for week in weeks]
 
-    for i, file in enumerate(files):
-        if not os.path.isfile(file):
-            raise HTTPException(status_code=400,
-                                detail="Apologies data is not available for {} week starting {}".format(lake, weeks[i]))
+    files = [file for file in files if os.path.isfile(file)]
+    if len(files) == 0:
+        raise HTTPException(status_code=400, detail="Apologies data is not available for your requested period")
 
     start_datetime = datetime.strptime(start[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
     end_datetime = datetime.strptime(end[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
@@ -953,10 +947,9 @@ def get_simulations_depthtime_delft3dflow(filesystem, lake, start, end, latitude
                                             datetime.strptime(end[0:8], "%Y%m%d").replace(tzinfo=timezone.utc))
     files = [os.path.join(lakes, lake, "{}.nc".format(week.strftime("%Y%m%d"))) for week in weeks]
 
-    for i, file in enumerate(files):
-        if not os.path.isfile(file):
-            raise HTTPException(status_code=400,
-                                detail="Apologies data is not available for {} week starting {}".format(lake, weeks[i]))
+    files = [file for file in files if os.path.isfile(file)]
+    if len(files) == 0:
+        raise HTTPException(status_code=400, detail="Apologies data is not available for your requested period")
 
     start_datetime = datetime.strptime(start, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
     end_datetime = datetime.strptime(end, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
@@ -1016,10 +1009,9 @@ def get_simulations_depthtime_mitgcm(filesystem, lake, start, end, latitude, lon
                                             datetime.strptime(end[0:8], "%Y%m%d").replace(tzinfo=timezone.utc))
     files = [os.path.join(lakes, lake, "{}.nc".format(week.strftime("%Y%m%d"))) for week in weeks]
 
-    for i, file in enumerate(files):
-        if not os.path.isfile(file):
-            raise HTTPException(status_code=400,
-                                detail="Apologies data is not available for {} week starting {}".format(lake, weeks[i]))
+    files = [file for file in files if os.path.isfile(file)]
+    if len(files) == 0:
+        raise HTTPException(status_code=400, detail="Apologies data is not available for your requested period")
 
     start_datetime = datetime.strptime(start, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
     end_datetime = datetime.strptime(end, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
@@ -1289,10 +1281,9 @@ def get_simulations_transect_period_delft3dflow(filesystem, lake, start, end, la
                                             datetime.strptime(end[0:8], "%Y%m%d").replace(tzinfo=timezone.utc))
     files = [os.path.join(lakes, lake, "{}.nc".format(week.strftime("%Y%m%d"))) for week in weeks]
 
-    for i, file in enumerate(files):
-        if not os.path.isfile(file):
-            raise HTTPException(status_code=400,
-                                detail="Apologies data is not available for {} week starting {}".format(lake, weeks[i]))
+    files = [file for file in files if os.path.isfile(file)]
+    if len(files) == 0:
+        raise HTTPException(status_code=400, detail="Apologies data is not available for your requested period")
 
     start_datetime = datetime.strptime(start[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
     end_datetime = datetime.strptime(end[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
@@ -1389,10 +1380,9 @@ def get_simulations_transect_period_mitgcm(filesystem, lake, start, end, latitud
                                             datetime.strptime(end[0:8], "%Y%m%d").replace(tzinfo=timezone.utc))
     files = [os.path.join(lakes, lake, "{}.nc".format(week.strftime("%Y%m%d"))) for week in weeks]
 
-    for i, file in enumerate(files):
-        if not os.path.isfile(file):
-            raise HTTPException(status_code=400,
-                                detail="Apologies data is not available for {} week starting {}".format(lake, weeks[i]))
+    files = [file for file in files if os.path.isfile(file)]
+    if len(files) == 0:
+        raise HTTPException(status_code=400, detail="Apologies data is not available for your requested period")
 
     start_datetime = datetime.strptime(start[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
     end_datetime = datetime.strptime(end[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
