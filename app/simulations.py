@@ -1183,8 +1183,8 @@ def get_simulations_transect_mitgcm(filesystem, lake, time, latitude_str, longit
         ds['time'] = ds.indexes['time'].tz_localize('UTC')
         time_index = functions.get_closest_index(functions.convert_to_unit(origin, "nano"), ds["time"].values)
         ds = ds.isel(time=time_index)
-        x = ds.lng[0, :].values if len(ds.lng.shape) == 3 else ds.lng[:].values
-        y = ds.lat[0, :].values if len(ds.lat.shape) == 3 else ds.lat[:].values
+        x = ds.lng[:].values
+        y = ds.lat[:].values
         z = ds.depth[0, :].values if len(ds.depth.shape) == 2 else ds.depth[:].values
         grid_spacing = functions.center_grid_spacing(x, y)
         indexes = np.where((x >= np.min(x_list) - 2 * grid_spacing) &
@@ -1382,8 +1382,8 @@ def get_simulations_transect_period_mitgcm(filesystem, lake, start, end, latitud
         if len(ds['time']) == 0:
             raise HTTPException(status_code=400,
                                 detail="No timesteps available between {} and {}".format(start, end))
-        x = ds.lng[:].values
-        y = ds.lat[:].values
+        x = ds.lng[0, :].values if len(ds.lng.shape) == 3 else ds.lng[:].values
+        y = ds.lat[0, :].values if len(ds.lat.shape) == 3 else ds.lat[:].values
         z = ds.depth[0, :].values if len(ds.depth.shape) == 2 else ds.depth[:].values
         grid_spacing = functions.center_grid_spacing(x, y)
         indexes = np.where((x >= np.min(x_list) - 2 * grid_spacing) &
