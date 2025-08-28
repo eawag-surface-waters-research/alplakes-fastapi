@@ -191,21 +191,6 @@ class Models(str, Enum):
     mitgcm = "mitgcm"
 
 
-class Lakes(str, Enum):
-    geneva = "geneva"
-    greifensee = "greifensee"
-    zurich = "zurich"
-    biel = "biel"
-    joux = "joux"
-    garda = "garda"
-    lugano = "lugano"
-    murten = "murten"
-    hallwil = "hallwil"
-    caldonazzo = "caldonazzo"
-    ageri = "ageri"
-    stmoritz = "stmoritz"
-
-
 class Variables(str, Enum):
     temperature = "temperature"
     velocity = "velocity"

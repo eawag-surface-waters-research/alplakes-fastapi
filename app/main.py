@@ -665,7 +665,7 @@ async def simulations_metadata():
 
 @app.get("/simulations/metadata/{model}/{lake}", tags=["3D Simulations"], response_model=simulations.MetadataLake)
 async def simulations_metadata_lake(model: simulations.Models = Path(..., title="Model", description="Model name"),
-                                    lake: simulations.Lakes = Path(..., title="Lake", description="Lake name")):
+                                    lake: str = Path(..., title="Lake", description="Lake name", example="geneva")):
     """
     Metadata for a specific 3D model and lake.
     """
@@ -674,7 +674,7 @@ async def simulations_metadata_lake(model: simulations.Models = Path(..., title=
 
 @app.get("/simulations/file/{model}/{lake}/{sunday}", tags=["3D Simulations"], response_class=FileResponse)
 async def simulations_file(model: simulations.Models = Path(..., title="Model", description="Model name"),
-                           lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
+                           lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
                            sunday: str = validate.path_date(description="The Sunday in YYYYmmdd format", example="20230402")):
     """
     NetCDF simulation results for a one-week period.
@@ -699,7 +699,7 @@ async def simulations_file(model: simulations.Models = Path(..., title="Model", 
 
 @app.get("/simulations/point/{model}/{lake}/{start_time}/{end_time}/{depth}/{lat}/{lng}", tags=["3D Simulations"], response_model=simulations.ResponseModelPoint)
 async def simulations_point(model: simulations.Models = Path(..., title="Model", description="Model name"),
-                            lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
+                            lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
                             start_time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202304050300"),
                             end_time: str = validate.path_time(description="The end time in YYYYmmddHHMM format (UTC)", example="202304112300"),
                             depth: float = validate.path_depth(),
@@ -718,7 +718,7 @@ async def simulations_point(model: simulations.Models = Path(..., title="Model",
 
 @app.get("/simulations/layer/{model}/{lake}/{time}/{depth}", tags=["3D Simulations"], response_model=simulations.ResponseModelLayer)
 async def simulations_layer(model: simulations.Models = Path(..., title="Model", description="Model name"),
-                            lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
+                            lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
                             time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202304050300"),
                             depth: float = validate.path_depth(),
                             variables: list[str] = Query(default=["temperature", "velocity"])):
@@ -732,7 +732,7 @@ async def simulations_layer(model: simulations.Models = Path(..., title="Model",
 @app.get("/simulations/layer_alplakes/{model}/{lake}/{variable}/{start_time}/{end_time}/{depth}", tags=["3D Simulations"],
          response_class=PlainTextResponse, include_in_schema=internal)
 async def simulations_layer_alplakes(model: simulations.Models = Path(..., title="Model", description="Model name"),
-                                     lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
+                                     lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
                                      variable: simulations.Variables = Path(..., title="Variable", description="Variable"),
                                      start_time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202304050300"),
                                      end_time: str = validate.path_time(description="The end time in YYYYmmddHHMM format (UTC)", example="202304112300"),
@@ -748,7 +748,7 @@ async def simulations_layer_alplakes(model: simulations.Models = Path(..., title
 
 @app.get("/simulations/layer/average_temperature/{model}/{lake}/{start_time}/{end_time}/{depth}", tags=["3D Simulations"], response_model=simulations.ResponseModelAverageLayer)
 async def simulations_layer_average_temperature(model: simulations.Models = Path(..., title="Model", description="Model name"),
-                                                lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
+                                                lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
                                                 start_time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202304050300"),
                                                 end_time: str = validate.path_time(description="The end time in YYYYmmddHHMM format (UTC)", example="202304112300"),
                                                 depth: float = validate.path_depth()):
@@ -764,7 +764,7 @@ async def simulations_layer_average_temperature(model: simulations.Models = Path
 
 @app.get("/simulations/layer/average_bottom_temperature/{model}/{lake}/{start_time}/{end_time}", tags=["3D Simulations"], response_model=simulations.ResponseModelAverageBottom)
 async def simulations_layer_average_temperature(model: simulations.Models = Path(..., title="Model", description="Model name"),
-                                                lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
+                                                lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
                                                 start_time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202304050300"),
                                                 end_time: str = validate.path_time(description="The end time in YYYYmmddHHMM format (UTC)", example="202304112300")):
     """
@@ -779,7 +779,7 @@ async def simulations_layer_average_temperature(model: simulations.Models = Path
 
 @app.get("/simulations/profile/{model}/{lake}/{time}/{lat}/{lng}", tags=["3D Simulations"], response_model=simulations.ResponseModelProfile)
 async def simulations_profile(model: simulations.Models = Path(..., title="Model", description="Model name"),
-                              lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
+                              lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
                               time: str = validate.path_time(),
                               lat: float = validate.path_latitude(),
                               lng: float = validate.path_longitude(),
@@ -793,7 +793,7 @@ async def simulations_profile(model: simulations.Models = Path(..., title="Model
 
 @app.get("/simulations/depthtime/{model}/{lake}/{start_time}/{end_time}/{lat}/{lng}", tags=["3D Simulations"], response_model=simulations.ResponseModelDepthTime)
 async def simulations_depth_time(model: simulations.Models = Path(..., title="Model", description="Model name"),
-                                 lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
+                                 lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
                                  start_time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202304050300"),
                                  end_time: str = validate.path_time(description="The end time in YYYYmmddHHMM format (UTC)", example="202304112300"),
                                  lat: float = validate.path_latitude(),
@@ -811,7 +811,7 @@ async def simulations_depth_time(model: simulations.Models = Path(..., title="Mo
 
 @app.get("/simulations/transect/{model}/{lake}/{time}/{lats}/{lngs}", tags=["3D Simulations"], response_model=simulations.ResponseModelTransect)
 async def simulations_transect(model: simulations.Models = Path(..., title="Model", description="Model name"),
-                               lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
+                               lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
                                time: str = validate.path_time(),
                                lats: str = Path(..., title="Lats", description="Comma separated list of latitudes (WGS84), minimum 2", example="46.37,46.54"),
                                lngs: str = Path(..., title="Lngs", description="Comma separated list of longitudes (WGS84), minimum 2", example="6.56,6.54"),
@@ -826,7 +826,7 @@ async def simulations_transect(model: simulations.Models = Path(..., title="Mode
 
 @app.get("/simulations/transect/{model}/{lake}/{start_time}/{end_time}/{lats}/{lngs}", tags=["3D Simulations"], response_model=simulations.ResponseModelTransectPeriod)
 async def simulations_transect_period(model: simulations.Models = Path(..., title="Model", description="Model name"),
-                                      lake: simulations.Lakes = Path(..., title="Lake", description="Lake name"),
+                                      lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
                                       start_time: str = validate.path_time( description="The start time in YYYYmmddHHMM format (UTC)", example="202304050300"),
                                       end_time: str = validate.path_time( description="The end time in YYYYmmddHHMM format (UTC)", example="202304051200"),
                                       lats: str = Path(..., title="Lats", description="Comma separated list of latitudes (WGS84), minimum 2", example="46.37,46.54"),
