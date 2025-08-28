@@ -140,6 +140,10 @@ def get_metadata(filesystem):
 
 def get_metadata_lake(filesystem, model, lake):
     path = os.path.join(os.path.join(filesystem, "media/simulations", model, "results", lake))
+    if not os.path.isdir(path):
+        raise HTTPException(status_code=400,
+                            detail="{} simulation results are not available for {}"
+                            .format(model, lake))
     files = os.listdir(path)
     files = [file for file in files if len(file.split(".")[0]) == 8 and file.split(".")[1] == "nc"]
     files.sort()
@@ -1179,8 +1183,8 @@ def get_simulations_transect_mitgcm(filesystem, lake, time, latitude_str, longit
         ds['time'] = ds.indexes['time'].tz_localize('UTC')
         time_index = functions.get_closest_index(functions.convert_to_unit(origin, "nano"), ds["time"].values)
         ds = ds.isel(time=time_index)
-        x = ds.lng[:].values
-        y = ds.lat[:].values
+        x = ds.lng[0, :].values if len(ds.lng.shape) == 3 else ds.lng[:].values
+        y = ds.lat[0, :].values if len(ds.lat.shape) == 3 else ds.lat[:].values
         z = ds.depth[0, :].values if len(ds.depth.shape) == 2 else ds.depth[:].values
         grid_spacing = functions.center_grid_spacing(x, y)
         indexes = np.where((x >= np.min(x_list) - 2 * grid_spacing) &
