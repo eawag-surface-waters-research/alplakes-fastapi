@@ -3,6 +3,7 @@ from fastapi.responses import RedirectResponse, PlainTextResponse, JSONResponse,
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, List, Union, Any
+import warnings
 import sentry_sdk
 
 from app import simulations, meteoswiss, bafu, remotesensing, insitu, validate, thredds, geosphere, arso, mistral, dwd
@@ -13,6 +14,7 @@ sentry_sdk.init(
     dsn="https://9b346d9bd9aa4309a18f5a47746b0a54@o1106970.ingest.sentry.io/4504402334777344",
     traces_sample_rate=1.0,
 )
+warnings.filterwarnings("ignore", message=".*example.*deprecated.*")
 origins = [
     "http://localhost:3000",
     "https://www.alplakes.eawag.ch",
@@ -123,7 +125,7 @@ if internal:
         For longer durations, it is recommended to make multiple requests with shorter intervals between them.
         """
         validate.date_range(start_date, end_date)
-        return meteoswiss.get_cosmo_area_reanalysis(filesystem, model, variables, start_date, end_date, ll_lat, ll_lng, ur_lat, ur_lng)
+        return meteoswiss.get_cosmo_area_reanalysis(filesystem, model.value, variables, start_date, end_date, ll_lat, ll_lng, ur_lat, ur_lng)
 
     @app.get("/meteoswiss/cosmo/area/forecast/{model}/{forecast_date}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}", tags=["Meteoswiss"], response_model=meteoswiss.ResponseModel2D)
     async def meteoswiss_cosmo_area_forecast(model: meteoswiss.CosmoForecast,
@@ -141,7 +143,7 @@ if internal:
         - VNXQ94 (forecast): Cosmo-1e 33 hour ensemble forecast
         """
         validate.date(forecast_date)
-        return meteoswiss.get_cosmo_area_forecast(filesystem, model, variables, forecast_date, ll_lat, ll_lng, ur_lat, ur_lng)
+        return meteoswiss.get_cosmo_area_forecast(filesystem, model.value, variables, forecast_date, ll_lat, ll_lng, ur_lat, ur_lng)
 
     @app.get("/meteoswiss/cosmo/point/reanalysis/{model}/{start_date}/{end_date}/{lat}/{lng}", tags=["Meteoswiss"], response_model=meteoswiss.ResponseModel1D)
     async def meteoswiss_cosmo_point_reanalysis(model: meteoswiss.CosmoReanalysis,
@@ -160,7 +162,7 @@ if internal:
         For longer durations, it is recommended to make multiple requests with shorter intervals between them.
         """
         validate.date_range(start_date, end_date)
-        return meteoswiss.get_cosmo_point_reanalysis(filesystem, model, variables, start_date, end_date, lat, lng)
+        return meteoswiss.get_cosmo_point_reanalysis(filesystem, model.value, variables, start_date, end_date, lat, lng)
 
     @app.get("/meteoswiss/cosmo/point/forecast/{model}/{forecast_date}/{lat}/{lng}", tags=["Meteoswiss"], response_model=meteoswiss.ResponseModel1D)
     async def meteoswiss_cosmo_point_forecast(model: meteoswiss.CosmoForecast,
@@ -178,7 +180,7 @@ if internal:
         - VNXZ32 (forecast): Cosmo-2e 5 day ensemble forecast
         """
         validate.date(forecast_date)
-        return meteoswiss.get_cosmo_point_forecast(filesystem, model, variables, forecast_date, lat, lng)
+        return meteoswiss.get_cosmo_point_forecast(filesystem, model.value, variables, forecast_date, lat, lng)
 
 
     @app.get("/meteoswiss/icon/metadata", tags=["Meteoswiss"], response_model=List[meteoswiss.Metadata])
@@ -215,7 +217,7 @@ if internal:
         For longer durations, it is recommended to make multiple requests with shorter intervals between them.
         """
         validate.date_range(start_date, end_date)
-        return meteoswiss.get_icon_area_reanalysis(filesystem, model, variables, start_date, end_date, ll_lat, ll_lng,
+        return meteoswiss.get_icon_area_reanalysis(filesystem, model.value, variables, start_date, end_date, ll_lat, ll_lng,
                                                     ur_lat, ur_lng)
 
     @app.get("/meteoswiss/icon/area/forecast/{model}/{forecast_date}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}", tags=["Meteoswiss"], response_model=meteoswiss.ResponseModel2D)
@@ -241,7 +243,7 @@ if internal:
         - icon-ch1-eps (forecast):  ICON-CH1-EPS 33 hour ensemble forecast
         """
         validate.date(forecast_date)
-        return meteoswiss.get_icon_area_forecast(filesystem, model, variables, forecast_date, ll_lat, ll_lng, ur_lat,
+        return meteoswiss.get_icon_area_forecast(filesystem, model.value, variables, forecast_date, ll_lat, ll_lng, ur_lat,
                                                   ur_lng)
 
     @app.get("/meteoswiss/icon/point/reanalysis/{model}/{start_date}/{end_date}/{lat}/{lng}", tags=["Meteoswiss"], response_model=meteoswiss.ResponseModel1D)
@@ -264,7 +266,7 @@ if internal:
         For longer durations, it is recommended to make multiple requests with shorter intervals between them.
         """
         validate.date_range(start_date, end_date)
-        return meteoswiss.get_icon_point_reanalysis(filesystem, model, variables, start_date, end_date, lat, lng)
+        return meteoswiss.get_icon_point_reanalysis(filesystem, model.value, variables, start_date, end_date, lat, lng)
 
     @app.get("/meteoswiss/icon/point/forecast/{model}/{forecast_date}/{lat}/{lng}", tags=["Meteoswiss"], response_model=meteoswiss.ResponseModel1D)
     async def meteoswiss_icon_point_forecast(model: meteoswiss.IconForecast,
@@ -284,7 +286,7 @@ if internal:
         - icon-ch1-eps (forecast):  ICON-CH1-EPS 33 hour ensemble forecast
         """
         validate.date(forecast_date)
-        return meteoswiss.get_icon_point_forecast(filesystem, model, variables, forecast_date, lat, lng)
+        return meteoswiss.get_icon_point_forecast(filesystem, model.value, variables, forecast_date, lat, lng)
 
     @app.get("/meteoswiss/meteodata/metadata", tags=["Meteoswiss"], response_class=RedirectResponse, response_description="Redirect to a GeoJSON file")
     async def meteoswiss_meteodata_metadata():
@@ -300,7 +302,7 @@ if internal:
 
     @app.get("/meteoswiss/meteodata/metadata/{station_id}", tags=["Meteoswiss"], response_model=meteoswiss.ResponseModelMeteoMeta)
     async def meteoswiss_meteodata_station_metadata(
-            station_id: str = Path(..., regex=r"^[a-zA-Z0-9]{3,6}$", title="Station ID", example="PUY",
+            station_id: str = Path(..., pattern=r"^[a-zA-Z0-9]{3,6}$", title="Station ID", example="PUY",
                                    description="3 digit station identification code")):
         """
         Meteorological data from the automatic measuring network of MeteoSwiss.
@@ -310,7 +312,7 @@ if internal:
         return meteoswiss.get_meteodata_station_metadata(filesystem, station_id)
 
     @app.get("/meteoswiss/meteodata/measured/{station_id}/{start_date}/{end_date}", tags=["Meteoswiss"], response_model=meteoswiss.ResponseModelMeteo)
-    async def meteoswiss_meteodata_measured(station_id: str = Path(..., regex=r"^[a-zA-Z0-9]{3,6}$", title="Station ID", example="PUY", description="3 digit station identification code"),
+    async def meteoswiss_meteodata_measured(station_id: str = Path(..., pattern=r"^[a-zA-Z0-9]{3,6}$", title="Station ID", example="PUY", description="3 digit station identification code"),
                                             start_date: str = validate.path_date(description="The start date in YYYYmmdd format"),
                                             end_date: str = validate.path_date(description="The end date in YYYYmmdd format"),
                                             variables: list[str] = Query(
@@ -566,7 +568,7 @@ if internal:
 
 
     @app.get("/bafu/hydrodata/metadata/{station_id}", tags=["Bafu"], response_model=bafu.ResponseModelMeta)
-    async def bafu_hydrodata_station_metadata(station_id: str = Path(..., regex=r"^\d{4}$", title="Station ID", example=2009, description="4 digit station identification code")):
+    async def bafu_hydrodata_station_metadata(station_id: str = Path(..., pattern=r"^\d{4}$", title="Station ID", example="2009", description="4 digit station identification code")):
         """
         Hydrological data from the automatic measuring network of Bafu.
 
@@ -575,7 +577,7 @@ if internal:
         return bafu.get_hydrodata_station_metadata(filesystem, station_id)
 
     @app.get("/bafu/hydrodata/measured/{station_id}/{variable}/{start_date}/{end_date}", tags=["Bafu"], response_model=bafu.ResponseModel)
-    async def bafu_hydrodata_measured(station_id: str = Path(..., regex=r"^\d{4}$", title="Station ID", example=2009, description="4 digit station identification code"),
+    async def bafu_hydrodata_measured(station_id: str = Path(..., pattern=r"^\d{4}$", title="Station ID", example="2009", description="4 digit station identification code"),
                                       variable: str = Path(..., title="Variable", example="AbflussPneumatikunten", description="Variable"),
                                       start_date: str = validate.path_date(description="The start date in YYYYmmdd format"),
                                       end_date: str = validate.path_date(description="The end date in YYYYmmdd format"),
@@ -669,7 +671,7 @@ async def simulations_metadata_lake(model: simulations.Models = Path(..., title=
     """
     Metadata for a specific 3D model and lake.
     """
-    return simulations.get_metadata_lake(filesystem, model, lake)
+    return simulations.get_metadata_lake(filesystem, model.value, lake)
 
 
 @app.get("/simulations/file/{model}/{lake}/{sunday}", tags=["3D Simulations"], response_class=FileResponse)
@@ -691,7 +693,7 @@ async def simulations_file(model: simulations.Models = Path(..., title="Model", 
     For example: [https://alplakes-api.eawag.ch/simulations/file/delft3d-flow/geneva/20230101](https://alplakes-api.eawag.ch/simulations/file/delft3d-flow/geneva/20230101)
     """
     validate.sunday(sunday)
-    path = os.path.join(filesystem, "media/simulations", model, "results", lake, "{}.nc".format(sunday))
+    path = os.path.join(filesystem, "media/simulations", model.value, "results", lake, "{}.nc".format(sunday))
     if not os.path.isfile(path):
         raise HTTPException(status_code=400, detail="Apologies data is not available for {} on the week beginning {}".format(model, sunday))
     return FileResponse(path, media_type="application/nc", filename="{}_{}_{}.nc".format(model, lake, sunday))
@@ -713,7 +715,7 @@ async def simulations_point(model: simulations.Models = Path(..., title="Model",
     For longer durations, it is recommended to make multiple requests with shorter intervals between them.
     """
     validate.time_range(start_time, end_time)
-    return simulations.get_simulations_point(filesystem, model, lake, start_time, end_time, depth, lat, lng, variables)
+    return simulations.get_simulations_point(filesystem, model.value, lake, start_time, end_time, depth, lat, lng, variables)
 
 
 @app.get("/simulations/layer/{model}/{lake}/{time}/{depth}", tags=["3D Simulations"], response_model=simulations.ResponseModelLayer)
@@ -726,7 +728,7 @@ async def simulations_layer(model: simulations.Models = Path(..., title="Model",
     Simulation results for an entire depth layer at a specific time.
     """
     validate.time(time)
-    return simulations.get_simulations_layer(filesystem, model, lake, time, depth, variables)
+    return simulations.get_simulations_layer(filesystem, model.value, lake, time, depth, variables)
 
 
 @app.get("/simulations/layer_alplakes/{model}/{lake}/{variable}/{start_time}/{end_time}/{depth}", tags=["3D Simulations"],
@@ -743,7 +745,7 @@ async def simulations_layer_alplakes(model: simulations.Models = Path(..., title
     ⚠️ **Warning:** This endpoint is designed for supplying data to the Alplakes website. The output is **not** self-explanatory.
     """
     validate.time_range(start_time, end_time)
-    return simulations.get_simulations_layer_alplakes(filesystem, model, lake, variable, start_time, end_time, depth)
+    return simulations.get_simulations_layer_alplakes(filesystem, model.value, lake, variable, start_time, end_time, depth)
 
 
 @app.get("/simulations/layer/average_temperature/{model}/{lake}/{start_time}/{end_time}/{depth}", tags=["3D Simulations"], response_model=simulations.ResponseModelAverageLayer)
@@ -759,7 +761,7 @@ async def simulations_layer_average_temperature(model: simulations.Models = Path
     For longer durations, it is recommended to make multiple requests with shorter intervals between them.
     """
     validate.time_range(start_time, end_time)
-    return simulations.get_simulations_layer_average_temperature(filesystem, model, lake, start_time, end_time, depth)
+    return simulations.get_simulations_layer_average_temperature(filesystem, model.value, lake, start_time, end_time, depth)
 
 
 @app.get("/simulations/layer/average_bottom_temperature/{model}/{lake}/{start_time}/{end_time}", tags=["3D Simulations"], response_model=simulations.ResponseModelAverageBottom)
@@ -774,7 +776,7 @@ async def simulations_layer_average_temperature(model: simulations.Models = Path
     For longer durations, it is recommended to make multiple requests with shorter intervals between them.
     """
     validate.time_range(start_time, end_time)
-    return simulations.get_simulations_average_bottom_temperature(filesystem, model, lake, start_time, end_time)
+    return simulations.get_simulations_average_bottom_temperature(filesystem, model.value, lake, start_time, end_time)
 
 
 @app.get("/simulations/profile/{model}/{lake}/{time}/{lat}/{lng}", tags=["3D Simulations"], response_model=simulations.ResponseModelProfile)
@@ -788,7 +790,7 @@ async def simulations_profile(model: simulations.Models = Path(..., title="Model
     Vertical profile for a specific **time** and location.
     """
     validate.time(time)
-    return simulations.get_simulations_profile(filesystem, model, lake, time, lat, lng, variables)
+    return simulations.get_simulations_profile(filesystem, model.value, lake, time, lat, lng, variables)
 
 
 @app.get("/simulations/depthtime/{model}/{lake}/{start_time}/{end_time}/{lat}/{lng}", tags=["3D Simulations"], response_model=simulations.ResponseModelDepthTime)
@@ -806,7 +808,7 @@ async def simulations_depth_time(model: simulations.Models = Path(..., title="Mo
     For longer durations, it is recommended to make multiple requests with shorter intervals between them.
     """
     validate.time_range(start_time, end_time)
-    return simulations.get_simulations_depthtime(filesystem, model, lake, start_time, end_time, lat, lng, variables)
+    return simulations.get_simulations_depthtime(filesystem, model.value, lake, start_time, end_time, lat, lng, variables)
 
 
 @app.get("/simulations/transect/{model}/{lake}/{time}/{lats}/{lngs}", tags=["3D Simulations"], response_model=simulations.ResponseModelTransect)
@@ -821,7 +823,7 @@ async def simulations_transect(model: simulations.Models = Path(..., title="Mode
     """
     validate.latitude_list(lats)
     validate.longitude_list(lngs)
-    return simulations.get_simulations_transect(filesystem, model, lake, time, lats, lngs, variables)
+    return simulations.get_simulations_transect(filesystem, model.value, lake, time, lats, lngs, variables)
 
 
 @app.get("/simulations/transect/{model}/{lake}/{start_time}/{end_time}/{lats}/{lngs}", tags=["3D Simulations"], response_model=simulations.ResponseModelTransectPeriod)
@@ -841,7 +843,7 @@ async def simulations_transect_period(model: simulations.Models = Path(..., titl
     validate.latitude_list(lats)
     validate.longitude_list(lngs)
     validate.time_range(start_time, end_time)
-    return simulations.get_simulations_transect_period(filesystem, model, lake, start_time, end_time, lats, lngs, variables)
+    return simulations.get_simulations_transect_period(filesystem, model.value, lake, start_time, end_time, lats, lngs, variables)
 
 
 @app.get("/simulations/1d/metadata", tags=["1D Simulations"], response_model=List[simulations.Metadata1D])
@@ -861,7 +863,7 @@ async def one_dimensional_simulations_metadata_lake(
     """
     Available 1D simulation data for a specific lake and model. Includes information on available variables.
     """
-    return simulations.get_one_dimensional_metadata_lake(filesystem, model, lake)
+    return simulations.get_one_dimensional_metadata_lake(filesystem, model.value, lake)
 
 
 @app.get("/simulations/1d/file/{model}/{lake}/{month}", tags=["1D Simulations"], response_class=FileResponse)
@@ -874,7 +876,7 @@ async def one_dimensional_simulations_file(
 
     Metadata in the file describes the available variables.
     """
-    path = os.path.join(filesystem, "media/1dsimulations", model, "results", lake, "{}.nc".format(month))
+    path = os.path.join(filesystem, "media/1dsimulations", model.value, "results", lake, "{}.nc".format(month))
     if not os.path.isfile(path):
         raise HTTPException(status_code=400, detail="Apologies data is not available for {} on the month beginning {}".format(model,month))
     return FileResponse(path, media_type="application/nc", filename="{}_{}_{}.nc".format(model, lake, month))
@@ -897,7 +899,7 @@ async def one_dimensional_simulations_point(
         For longer durations, it is recommended to make multiple requests with shorter intervals between them.
     """
     validate.time_range(start_time, end_time)
-    return simulations.get_one_dimensional_point(filesystem, model, lake, start_time, end_time, depth, variables, resample)
+    return simulations.get_one_dimensional_point(filesystem, model.value, lake, start_time, end_time, depth, variables, resample)
 
 
 @app.get("/simulations/1d/profile/{model}/{lake}/{time}", tags=["1D Simulations"], response_model=simulations.ResponseModel1DProfile)
@@ -910,7 +912,7 @@ async def one_dimensional_simulations_profile(
     Vertical profile for a specific **time**.
     """
     validate.time(time)
-    return simulations.get_one_dimensional_profile(filesystem, model, lake, time, variables)
+    return simulations.get_one_dimensional_profile(filesystem, model.value, lake, time, variables)
 
 
 @app.get("/simulations/1d/depthtime/{model}/{lake}/{start_time}/{end_time}", tags=["1D Simulations"], response_model=simulations.ResponseModel1DDepthTime)
@@ -927,7 +929,7 @@ async def one_dimensional_simulations_depth_time(
         For longer durations, it is recommended to make multiple requests with shorter intervals between them.
     """
     validate.time_range(start_time, end_time)
-    return simulations.get_one_dimensional_depth_time(filesystem, model, lake, start_time, end_time, variables)
+    return simulations.get_one_dimensional_depth_time(filesystem, model.value, lake, start_time, end_time, variables)
 
 
 @app.get("/simulations/1d/doy/metadata", tags=["1D Simulations"], response_model=List[simulations.Metadata1DDOY])
@@ -949,7 +951,7 @@ async def one_dimensional_simulations_day_of_year(
 
     ⚠️ **Warning:** Only available once computed using the write endpoint, see metadata for available products
     """
-    return simulations.get_one_dimensional_day_of_year(filesystem, model, lake, variable, depth)
+    return simulations.get_one_dimensional_day_of_year(filesystem, model.value, lake, variable, depth)
 
 
 if internal:
@@ -966,7 +968,7 @@ if internal:
         ⚠️ **Warning:** Processing is slow due to the large volumes of data, once it has completed data is available from the doy
         endpoint.
         """
-        background_tasks.add_task(simulations.write_one_dimensional_day_of_year, filesystem, model, lake, variable, depth)
+        background_tasks.add_task(simulations.write_one_dimensional_day_of_year, filesystem, model.value, lake, variable, depth)
         return Response(content="Computing DOY", status_code=202)
 
 
@@ -986,4 +988,4 @@ async def remote_sensing_products(lake: str = Path(..., title="Lake", descriptio
     Metadata for full time series of remote sensing products for a given lake, satellite and variable.
     See /remotesensing/metadata for input options.
     """
-    return RedirectResponse("https://eawagrs.s3.eu-central-1.amazonaws.com/alplakes/metadata/{}/{}/{}_public.json".format(satellite, lake, variable))
+    return RedirectResponse("https://eawagrs.s3.eu-central-1.amazonaws.com/alplakes/metadata/{}/{}/{}_public.json".format(satellite.value, lake, variable))

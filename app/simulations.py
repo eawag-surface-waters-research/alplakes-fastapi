@@ -6,7 +6,7 @@ import xarray as xr
 import pandas as pd
 from enum import Enum
 from typing import Dict, List, Union, Any
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 from fastapi import HTTPException
 from fastapi.responses import FileResponse
 from datetime import datetime, timedelta, timezone, date
@@ -34,9 +34,14 @@ class ResponseModelPoint(BaseModel):
     depth: functions.VariableKeyModel1D
     distance: functions.VariableKeyModel1D
     variables: Dict[str, functions.VariableKeyModel1D]
-    @validator('time', each_item=True)
+    @field_validator('time')
+    @classmethod
     def validate_timezone(cls, value):
-        if value.tzinfo is None:
+        if isinstance(value, list):
+            for v in value:
+                if v.tzinfo is None:
+                    raise ValueError('time must have a timezone')
+        elif value.tzinfo is None:
             raise ValueError('time must have a timezone')
         return value
 
@@ -47,9 +52,14 @@ class ResponseModelLayer(BaseModel):
     lng: List[List[Any]]
     depth: functions.VariableKeyModel1D
     variables: Dict[str, functions.VariableKeyModel2D]
-    @validator('time', each_item=True)
+    @field_validator('time')
+    @classmethod
     def validate_timezone(cls, value):
-        if value.tzinfo is None:
+        if isinstance(value, list):
+            for v in value:
+                if v.tzinfo is None:
+                    raise ValueError('time must have a timezone')
+        elif value.tzinfo is None:
             raise ValueError('time must have a timezone')
         return value
 
@@ -58,9 +68,14 @@ class ResponseModelAverageLayer(BaseModel):
     time: List[datetime]
     depth: functions.VariableKeyModel1D
     variable: functions.VariableKeyModel1D
-    @validator('time', each_item=True)
+    @field_validator('time')
+    @classmethod
     def validate_timezone(cls, value):
-        if value.tzinfo is None:
+        if isinstance(value, list):
+            for v in value:
+                if v.tzinfo is None:
+                    raise ValueError('time must have a timezone')
+        elif value.tzinfo is None:
             raise ValueError('time must have a timezone')
         return value
 
@@ -77,9 +92,14 @@ class ResponseModelProfile(BaseModel):
     lng: float
     depth: functions.VariableKeyModel1D
     variables: Dict[str, functions.VariableKeyModel1D]
-    @validator('time', each_item=True)
+    @field_validator('time')
+    @classmethod
     def validate_timezone(cls, value):
-        if value.tzinfo is None:
+        if isinstance(value, list):
+            for v in value:
+                if v.tzinfo is None:
+                    raise ValueError('time must have a timezone')
+        elif value.tzinfo is None:
             raise ValueError('time must have a timezone')
         return value
 
@@ -90,9 +110,14 @@ class ResponseModelDepthTime(BaseModel):
     depth: functions.VariableKeyModel1D
     distance: functions.VariableKeyModel1D
     variables: Dict[str, functions.VariableKeyModel1D]
-    @validator('time', each_item=True)
+    @field_validator('time')
+    @classmethod
     def validate_timezone(cls, value):
-        if value.tzinfo is None:
+        if isinstance(value, list):
+            for v in value:
+                if v.tzinfo is None:
+                    raise ValueError('time must have a timezone')
+        elif value.tzinfo is None:
             raise ValueError('time must have a timezone')
         return value
 
@@ -103,9 +128,14 @@ class ResponseModelTransect(BaseModel):
     depth: functions.VariableKeyModel1D
     distance: functions.VariableKeyModel1D
     variables: Dict[str, functions.VariableKeyModel1D]
-    @validator('time', each_item=True)
+    @field_validator('time')
+    @classmethod
     def validate_timezone(cls, value):
-        if value.tzinfo is None:
+        if isinstance(value, list):
+            for v in value:
+                if v.tzinfo is None:
+                    raise ValueError('time must have a timezone')
+        elif value.tzinfo is None:
             raise ValueError('time must have a timezone')
         return value
 
@@ -116,9 +146,14 @@ class ResponseModelTransectPeriod(BaseModel):
     depth: functions.VariableKeyModel1D
     distance: functions.VariableKeyModel1D
     variables: Dict[str, functions.VariableKeyModel1D]
-    @validator('time', each_item=True)
+    @field_validator('time')
+    @classmethod
     def validate_timezone(cls, value):
-        if value.tzinfo is None:
+        if isinstance(value, list):
+            for v in value:
+                if v.tzinfo is None:
+                    raise ValueError('time must have a timezone')
+        elif value.tzinfo is None:
             raise ValueError('time must have a timezone')
         return value
 
@@ -231,7 +266,7 @@ def get_simulations_point_delft3dflow(filesystem, lake, start, end, depth, latit
     start_datetime = datetime.strptime(start, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
     end_datetime = datetime.strptime(end, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
 
-    with xr.open_mfdataset(files) as ds:
+    with xr.open_mfdataset(files, data_vars='minimal', compat='no_conflicts') as ds:
         ds['time'] = ds.indexes['time'].tz_localize('UTC')
         ds = ds.sel(time=slice(start_datetime, end_datetime))
         if len(ds['time']) == 0:
@@ -284,7 +319,7 @@ def get_simulations_point_mitgcm(filesystem, lake, start, end, depth, latitude, 
     start_datetime = datetime.strptime(start, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
     end_datetime = datetime.strptime(end, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
 
-    with xr.open_mfdataset(files) as ds:
+    with xr.open_mfdataset(files, data_vars='minimal', compat='no_conflicts') as ds:
         ds['time'] = ds.indexes['time'].tz_localize('UTC')
         ds = ds.sel(time=slice(start_datetime, end_datetime))
         if len(ds['time']) == 0:
@@ -624,7 +659,7 @@ def get_simulations_layer_average_temperature_delft3dflow(filesystem, lake, star
     start_datetime = datetime.strptime(start[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
     end_datetime = datetime.strptime(end[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
 
-    with xr.open_mfdataset(files) as ds:
+    with xr.open_mfdataset(files, data_vars='minimal', compat='no_conflicts') as ds:
         ds['time'] = ds.indexes['time'].tz_localize('UTC')
         ds = ds.sel(time=slice(start_datetime, end_datetime))
         if len(ds['time']) == 0:
@@ -663,7 +698,7 @@ def get_simulations_layer_average_temperature_mitgcm(filesystem, lake, start, en
     start_datetime = datetime.strptime(start[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
     end_datetime = datetime.strptime(end[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
 
-    with xr.open_mfdataset(files) as ds:
+    with xr.open_mfdataset(files, data_vars='minimal', compat='no_conflicts') as ds:
         ds['time'] = ds.indexes['time'].tz_localize('UTC')
         ds = ds.sel(time=slice(start_datetime, end_datetime))
         if len(ds['time']) == 0:
@@ -712,7 +747,7 @@ def get_simulations_average_bottom_temperature_delft3dflow(filesystem, lake, sta
     start_datetime = datetime.strptime(start[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
     end_datetime = datetime.strptime(end[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
 
-    with xr.open_mfdataset(files) as ds:
+    with xr.open_mfdataset(files, data_vars='minimal', compat='no_conflicts') as ds:
         ds['time'] = ds.indexes['time'].tz_localize('UTC')
         ds = ds.sel(time=slice(start_datetime, end_datetime))
         if len(ds['time']) == 0:
@@ -728,7 +763,7 @@ def get_simulations_average_bottom_temperature_delft3dflow(filesystem, lake, sta
             no_valid_data_mask = no_valid_data_mask[0]
         bottom_indices[no_valid_data_mask] = -1
         rows, cols = np.meshgrid(np.arange(t.shape[2]), np.arange(t.shape[3]), indexing='ij')
-        result = np.nanmean(t[:, bottom_indices, rows, cols], axis=0)
+        result = functions.safe_nanmean(t[:, bottom_indices, rows, cols], axis=0)
 
         lat_grid, lng_grid = functions.coordinates_to_latlng(ds["XZ"].values, ds["YZ"].values)
 
@@ -757,7 +792,7 @@ def get_simulations_average_bottom_temperature_mitgcm(filesystem, lake, start, e
     start_datetime = datetime.strptime(start[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
     end_datetime = datetime.strptime(end[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
 
-    with xr.open_mfdataset(files) as ds:
+    with xr.open_mfdataset(files, data_vars='minimal', compat='no_conflicts') as ds:
         ds['time'] = ds.indexes['time'].tz_localize('UTC')
         ds = ds.sel(time=slice(start_datetime, end_datetime))
         if len(ds['time']) == 0:
@@ -774,7 +809,7 @@ def get_simulations_average_bottom_temperature_mitgcm(filesystem, lake, start, e
         all_nan_mask = ~np.any(valid_mask, axis=0)
         deepest_valid_indices[all_nan_mask] = -1
         rows, cols = np.meshgrid(np.arange(t.shape[2]), np.arange(t.shape[3]), indexing='ij')
-        result = np.nanmean(t[:, deepest_valid_indices, rows, cols], axis=0)
+        result = functions.safe_nanmean(t[:, deepest_valid_indices, rows, cols], axis=0)
         lat_grid, lng_grid = ds["lat"].values, ds["lng"].values
 
         output = {"variable": {"data": functions.filter_variable(result), "unit": "degC", "description": "Average bottom temperature"},
@@ -943,7 +978,7 @@ def get_simulations_depthtime_delft3dflow(filesystem, lake, start, end, latitude
     start_datetime = datetime.strptime(start, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
     end_datetime = datetime.strptime(end, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
 
-    with xr.open_mfdataset(files) as ds:
+    with xr.open_mfdataset(files, data_vars='minimal', compat='no_conflicts') as ds:
         ds['time'] = ds.indexes['time'].tz_localize('UTC')
         ds = ds.sel(time=slice(start_datetime, end_datetime))
         if len(ds['time']) == 0:
@@ -1005,7 +1040,7 @@ def get_simulations_depthtime_mitgcm(filesystem, lake, start, end, latitude, lon
     start_datetime = datetime.strptime(start, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
     end_datetime = datetime.strptime(end, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
 
-    with xr.open_mfdataset(files) as ds:
+    with xr.open_mfdataset(files, data_vars='minimal', compat='no_conflicts') as ds:
         ds['time'] = ds.indexes['time'].tz_localize('UTC')
         ds = ds.sel(time=slice(start_datetime, end_datetime))
         if len(ds['time']) == 0:
@@ -1125,7 +1160,11 @@ def get_simulations_transect_delft3dflow(filesystem, lake, time, latitude_str, l
         valid_depths = ~np.all(t == nodata, axis=1)
         depth = z[valid_depths]
         ds = ds.sel(KMAXOUT_RESTR=valid_depths)
-        output = {"time": ds.time.values,
+        time_value = ds.time.values
+        if isinstance(time_value, np.datetime64):
+            time_value = pd.Timestamp(time_value).tz_localize('UTC')
+            time_value = time_value.to_pydatetime()
+        output = {"time": time_value,
                   "distance": {"data": functions.filter_variable(sp_arr), "unit": "m",
                                "description": "Distance along transect"},
                   "depth": {"data": functions.filter_variable(depth), "unit": "m",
@@ -1214,7 +1253,11 @@ def get_simulations_transect_mitgcm(filesystem, lake, time, latitude_str, longit
         valid_depths = ~np.all(np.isnan(t), axis=1)
         depth = z[valid_depths]
         ds = ds.sel(depth=valid_depths)
-        output = {"time": ds.time.values,
+        time_value = ds.time.values
+        if isinstance(time_value, np.datetime64):
+            time_value = pd.Timestamp(time_value).tz_localize('UTC')
+            time_value = time_value.to_pydatetime()
+        output = {"time": time_value,
                   "distance": {"data": functions.filter_variable(sp_arr), "unit": "m",
                                "description": "Distance along transect"},
                   "depth": {"data": functions.filter_variable(depth), "unit": "m",
@@ -1277,7 +1320,7 @@ def get_simulations_transect_period_delft3dflow(filesystem, lake, start, end, la
     start_datetime = datetime.strptime(start[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
     end_datetime = datetime.strptime(end[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
 
-    with xr.open_mfdataset(files) as ds:
+    with xr.open_mfdataset(files, data_vars='minimal', compat='no_conflicts') as ds:
         ds['time'] = ds.indexes['time'].tz_localize('UTC')
         ds = ds.sel(time=slice(start_datetime, end_datetime))
         if len(ds['time']) == 0:
@@ -1376,7 +1419,7 @@ def get_simulations_transect_period_mitgcm(filesystem, lake, start, end, latitud
     start_datetime = datetime.strptime(start[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
     end_datetime = datetime.strptime(end[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
 
-    with xr.open_mfdataset(files) as ds:
+    with xr.open_mfdataset(files, data_vars='minimal', compat='no_conflicts') as ds:
         ds['time'] = ds.indexes['time'].tz_localize('UTC')
         ds = ds.sel(time=slice(start_datetime, end_datetime))
         if len(ds['time']) == 0:
@@ -1466,9 +1509,14 @@ class ResponseModel1DPoint(BaseModel):
     depth: functions.VariableKeyModel1D
     resample: Union[str, None]
     variables: Dict[str, functions.VariableKeyModel1D]
-    @validator('time', each_item=True)
+    @field_validator('time')
+    @classmethod
     def validate_timezone(cls, value):
-        if value.tzinfo is None:
+        if isinstance(value, list):
+            for v in value:
+                if v.tzinfo is None:
+                    raise ValueError('time must have a timezone')
+        elif value.tzinfo is None:
             raise ValueError('time must have a timezone')
         return value
 
@@ -1476,9 +1524,14 @@ class ResponseModel1DProfile(BaseModel):
     time: datetime
     depth: functions.VariableKeyModel1D
     variables: Dict[str, functions.VariableKeyModel1D]
-    @validator('time', each_item=True)
+    @field_validator('time')
+    @classmethod
     def validate_timezone(cls, value):
-        if value.tzinfo is None:
+        if isinstance(value, list):
+            for v in value:
+                if v.tzinfo is None:
+                    raise ValueError('time must have a timezone')
+        elif value.tzinfo is None:
             raise ValueError('time must have a timezone')
         return value
 
@@ -1486,9 +1539,14 @@ class ResponseModel1DDepthTime(BaseModel):
     time: List[datetime]
     depth: functions.VariableKeyModel1D
     variables: Dict[str, functions.VariableKeyModel1D]
-    @validator('time', each_item=True)
+    @field_validator('time')
+    @classmethod
     def validate_timezone(cls, value):
-        if value.tzinfo is None:
+        if isinstance(value, list):
+            for v in value:
+                if v.tzinfo is None:
+                    raise ValueError('time must have a timezone')
+        elif value.tzinfo is None:
             raise ValueError('time must have a timezone')
         return value
 
@@ -1509,9 +1567,14 @@ class ResponseModel1DDOY(BaseModel):
     end_time: datetime
     depth: functions.VariableKeyModel1D
     variables: Dict[str, functions.VariableKeyModel1D]
-    @validator('start_time', 'end_time', each_item=True)
+    @field_validator('start_time', 'end_time')
+    @classmethod
     def validate_timezone(cls, value):
-        if value.tzinfo is None:
+        if isinstance(value, list):
+            for v in value:
+                if v.tzinfo is None:
+                    raise ValueError('time must have a timezone')
+        elif value.tzinfo is None:
             raise ValueError('time must have a timezone')
         return value
 
@@ -1656,7 +1719,7 @@ def get_one_dimensional_point_simstrat(filesystem, lake, start, end, depth, vari
     start_datetime = datetime.strptime(start, "%Y%m%d%H%M").replace(tzinfo=timezone.utc).astimezone().replace(tzinfo=None)
     end_datetime = datetime.strptime(end, "%Y%m%d%H%M").replace(tzinfo=timezone.utc).astimezone().replace(tzinfo=None)
 
-    with xr.open_mfdataset(files) as ds:
+    with xr.open_mfdataset(files, data_vars='minimal', compat='no_conflicts') as ds:
         dims = None
         for v in variables:
             if v not in ds.variables:
@@ -1725,7 +1788,11 @@ def get_one_dimensional_profile_simstrat(filesystem, lake, time, variables):
         time_index = functions.get_closest_index(functions.convert_to_unit(origin, "nano"), ds["time"].values)
         ds = ds.isel(time=time_index)
         depths = ds.depth[:].values * - 1
-        out["time"] = ds.time.values
+        time_value = ds.time.values
+        if isinstance(time_value, np.datetime64):
+            time_value = pd.Timestamp(time_value).tz_localize('UTC')
+            time_value = time_value.to_pydatetime()
+        out["time"] = time_value
         out["depth"] = {"data": functions.filter_variable(depths), "unit": "m", "description": "Distance from the surface to the closest grid point to requested depth"}
         for v in variables:
             out["variables"][v] = {"data": functions.filter_variable(ds[v].values), "unit": ds[v].units, "description": ds[v].long_name}
@@ -1760,7 +1827,7 @@ def get_one_dimensional_depth_time_simstrat(filesystem, lake, start, end, variab
     end_datetime = datetime.strptime(end, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
 
     files = [os.path.join(lakes, lake, "{}.nc".format(month.strftime("%Y%m"))) for month in months]
-    with xr.open_mfdataset(files) as ds:
+    with xr.open_mfdataset(files, data_vars='minimal', compat='no_conflicts') as ds:
         for v in variables:
             if v not in ds.variables:
                 raise HTTPException(status_code=400, detail="Variable {} is not available".format(v))
@@ -1848,7 +1915,7 @@ def write_one_dimensional_day_of_year_simstrat(filesystem, lake, variable, depth
     if len(files) > 48:
         files = files[24:]  # Remove first two years as a warmup
     try:
-        with xr.open_mfdataset(files) as ds:
+        with xr.open_mfdataset(files, data_vars='minimal', compat='no_conflicts') as ds:
             if variable not in ds.variables:
                 raise HTTPException(status_code=400, detail="Variable {} is not available".format(variable))
             ds['time'] = ds.indexes['time'].tz_localize('UTC')

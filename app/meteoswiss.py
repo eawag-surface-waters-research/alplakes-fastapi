@@ -8,7 +8,7 @@ from enum import Enum
 from datetime import datetime, timedelta, timezone, date
 from fastapi import HTTPException
 from typing import Dict, List, Union, Any
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 from app import functions
 
 
@@ -25,9 +25,14 @@ class ResponseModel2D(BaseModel):
     lat: List[List[float]]
     lng: List[List[float]]
     variables: Dict[str, functions.VariableKeyModel2D]
-    @validator('time', each_item=True)
+    @field_validator('time')
+    @classmethod
     def validate_timezone(cls, value):
-        if value.tzinfo is None:
+        if isinstance(value, list):
+            for v in value:
+                if v.tzinfo is None:
+                    raise ValueError('time must have a timezone')
+        elif value.tzinfo is None:
             raise ValueError('time must have a timezone')
         return value
 
@@ -37,9 +42,14 @@ class ResponseModel1D(BaseModel):
     lng: float
     distance: functions.VariableKeyModel1D
     variables: Dict[str, functions.VariableKeyModel1D]
-    @validator('time', each_item=True)
+    @field_validator('time')
+    @classmethod
     def validate_timezone(cls, value):
-        if value.tzinfo is None:
+        if isinstance(value, list):
+            for v in value:
+                if v.tzinfo is None:
+                    raise ValueError('time must have a timezone')
+        elif value.tzinfo is None:
             raise ValueError('time must have a timezone')
         return value
 
@@ -631,9 +641,14 @@ class VariableKeyModelMeteo(BaseModel):
 class ResponseModelMeteo(BaseModel):
     time: List[datetime]
     variables: Dict[str, VariableKeyModelMeteo]
-    @validator('time', each_item=True)
+    @field_validator('time')
+    @classmethod
     def validate_timezone(cls, value):
-        if value.tzinfo is None:
+        if isinstance(value, list):
+            for v in value:
+                if v.tzinfo is None:
+                    raise ValueError('time must have a timezone')
+        elif value.tzinfo is None:
             raise ValueError('time must have a timezone')
         return value
 
@@ -767,5 +782,5 @@ def get_meteodata_measured(filesystem, station_id, variables, start_date, end_da
 
 
 def meteoswiss_time_iso(time_array):
-    return [datetime.utcfromtimestamp(time.astype('datetime64[s]').astype('int')).replace(tzinfo=timezone.utc) for
-     time in np.array(time_array.values, dtype='datetime64[ns]')]
+    return [datetime.fromtimestamp(time.astype('datetime64[s]').astype('int'), tz=timezone.utc) for
+            time in np.array(time_array.values, dtype='datetime64[ns]')]

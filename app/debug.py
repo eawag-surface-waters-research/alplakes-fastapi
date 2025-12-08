@@ -13,14 +13,14 @@ import simulations
 
 filesystem = "../filesystem"
 
-function = "insitu.get_temperature_measured"
+function = "meteoswiss.get_cosmo_area_reanalysis"
 
 if function == "meteoswiss.get_cosmo_metadata":
     data = meteoswiss.get_cosmo_metadata(filesystem)
     print(data)
 
 if function == "meteoswiss.get_cosmo_area_reanalysis":
-    data = meteoswiss.get_cosmo_area_reanalysis(filesystem, "VNXQ34", ["T_2M"], "20221231", "20230101", 47.236215858048524, 8.526197876275669, 47.456287451632484, 8.835863473096651)
+    data = meteoswiss.get_cosmo_area_reanalysis(filesystem, "VNXQ34", ["T_2M"], "20230101", "20230101", 46.49, 6.65, 46.51, 6.67)
     print(data)
 
 if function == "meteoswiss.get_cosmo_area_forecast":
