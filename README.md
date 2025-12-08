@@ -56,7 +56,7 @@ docker compose up --build -d
 ### 1. Install virtual environment
 
 ```console
-conda create --name fastapi python=3.9.14
+conda create --name fastapi python=3.12
 conda activate fastapi
 conda install --file requirements.txt
 ```
