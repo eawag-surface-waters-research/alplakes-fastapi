@@ -17,7 +17,7 @@ class Metadata(BaseModel):
     end_date: date
     month_coverage: List[int]
 
-class ResponseModel(BaseModel):
+class ResponseModel(functions.TimeBaseModel):
     time: List[datetime]
     variable: functions.VariableKeyModel1D
     @field_validator('time')

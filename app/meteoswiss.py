@@ -20,7 +20,7 @@ class IconForecast(str, Enum):
     icon_ch2_eps = "icon-ch2-eps"
     icon_ch1_eps = "icon-ch1-eps"
 
-class ResponseModel2D(BaseModel):
+class ResponseModel2D(functions.TimeBaseModel):
     time: List[datetime]
     lat: List[List[float]]
     lng: List[List[float]]
@@ -36,7 +36,7 @@ class ResponseModel2D(BaseModel):
             raise ValueError('time must have a timezone')
         return value
 
-class ResponseModel1D(BaseModel):
+class ResponseModel1D(functions.TimeBaseModel):
     time: List[datetime]
     lat: float
     lng: float
@@ -638,7 +638,7 @@ class VariableKeyModelMeteo(BaseModel):
     description: str
     data: List[Union[float, None]]
 
-class ResponseModelMeteo(BaseModel):
+class ResponseModelMeteo(functions.TimeBaseModel):
     time: List[datetime]
     variables: Dict[str, VariableKeyModelMeteo]
     @field_validator('time')

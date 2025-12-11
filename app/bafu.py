@@ -27,7 +27,7 @@ class ResponseModelMeta(BaseModel):
     lng: float
     variables: Dict[str, VariableKeyModelMeta]
 
-class ResponseModel(BaseModel):
+class ResponseModel(functions.TimeBaseModel):
     time: List[datetime]
     variable: functions.VariableKeyModel1D
     @field_validator('time')

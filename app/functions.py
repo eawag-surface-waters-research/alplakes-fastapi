@@ -8,9 +8,19 @@ import numpy as np
 import pandas as pd
 from fastapi import HTTPException
 from typing import Dict, List, Union, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer
 from datetime import datetime, timedelta, timezone
 from dateutil.relativedelta import relativedelta, SU
+
+
+class TimeBaseModel(BaseModel):
+    @field_serializer('*', when_used='json', check_fields=False)
+    def serialize_dt(self, value: Any):
+        if isinstance(value, datetime):
+            return value.isoformat()
+        if isinstance(value, list):
+            return [dt.isoformat() if isinstance(dt, datetime) else dt for dt in value]
+        return value
 
 
 class VariableKeyModel1D(BaseModel):

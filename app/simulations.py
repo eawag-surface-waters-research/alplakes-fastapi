@@ -27,7 +27,7 @@ class Metadata(BaseModel):
     model: str
     lakes: List[MetadataLake]
 
-class ResponseModelPoint(BaseModel):
+class ResponseModelPoint(functions.TimeBaseModel):
     time: List[datetime]
     lat: float
     lng: float
@@ -46,7 +46,7 @@ class ResponseModelPoint(BaseModel):
         return value
 
 
-class ResponseModelLayer(BaseModel):
+class ResponseModelLayer(functions.TimeBaseModel):
     time: datetime
     lat: List[List[Any]]
     lng: List[List[Any]]
@@ -64,7 +64,7 @@ class ResponseModelLayer(BaseModel):
         return value
 
 
-class ResponseModelAverageLayer(BaseModel):
+class ResponseModelAverageLayer(functions.TimeBaseModel):
     time: List[datetime]
     depth: functions.VariableKeyModel1D
     variable: functions.VariableKeyModel1D
@@ -86,7 +86,7 @@ class ResponseModelAverageBottom(BaseModel):
     variable: functions.VariableKeyModel1D
 
 
-class ResponseModelProfile(BaseModel):
+class ResponseModelProfile(functions.TimeBaseModel):
     time: datetime
     lat: float
     lng: float
@@ -103,7 +103,7 @@ class ResponseModelProfile(BaseModel):
             raise ValueError('time must have a timezone')
         return value
 
-class ResponseModelDepthTime(BaseModel):
+class ResponseModelDepthTime(functions.TimeBaseModel):
     time: List[datetime]
     lat: float
     lng: float
@@ -121,7 +121,7 @@ class ResponseModelDepthTime(BaseModel):
             raise ValueError('time must have a timezone')
         return value
 
-class ResponseModelTransect(BaseModel):
+class ResponseModelTransect(functions.TimeBaseModel):
     time: datetime
     lat: List[float]
     lng: List[float]
@@ -139,7 +139,7 @@ class ResponseModelTransect(BaseModel):
             raise ValueError('time must have a timezone')
         return value
 
-class ResponseModelTransectPeriod(BaseModel):
+class ResponseModelTransectPeriod(functions.TimeBaseModel):
     time: List[datetime]
     lat: List[float]
     lng: List[float]
@@ -1504,7 +1504,7 @@ class Metadata1D(BaseModel):
     model: str
     lakes: List[MetadataLake1DDetail]
 
-class ResponseModel1DPoint(BaseModel):
+class ResponseModel1DPoint(functions.TimeBaseModel):
     time: List[datetime]
     depth: functions.VariableKeyModel1D
     resample: Union[str, None]
@@ -1520,7 +1520,7 @@ class ResponseModel1DPoint(BaseModel):
             raise ValueError('time must have a timezone')
         return value
 
-class ResponseModel1DProfile(BaseModel):
+class ResponseModel1DProfile(functions.TimeBaseModel):
     time: datetime
     depth: functions.VariableKeyModel1D
     variables: Dict[str, functions.VariableKeyModel1D]
@@ -1535,7 +1535,7 @@ class ResponseModel1DProfile(BaseModel):
             raise ValueError('time must have a timezone')
         return value
 
-class ResponseModel1DDepthTime(BaseModel):
+class ResponseModel1DDepthTime(functions.TimeBaseModel):
     time: List[datetime]
     depth: functions.VariableKeyModel1D
     variables: Dict[str, functions.VariableKeyModel1D]

@@ -36,7 +36,7 @@ class VariableKeyModelMeteo(BaseModel):
     description: str
     data: List[Union[float, None]]
 
-class ResponseModelMeteo(BaseModel):
+class ResponseModelMeteo(functions.TimeBaseModel):
     time: List[datetime]
     variables: Dict[str, VariableKeyModelMeteo]
     @field_validator('time')
