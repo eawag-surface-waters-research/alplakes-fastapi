@@ -5,7 +5,7 @@ import pandas as pd
 from typing import List
 from datetime import datetime, date, timezone, timedelta
 from typing import Dict, List, Union
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 from fastapi import HTTPException
 
 from app import functions
@@ -20,9 +20,14 @@ class Metadata(BaseModel):
 class ResponseModel(BaseModel):
     time: List[datetime]
     variable: functions.VariableKeyModel1D
-    @validator('time', each_item=True)
+    @field_validator('time')
+    @classmethod
     def validate_timezone(cls, value):
-        if value.tzinfo is None:
+        if isinstance(value, list):
+            for v in value:
+                if v.tzinfo is None:
+                    raise ValueError('time must have a timezone')
+        elif value.tzinfo is None:
             raise ValueError('time must have a timezone')
         return value
 
@@ -34,7 +39,7 @@ def get_insitu_secchi_metadata(filesystem):
     for file in os.listdir(folder):
         try:
             df = pd.read_csv(os.path.join(folder, file))
-            df["Time"] = pd.to_datetime(df["Time"], utc=True).dt.to_pydatetime()
+            df["Time"] = pd.to_datetime(df["Time"], utc=True)
             months = sorted(df['Time'].dt.month.unique().tolist())
             out.append({
                 "key": file.split(".")[0],
@@ -54,7 +59,7 @@ def get_insitu_secchi_lake(filesystem, lake):
         raise HTTPException(status_code=404, detail="Lake {} not available, please see the list of available lakes on "
                                                     "the metadata endpoint".format(lake))
     df = pd.read_csv(file_path)
-    df["Time"] = pd.to_datetime(df["Time"], utc=True).dt.to_pydatetime()
+    df["Time"] = pd.to_datetime(df["Time"], utc=True)
     df = df.dropna(subset=['Secchi depth [m]'])
     out = {"time": df["Time"].to_list(),
            "lat": df["Latitude"].to_list(),

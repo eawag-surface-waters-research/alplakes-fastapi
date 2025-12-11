@@ -8,7 +8,7 @@ from enum import Enum
 from datetime import datetime, timedelta, timezone, date
 from fastapi import HTTPException
 from typing import Dict, List, Union, Any
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 from app import functions
 
 class ResampleOptions(str, Enum):
@@ -38,9 +38,14 @@ class VariableKeyModelMeteo(BaseModel):
 class ResponseModelMeteo(BaseModel):
     time: List[datetime]
     variables: Dict[str, VariableKeyModelMeteo]
-    @validator('time', each_item=True)
+    @field_validator('time')
+    @classmethod
     def validate_timezone(cls, value):
-        if value.tzinfo is None:
+        if isinstance(value, list):
+            for v in value:
+                if v.tzinfo is None:
+                    raise ValueError('time must have a timezone')
+        elif value.tzinfo is None:
             raise ValueError('time must have a timezone')
         return value
 

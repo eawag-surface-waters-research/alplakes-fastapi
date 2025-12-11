@@ -56,7 +56,7 @@ docker compose up --build -d
 ### 1. Install virtual environment
 
 ```console
-conda create --name fastapi python=3.9.14
+conda create --name fastapi python=3.12
 conda activate fastapi
 conda install --file requirements.txt
 ```
@@ -104,4 +104,4 @@ pytest
 
 [mit-by]: https://opensource.org/licenses/MIT
 [mit-by-shield]: https://img.shields.io/badge/License-MIT-g.svg
-[python-by-shield]: https://img.shields.io/badge/Python-3.9-g
+[python-by-shield]: https://img.shields.io/badge/Python-3.12-g

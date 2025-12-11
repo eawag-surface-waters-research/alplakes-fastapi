@@ -3,6 +3,7 @@ import json
 import math
 import shutil
 import requests
+import warnings
 import numpy as np
 import pandas as pd
 from fastapi import HTTPException
@@ -41,11 +42,14 @@ def convert_to_unit(time, units):
 
 def convert_from_unit(time, units):
     if units == "seconds since 2008-03-01 00:00:00":
-        return datetime.utcfromtimestamp(time + (datetime(2008, 3, 1).replace(tzinfo=timezone.utc) - datetime(1970, 1, 1).replace(tzinfo=timezone.utc)).total_seconds())
+        return datetime.fromtimestamp(
+            float(time) + (datetime(2008, 3, 1, tzinfo=timezone.utc) - datetime(1970, 1, 1, tzinfo=timezone.utc)).total_seconds(),
+            tz=timezone.utc
+        )
     elif units == "seconds since 1970-01-01 00:00:00":
-        return datetime.utcfromtimestamp(float(time))
+        return datetime.fromtimestamp(float(time), tz=timezone.utc)
     elif units == "nano":
-        return datetime.utcfromtimestamp(time / 1000000000)
+        return datetime.fromtimestamp(float(time) / 1000000000, tz=timezone.utc)
     else:
         raise HTTPException(status_code=400,
                             detail="Apologies unable to read NetCDF with time unit: {}".format(units))
@@ -217,6 +221,13 @@ def alplakes_time(t, units):
 
 def unix_time(t, units):
     return np.array([convert_from_unit(x, units).timestamp() for x in t])
+
+
+def safe_nanmean(arr, axis=None):
+    """Compute nanmean, returning nan for empty slices without warning"""
+    with warnings.catch_warnings():
+        warnings.filterwarnings('ignore', category=RuntimeWarning)
+        return np.nanmean(arr, axis=axis)
 
 
 def exact_line_segments(lat1, lng1, lat2, lng2, lat_grid, lng_grid, start, grid):

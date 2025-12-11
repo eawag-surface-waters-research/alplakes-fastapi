@@ -4,7 +4,7 @@ import requests
 import pandas as pd
 from enum import Enum
 from typing import Dict, List
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 from datetime import datetime, timedelta, timezone, date
 from fastapi import HTTPException
 from fastapi.responses import FileResponse
@@ -30,9 +30,14 @@ class ResponseModelMeta(BaseModel):
 class ResponseModel(BaseModel):
     time: List[datetime]
     variable: functions.VariableKeyModel1D
-    @validator('time', each_item=True)
+    @field_validator('time')
+    @classmethod
     def validate_timezone(cls, value):
-        if value.tzinfo is None:
+        if isinstance(value, list):
+            for v in value:
+                if v.tzinfo is None:
+                    raise ValueError('time must have a timezone')
+        elif value.tzinfo is None:
             raise ValueError('time must have a timezone')
         return value
 
@@ -47,7 +52,7 @@ def get_hydrodata_station_metadata(filesystem, station_id):
         {"substring": "truebung", "unit": "NTU", "description": "Water turbidity"},
     ]
     station_id = int(station_id)
-    out = {"id": station_id}
+    out = {"id": str(station_id)}
     station_dir = os.path.join(filesystem, "media/bafu/hydrodata/stations", str(station_id))
     stations_file = os.path.join(filesystem, "media/bafu/hydrodata/stations/stations.json")
     if not os.path.exists(stations_file):
@@ -130,7 +135,7 @@ def get_hydrodata_measured(filesystem, station_id, variable, start_date, end_dat
     start = datetime.strptime(start_date, '%Y%m%d').replace(tzinfo=timezone.utc)
     end = datetime.strptime(end_date, '%Y%m%d').replace(tzinfo=timezone.utc) + timedelta(days=1)
     df = df[(df['time'] >= start) & (df['time'] < end)]
-    resample_options = {"hourly": "H", "daily": "D"}
+    resample_options = {"hourly": "h", "daily": "d"}
     if resample is not None:
         df.set_index('time', inplace=True)
         df = df.resample(resample_options[resample]).mean(numeric_only=True)
