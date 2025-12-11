@@ -266,7 +266,7 @@ def get_simulations_point_delft3dflow(filesystem, lake, start, end, depth, latit
     start_datetime = datetime.strptime(start, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
     end_datetime = datetime.strptime(end, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
 
-    with xr.open_mfdataset(files, data_vars='minimal', compat='override') as ds:
+    with xr.open_mfdataset(files, data_vars='minimal', compat='no_conflicts') as ds:
         ds['time'] = ds.indexes['time'].tz_localize('UTC')
         ds = ds.sel(time=slice(start_datetime, end_datetime))
         if len(ds['time']) == 0:
@@ -319,7 +319,7 @@ def get_simulations_point_mitgcm(filesystem, lake, start, end, depth, latitude, 
     start_datetime = datetime.strptime(start, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
     end_datetime = datetime.strptime(end, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
 
-    with xr.open_mfdataset(files, data_vars='minimal', compat='override') as ds:
+    with xr.open_mfdataset(files, data_vars='minimal', compat='no_conflicts') as ds:
         ds['time'] = ds.indexes['time'].tz_localize('UTC')
         ds = ds.sel(time=slice(start_datetime, end_datetime))
         if len(ds['time']) == 0:
@@ -659,7 +659,7 @@ def get_simulations_layer_average_temperature_delft3dflow(filesystem, lake, star
     start_datetime = datetime.strptime(start[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
     end_datetime = datetime.strptime(end[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
 
-    with xr.open_mfdataset(files, data_vars='minimal', compat='override') as ds:
+    with xr.open_mfdataset(files, data_vars='minimal', compat='no_conflicts') as ds:
         ds['time'] = ds.indexes['time'].tz_localize('UTC')
         ds = ds.sel(time=slice(start_datetime, end_datetime))
         if len(ds['time']) == 0:
@@ -698,7 +698,7 @@ def get_simulations_layer_average_temperature_mitgcm(filesystem, lake, start, en
     start_datetime = datetime.strptime(start[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
     end_datetime = datetime.strptime(end[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
 
-    with xr.open_mfdataset(files, data_vars='minimal', compat='override') as ds:
+    with xr.open_mfdataset(files, data_vars='minimal', compat='no_conflicts') as ds:
         ds['time'] = ds.indexes['time'].tz_localize('UTC')
         ds = ds.sel(time=slice(start_datetime, end_datetime))
         if len(ds['time']) == 0:
@@ -747,7 +747,7 @@ def get_simulations_average_bottom_temperature_delft3dflow(filesystem, lake, sta
     start_datetime = datetime.strptime(start[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
     end_datetime = datetime.strptime(end[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
 
-    with xr.open_mfdataset(files, data_vars='minimal', compat='override') as ds:
+    with xr.open_mfdataset(files, data_vars='minimal', compat='no_conflicts') as ds:
         ds['time'] = ds.indexes['time'].tz_localize('UTC')
         ds = ds.sel(time=slice(start_datetime, end_datetime))
         if len(ds['time']) == 0:
@@ -792,7 +792,7 @@ def get_simulations_average_bottom_temperature_mitgcm(filesystem, lake, start, e
     start_datetime = datetime.strptime(start[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
     end_datetime = datetime.strptime(end[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
 
-    with xr.open_mfdataset(files, data_vars='minimal', compat='override') as ds:
+    with xr.open_mfdataset(files, data_vars='minimal', compat='no_conflicts') as ds:
         ds['time'] = ds.indexes['time'].tz_localize('UTC')
         ds = ds.sel(time=slice(start_datetime, end_datetime))
         if len(ds['time']) == 0:
@@ -978,7 +978,7 @@ def get_simulations_depthtime_delft3dflow(filesystem, lake, start, end, latitude
     start_datetime = datetime.strptime(start, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
     end_datetime = datetime.strptime(end, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
 
-    with xr.open_mfdataset(files, data_vars='minimal', compat='override') as ds:
+    with xr.open_mfdataset(files, data_vars='minimal', compat='no_conflicts') as ds:
         ds['time'] = ds.indexes['time'].tz_localize('UTC')
         ds = ds.sel(time=slice(start_datetime, end_datetime))
         if len(ds['time']) == 0:
@@ -1040,7 +1040,7 @@ def get_simulations_depthtime_mitgcm(filesystem, lake, start, end, latitude, lon
     start_datetime = datetime.strptime(start, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
     end_datetime = datetime.strptime(end, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
 
-    with xr.open_mfdataset(files, data_vars='minimal', compat='override') as ds:
+    with xr.open_mfdataset(files, data_vars='minimal', compat='no_conflicts') as ds:
         ds['time'] = ds.indexes['time'].tz_localize('UTC')
         ds = ds.sel(time=slice(start_datetime, end_datetime))
         if len(ds['time']) == 0:
@@ -1320,7 +1320,7 @@ def get_simulations_transect_period_delft3dflow(filesystem, lake, start, end, la
     start_datetime = datetime.strptime(start[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
     end_datetime = datetime.strptime(end[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
 
-    with xr.open_mfdataset(files, data_vars='minimal', compat='override') as ds:
+    with xr.open_mfdataset(files, data_vars='minimal', compat='no_conflicts') as ds:
         ds['time'] = ds.indexes['time'].tz_localize('UTC')
         ds = ds.sel(time=slice(start_datetime, end_datetime))
         if len(ds['time']) == 0:
@@ -1419,7 +1419,7 @@ def get_simulations_transect_period_mitgcm(filesystem, lake, start, end, latitud
     start_datetime = datetime.strptime(start[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
     end_datetime = datetime.strptime(end[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
 
-    with xr.open_mfdataset(files, data_vars='minimal', compat='override') as ds:
+    with xr.open_mfdataset(files, data_vars='minimal', compat='no_conflicts') as ds:
         ds['time'] = ds.indexes['time'].tz_localize('UTC')
         ds = ds.sel(time=slice(start_datetime, end_datetime))
         if len(ds['time']) == 0:
@@ -1719,7 +1719,7 @@ def get_one_dimensional_point_simstrat(filesystem, lake, start, end, depth, vari
     start_datetime = datetime.strptime(start, "%Y%m%d%H%M").replace(tzinfo=timezone.utc).astimezone().replace(tzinfo=None)
     end_datetime = datetime.strptime(end, "%Y%m%d%H%M").replace(tzinfo=timezone.utc).astimezone().replace(tzinfo=None)
 
-    with xr.open_mfdataset(files, data_vars='minimal', compat='override') as ds:
+    with xr.open_mfdataset(files, data_vars='minimal', compat='no_conflicts') as ds:
         dims = None
         for v in variables:
             if v not in ds.variables:
@@ -1827,7 +1827,7 @@ def get_one_dimensional_depth_time_simstrat(filesystem, lake, start, end, variab
     end_datetime = datetime.strptime(end, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
 
     files = [os.path.join(lakes, lake, "{}.nc".format(month.strftime("%Y%m"))) for month in months]
-    with xr.open_mfdataset(files, data_vars='minimal', compat='override') as ds:
+    with xr.open_mfdataset(files, data_vars='minimal', compat='no_conflicts') as ds:
         for v in variables:
             if v not in ds.variables:
                 raise HTTPException(status_code=400, detail="Variable {} is not available".format(v))
@@ -1915,7 +1915,7 @@ def write_one_dimensional_day_of_year_simstrat(filesystem, lake, variable, depth
     if len(files) > 48:
         files = files[24:]  # Remove first two years as a warmup
     try:
-        with xr.open_mfdataset(files, data_vars='minimal', compat='override') as ds:
+        with xr.open_mfdataset(files, data_vars='minimal', compat='no_conflicts') as ds:
             if variable not in ds.variables:
                 raise HTTPException(status_code=400, detail="Variable {} is not available".format(variable))
             ds['time'] = ds.indexes['time'].tz_localize('UTC')
