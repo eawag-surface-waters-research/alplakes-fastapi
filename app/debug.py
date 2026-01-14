@@ -10,6 +10,7 @@ import meteoswiss
 import bafu
 import insitu
 import simulations
+import remotesensing
 
 filesystem = "../filesystem"
 
@@ -256,3 +257,8 @@ if function == "simulations.get_one_dimensional_day_of_year":
     plt.fill_between(range(366), data["variables"]["perc25"]["data"], data["variables"]["perc75"]["data"], color='skyblue', alpha=0.5)
     plt.legend()
     plt.show()
+
+if function == "remotesensing.get_remote_sensing_products":
+    data = remotesensing.get_remote_sensing_products("geneva", "sentinel3", "chla", 202405050300, 202405050300, 50)
+    print(data)
+

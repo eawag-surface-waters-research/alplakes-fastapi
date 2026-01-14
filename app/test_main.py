@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 from datetime import datetime
 import numpy as np
+import requests
 import pytest
 from .main import app
 
@@ -481,3 +482,19 @@ def test_one_dimensional_simulations_day_of_year():
     assert isinstance(data["variables"]["max"]["data"][0], float)
     assert isinstance(data["variables"]["min"]["data"][0], float)
     assert isinstance(data["variables"]["std"]["data"][0], float)
+
+
+def test_remote_sensing_products():
+    response = client.get("/remotesensing/products/geneva/sentinel3/chla?valid_pixels=60")
+    assert response.status_code == 200
+    data = response.json()
+    assert datetime.strptime(data[0]["time"], "%Y-%m-%dT%H:%M:%S%z")
+    response = requests.get(data[0]["full_tile"])
+    assert response.status_code == 200
+    response = requests.get(data[0]["lake_subset"])
+    assert response.status_code == 200
+    assert datetime.strptime(data[-1]["time"], "%Y-%m-%dT%H:%M:%S%z")
+    response = requests.get(data[-1]["full_tile"])
+    assert response.status_code == 200
+    response = requests.get(data[-1]["lake_subset"])
+    assert response.status_code == 200

@@ -27,21 +27,32 @@ def path_depth(example="1", description="Depth (m)"):
 
 
 def date(value):
-    year = int(value[:4])
-    month = int(value[4:6])
-    day = int(value[6:])
+    try:
+        year = int(value[:4])
+        month = int(value[4:6])
+        day = int(value[6:])
+    except:
+        raise HTTPException(status_code=400, detail="Invalid date format: {}".format(value))
     if year < 1000 or month < 1 or month > 12 or day < 1 or day > 31:
         raise HTTPException(status_code=400, detail="Invalid date format: {}".format(value))
 
 
 def time(value):
-    year = int(value[:4])
-    month = int(value[4:6])
-    day = int(value[6:8])
-    hour = int(value[8:10])
-    minute = int(value[10:12])
+    try:
+        year = int(value[:4])
+        month = int(value[4:6])
+        day = int(value[6:8])
+        hour = int(value[8:10])
+        minute = int(value[10:12])
+    except:
+        raise HTTPException(status_code=400, detail="Invalid time format: {}".format(value))
     if year < 1000 or month < 1 or month > 12 or day < 1 or day > 31 or hour < 0 or hour > 24 or minute < 0 or minute > 59:
         raise HTTPException(status_code=400, detail="Invalid time format: {}".format(value))
+
+
+def percentage(value):
+    if value < 0 or value > 100:
+        raise HTTPException(status_code=400, detail="Invalid percentage format: {}".format(value))
 
 
 def date_range(start, end):

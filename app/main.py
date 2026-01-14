@@ -980,12 +980,21 @@ async def remote_sensing_metadata():
     return RedirectResponse("https://eawagrs.s3.eu-central-1.amazonaws.com/alplakes/metadata/summary.json")
 
 
-@app.get("/remotesensing/products/{lake}/{satellite}/{variable}", tags=["Remote Sensing"], response_class=RedirectResponse, response_description="Redirect to a GeoJSON file")
+@app.get("/remotesensing/products/{lake}/{satellite}/{variable}", tags=["Remote Sensing"], response_model=remotesensing.ResponseModelSatellite)
 async def remote_sensing_products(lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
                                   satellite: remotesensing.Satellites = Path(..., title="Satellite", description="Satellite name"),
-                                  variable: str = Path(..., title="Variable", description="Variable", example="chla")):
+                                  variable: str = Path(..., title="Variable", description="Variable", example="chla"),
+                                  min_date: str = Query(None, description="Minimum date in YYYYmmddHHMM format (UTC)", example="202507010300"),
+                                  max_date: str = Query(None, description="Maximum date in YYYYmmddHHMM format (UTC)", example="202508010300"),
+                                  valid_pixels: int = Query(None, description="Minimum percentage of valid pixels", example="50")):
     """
     Metadata for full time series of remote sensing products for a given lake, satellite and variable.
     See /remotesensing/metadata for input options.
     """
-    return RedirectResponse("https://eawagrs.s3.eu-central-1.amazonaws.com/alplakes/metadata/{}/{}/{}_public.json".format(satellite.value, lake, variable))
+    if min_date is not None:
+        validate.time(min_date)
+    if max_date is not None:
+        validate.time(max_date)
+    if valid_pixels is not None:
+        validate.percentage(valid_pixels)
+    return remotesensing.get_remote_sensing_products(lake, satellite.value, variable, min_date, max_date, valid_pixels)
