@@ -14,7 +14,7 @@ import remotesensing
 
 filesystem = "../filesystem"
 
-function = "meteoswiss.get_cosmo_area_reanalysis"
+function = "remotesensing.get_remote_sensing_timeseries"
 
 if function == "meteoswiss.get_cosmo_metadata":
     data = meteoswiss.get_cosmo_metadata(filesystem)
@@ -260,5 +260,9 @@ if function == "simulations.get_one_dimensional_day_of_year":
 
 if function == "remotesensing.get_remote_sensing_products":
     data = remotesensing.get_remote_sensing_products("geneva", "sentinel3", "chla", 202405050300, 202405050300, 50)
+    print(data)
+
+if function == "remotesensing.get_remote_sensing_timeseries":
+    data = remotesensing.get_remote_sensing_timeseries("geneva", "sentinel3", "chla", 46.5, 6.67, 2,  202104010000, 202105010000, 10)
     print(data)
 

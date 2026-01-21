@@ -8,6 +8,7 @@ pandas==2.3.3
 pydantic==2.12.5
 pytest==9.0.2
 python-dateutil==2.9.0.post0
+rasterio==1.4.4
 requests==2.32.5
 seaborn==0.13.2
 sentry-sdk==2.47.0
