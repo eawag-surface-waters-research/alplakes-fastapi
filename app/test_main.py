@@ -483,7 +483,6 @@ def test_one_dimensional_simulations_day_of_year():
     assert isinstance(data["variables"]["min"]["data"][0], float)
     assert isinstance(data["variables"]["std"]["data"][0], float)
 
-
 def test_remote_sensing_products():
     response = client.get("/remotesensing/products/geneva/sentinel3/chla?valid_pixels=60")
     assert response.status_code == 200
@@ -498,3 +497,11 @@ def test_remote_sensing_products():
     assert response.status_code == 200
     response = requests.get(data[-1]["lake_subset"])
     assert response.status_code == 200
+
+def test_remote_sensing_timeseries():
+    response = client.get("/remotesensing/timeseries/geneva/sentinel3/chla/46.5/6.67?window=1&min_date=202104010000&max_date=202105010000&valid_pixels=10&stream=false")
+    assert response.status_code == 200
+    data = response.json()
+    assert datetime.strptime(data[0]["time"], "%Y-%m-%dT%H:%M:%S%z")
+    assert isinstance(data[0]["value"], dict)
+    assert set(data[0]["value"].keys()) == {'mean', 'median', 'min', 'max', 'std', 'count'}
