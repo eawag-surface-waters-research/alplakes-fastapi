@@ -263,6 +263,6 @@ if function == "remotesensing.get_remote_sensing_products":
     print(data)
 
 if function == "remotesensing.get_remote_sensing_timeseries":
-    data = remotesensing.get_remote_sensing_timeseries("geneva", "sentinel3", "chla", 46.5, 6.67, 2,  202104010000, 202105010000, 10)
+    data = remotesensing.get_remote_sensing_timeseries("geneva", "sentinel3", "chla", 46.5, 6.67, 2,  202104010000, 202105010000, 10, False)
     print(data)
 
