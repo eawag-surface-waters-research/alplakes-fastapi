@@ -984,45 +984,40 @@ async def remote_sensing_metadata():
 async def remote_sensing_products(lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
                                   satellite: remotesensing.Satellites = Path(..., title="Satellite", description="Satellite name"),
                                   variable: str = Path(..., title="Variable", description="Variable", example="chla"),
-                                  min_date: str = Query(None, description="Minimum date in YYYYmmddHHMM format (UTC)", example="202507010300"),
-                                  max_date: str = Query(None, description="Maximum date in YYYYmmddHHMM format (UTC)", example="202508010300"),
+                                  start_date: str = Query(None, description="Minimum date in YYYYmmdd", example="20250701"),
+                                  end_date: str = Query(None, description="Maximum date in YYYYmmdd", example="20250801"),
                                   valid_pixels: int = Query(None, description="Minimum percentage of valid pixels", example="50")):
     """
     Metadata for full time series of remote sensing products for a given lake, satellite and variable.
     See /remotesensing/metadata for input options.
     """
-    if min_date is not None:
-        validate.time(min_date)
-    if max_date is not None:
-        validate.time(max_date)
+    if start_date is not None:
+        validate.date(start_date)
+    if end_date is not None:
+        validate.date(end_date)
     if valid_pixels is not None:
         validate.percentage(valid_pixels)
-    return remotesensing.get_remote_sensing_products(lake, satellite.value, variable, min_date, max_date, valid_pixels)
+    return remotesensing.get_remote_sensing_products(lake, satellite.value, variable, start_date, end_date, valid_pixels)
 
 
-@app.get("/remotesensing/timeseries/{lake}/{satellite}/{variable}/{lat}/{lng}", tags=["Remote Sensing"])
+@app.get("/remotesensing/timeseries/{lake}/{satellite}/{variable}/{lat}/{lng}/{start_date}/{end_date}", tags=["Remote Sensing"])
 async def remote_sensing_products(lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
                                   satellite: remotesensing.Satellites = Path(..., title="Satellite", description="Satellite name"),
                                   variable: str = Path(..., title="Variable", description="Variable", example="chla"),
                                   lat: float = validate.path_latitude(example="46.49", description="Latitude"),
                                   lng: float = validate.path_longitude(example="6.65", description="Longitude"),
+                                  start_date: str = validate.path_date(description="The start date in YYYYmmdd format", example="20250701"),
+                                  end_date: str = validate.path_date(description="The end date in YYYYmmdd format", example="20250801"),
                                   window: int = Query(0, description="Extraction window radius. 0=1px, 1=9px, 2=25px...", example=0),
-                                  min_date: str = Query(None, description="Minimum date in YYYYmmddHHMM format (UTC)", example="202104010000"),
-                                  max_date: str = Query(None, description="Maximum date in YYYYmmddHHMM format (UTC)", example="202105010000"),
-                                  valid_pixels: int = Query(None, description="Minimum percentage of valid pixels", example="10"),
-                                  stream: bool = Query(False, description="Stream results. Results are returned per image as they are processed.")):
+                                  valid_pixels: int = Query(None, description="Minimum percentage of valid pixels", example="50")):
     """
     Timeseries at a given location for a given lake, satellite and variable.
 
     See /remotesensing/metadata for input options.
 
-    ⚠️ **Warning**: If your request returns a 502 timeout error reduce the period you are requesting or switch to streaming.
-    For longer durations, it is recommended to make multiple requests with shorter intervals between them or use the streaming option.
+    ⚠️ **Warning**: If your request returns a 502 timeout error reduce the period you are requesting.
+    For longer durations, it is recommended to make multiple requests with shorter intervals between them.
     """
-    if min_date is not None:
-        validate.time(min_date)
-    if max_date is not None:
-        validate.time(max_date)
     if valid_pixels is not None:
         validate.percentage(valid_pixels)
-    return remotesensing.get_remote_sensing_timeseries(lake, satellite.value, variable, lat, lng, window, min_date, max_date, valid_pixels, stream)
+    return remotesensing.get_remote_sensing_timeseries(lake, satellite.value, variable, lat, lng, start_date, end_date, window, valid_pixels)

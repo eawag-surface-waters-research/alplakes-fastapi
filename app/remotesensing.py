@@ -60,7 +60,7 @@ class ResponseModelSatellite(RootModel):
         return self.root[item]
 
 
-def get_remote_sensing_products(lake, satellite, variable, min_date, max_date, valid_pixels):
+def get_remote_sensing_products(lake, satellite, variable, start_date, end_date, valid_pixels):
     url = "https://eawagrs.s3.eu-central-1.amazonaws.com/alplakes/metadata/{}/{}/{}_public.json".format(satellite, lake, variable)
     try:
         response = requests.get(url)
@@ -72,8 +72,8 @@ def get_remote_sensing_products(lake, satellite, variable, min_date, max_date, v
 
     metadata =  [
         format_response(d, satellite, lake) for d in metadata
-        if (min_date is None or int(d['datetime'].replace("T", "")[:12]) >= int(min_date))
-           and (max_date is None or int(d['datetime'].replace("T", "")[:12]) <= int(max_date))
+        if (start_date is None or int(d['datetime'][:8]) >= int(start_date))
+           and (end_date is None or int(d['datetime'][:8]) <= int(end_date))
            and (valid_pixels is None or int(d['valid_pixels'].replace("%", "")) >= int(valid_pixels))
     ]
 
@@ -90,7 +90,7 @@ def format_response(data, satellite, lake):
              "valid_pixels": data["valid_pixels"] }
 
 
-def get_remote_sensing_timeseries(lake, satellite, variable, lat, lng, window, min_date, max_date, valid_pixels, stream):
+def get_remote_sensing_timeseries(lake, satellite, variable, lat, lng, start_date, end_date, window, valid_pixels):
     url = "https://eawagrs.s3.eu-central-1.amazonaws.com/alplakes/metadata/{}/{}/{}_public.json".format(satellite, lake, variable)
     try:
         response = requests.get(url)
@@ -102,31 +102,14 @@ def get_remote_sensing_timeseries(lake, satellite, variable, lat, lng, window, m
 
     metadata = [
         format_response(d, satellite, lake) for d in metadata
-        if (min_date is None or int(d['datetime'].replace("T", "")[:12]) >= int(min_date))
-           and (max_date is None or int(d['datetime'].replace("T", "")[:12]) <= int(max_date))
+        if (start_date is None or int(d['datetime'][:8]) >= int(start_date))
+           and (end_date is None or int(d['datetime'][:8]) <= int(end_date))
            and (valid_pixels is None or int(d['valid_pixels'].replace("%", "")) >= int(valid_pixels))
     ]
 
     metadata = sorted(metadata, key=lambda x: x['time'], reverse=True)
 
-    if stream:
-        return StreamingResponse(
-            generate_timeseries_stream(lng, lat, window, metadata),
-            media_type="application/x-ndjson"
-        )
-    else:
-        return generate_timeseries(lng, lat, window, metadata)
-
-
-def generate_timeseries_stream(lng, lat, window, metadata):
-    for file_info in metadata:
-        value = get_pixel_value(file_info['lake_subset'], lng, lat, window)
-        if value is not None:
-            data_point = {
-                "time": file_info["time"].isoformat(),
-                "value": value,
-            }
-            yield json.dumps(data_point) + "\n"
+    return generate_timeseries(lng, lat, window, metadata)
 
 
 def generate_timeseries(lng, lat, window, metadata):
