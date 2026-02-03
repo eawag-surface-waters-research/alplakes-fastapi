@@ -8,6 +8,8 @@ import numpy as np
 import pandas as pd
 from fastapi import HTTPException
 from typing import Dict, List, Union, Any
+
+from pandas.util.version import Infinity
 from pydantic import BaseModel, field_serializer
 from datetime import datetime, timedelta, timezone
 from dateutil.relativedelta import relativedelta, SU
@@ -105,6 +107,13 @@ def get_closest_index(value, array):
                             detail="Value {} less than min available ({})".format(value, sorted_array[0]))
     return (np.abs(array - value)).argmin()
 
+def get_closest_positive_index(value, array):
+    array = np.asarray(array)
+    positive_mask = array >= 0
+    positive_indices = np.where(positive_mask)[0]
+    positive_values = array[positive_mask]
+    closest_within_positive = get_closest_index(value, positive_values)
+    return positive_indices[closest_within_positive]
 
 def get_closest_location(latitude, longitude, lat_grid, lon_grid, yx=False):
     lon1, lat1, lon2, lat2 = map(np.radians, [longitude, latitude, lon_grid, lat_grid])

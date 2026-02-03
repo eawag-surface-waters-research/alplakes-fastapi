@@ -273,7 +273,7 @@ def get_simulations_point_delft3dflow(filesystem, lake, start, end, depth, latit
             raise HTTPException(status_code=400,
                                 detail="No timesteps available between {} and {}".format(start, end))
         z = ds.ZK_LYR[0, :].values * -1 if len(ds.ZK_LYR.shape) == 2 else ds.ZK_LYR[:].values * -1
-        depth_index = functions.get_closest_index(depth, z)
+        depth_index = functions.get_closest_positive_index(depth, z)
         depth = float(z[depth_index])
         lat_grid, lng_grid = functions.coordinates_to_latlng(ds.XZ[:].values, ds.YZ[:].values)
         x_index, y_index, distance = functions.get_closest_location(latitude, longitude, lat_grid, lng_grid)
@@ -388,7 +388,7 @@ def get_simulations_layer_delft3dflow(filesystem, lake, time, depth, variables):
     with netCDF4.Dataset(file) as nc:
         converted_time = functions.convert_to_unit(origin, nc.variables["time"].units)
         time_index = functions.get_closest_index(converted_time, np.array(nc.variables["time"][:]))
-        depth_index = functions.get_closest_index(depth, np.array(nc.variables["ZK_LYR"][:]) * -1)
+        depth_index = functions.get_closest_positive_index(depth, np.array(nc.variables["ZK_LYR"][:]) * -1)
         time = nc.variables["time"][time_index].tolist()
         depth = nc.variables["ZK_LYR"][depth_index].tolist() * -1
         lat_grid, lng_grid = functions.coordinates_to_latlng(nc.variables["XZ"][:], nc.variables["YZ"][:])
@@ -511,7 +511,7 @@ def get_simulations_layer_alplakes_delft3dflow(filesystem, lake, variable, start
             else:
                 time_index_end = len(time)
 
-            depth_index = functions.get_closest_index(depth, np.array(nc.variables["ZK_LYR"][:]) * -1)
+            depth_index = functions.get_closest_positive_index(depth, np.array(nc.variables["ZK_LYR"][:]) * -1)
 
             if variable == "temperature":
                 f = '%0.2f'
@@ -666,7 +666,7 @@ def get_simulations_layer_average_temperature_delft3dflow(filesystem, lake, star
             raise HTTPException(status_code=400,
                                 detail="No timesteps available between {} and {}".format(start, end))
         z = ds.ZK_LYR[0, :].values * -1 if len(ds.ZK_LYR.shape) == 2 else ds.ZK_LYR[:].values * -1
-        depth_index = functions.get_closest_index(depth, z)
+        depth_index = functions.get_closest_positive_index(depth, z)
         depth = float(z[depth_index])
         time = functions.alplakes_time(ds.time.values, "nano")
         t_arr = ds.R1.isel(KMAXOUT_RESTR=depth_index, LSTSCI=0)
