@@ -14,7 +14,7 @@ import remotesensing
 
 filesystem = "../filesystem"
 
-function = "remotesensing.get_remote_sensing_timeseries"
+function = "meteoswiss.get_icon_layer_alplakes"
 
 if function == "meteoswiss.get_cosmo_metadata":
     data = meteoswiss.get_cosmo_metadata(filesystem)
@@ -58,6 +58,10 @@ if function == "meteoswiss.get_icon_point_reanalysis":
 
 if function == "meteoswiss.get_icon_point_forecast":
     data = meteoswiss.get_icon_point_forecast(filesystem, "icon-ch2-eps", ["T_2M"], "20240703", 46.5, 6.67)
+    print(data)
+
+if function == "meteoswiss.get_icon_layer_alplakes":
+    data = meteoswiss.get_icon_layer_alplakes(filesystem, "T_2M", "20260217", "20260221", 46.194, 6.13, 46.526, 6.945)
     print(data)
 
 if function == "meteoswiss.get_meteodata_station_metadata":

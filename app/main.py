@@ -288,6 +288,29 @@ if internal:
         validate.date(forecast_date)
         return meteoswiss.get_icon_point_forecast(filesystem, model.value, variables, forecast_date, lat, lng)
 
+    @app.get("/meteoswiss/icon/layer/alplakes/{variable}/{start}/{end}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}",
+             tags=["Meteoswiss"], response_class=PlainTextResponse, include_in_schema=internal)
+    async def meteoswiss_icon_layer_alplakes(
+            variable: str = Path(..., title="Variable", example="T_2M",
+                                 description="Variable name (e.g. T_2M, UV, GLOB, RELHUM_2M, PMSL, CLCT). Use 'geometry' to retrieve the lat/lng grid. Use 'UV' for combined wind components."),
+            start: str = validate.path_date(description="The start date in YYYYmmdd format", example="20240729"),
+            end: str = validate.path_date(description="The end date in YYYYmmdd format", example="20240731"),
+            ll_lat: float = validate.path_latitude(example="46.49", description="Latitude of lower left corner of bounding box (WGS 84)"),
+            ll_lng: float = validate.path_longitude(example="6.65", description="Longitude of lower left corner of bounding box (WGS 84)"),
+            ur_lat: float = validate.path_latitude(example="46.51", description="Latitude of upper right corner of bounding box (WGS 84)"),
+            ur_lng: float = validate.path_longitude(example="6.67", description="Longitude of upper right corner of bounding box (WGS 84)")):
+        """
+        Plain text formatted MeteoSwiss ICON data for a bounding box over a time range.
+
+        Uses kenda-ch1 reanalysis for historical dates where available, automatically filling
+        remaining dates with the most recent icon-ch2-eps forecast to provide a seamless
+        time series across both data sources.
+
+        ⚠️ **Warning:** This endpoint is designed for supplying data to the Alplakes website. The output is **not** self-explanatory.
+        """
+        validate.date_range(start, end)
+        return meteoswiss.get_icon_layer_alplakes(filesystem, variable, start, end, ll_lat, ll_lng, ur_lat, ur_lng)
+
     @app.get("/meteoswiss/meteodata/metadata", tags=["Meteoswiss"], response_class=RedirectResponse, response_description="Redirect to a GeoJSON file")
     async def meteoswiss_meteodata_metadata():
         """
