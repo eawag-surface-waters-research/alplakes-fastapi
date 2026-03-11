@@ -728,7 +728,7 @@ def get_icon_layer_alplakes(filesystem, variable, start_date, end_date, ll_lat, 
         if variable == "geometry":
             return to_geometry_string(lat_g_r[xn:xx, yn:yx], lng_g_r[xn:xx, yn:yx])
         try:
-            with xr.open_mfdataset(reanalysis_files) as ds:
+            with xr.open_mfdataset(reanalysis_files, data_vars="all") as ds:
                 if variable == "UV":
                     u_name = resolve_variable(ds, "U")
                     v_name = resolve_variable(ds, "V")
