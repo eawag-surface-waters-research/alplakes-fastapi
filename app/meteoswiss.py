@@ -4,6 +4,7 @@ import requests
 import numpy as np
 import pandas as pd
 import xarray as xr
+from scipy.ndimage import zoom as ndimage_zoom
 from enum import Enum
 from datetime import datetime, timedelta, timezone, date
 from fastapi import HTTPException
@@ -615,6 +616,193 @@ def get_icon_point_reanalysis(filesystem, model, input_variables, start_date, en
                                 start_date, end_date))
     except Exception as e:
         raise
+
+def get_icon_layer_alplakes(filesystem, variable, start_date, end_date, ll_lat, ll_lng, ur_lat, ur_lng):
+    """Return ICON data in Alplakes compact plain-text format for a bounding box and time range.
+
+    Uses kenda-ch1 reanalysis for historical dates where files exist, filling remaining dates
+    with the most recent icon-ch2-eps forecast file.
+    """
+    start_date = datetime.strptime(start_date, '%Y%m%d').date()
+    end_date = datetime.strptime(end_date, '%Y%m%d').date()
+
+    # Find available reanalysis files (kenda-ch1); file date is offset +1 day
+    reanalysis_folder = os.path.join(filesystem, "media/meteoswiss/icon/kenda-ch1")
+    reanalysis_files = []
+    for x in range(1, (end_date - start_date).days + 2):
+        fname = os.path.join(reanalysis_folder, "{}_00_kenda-ch1_eawag_lakes.nc".format(
+            (start_date + timedelta(days=x)).strftime("%Y_%m_%d")))
+        if os.path.isfile(fname):
+            reanalysis_files.append(fname)
+
+    # Find the most recent forecast file (icon-ch2-eps)
+    forecast_file = None
+    forecast_folder = os.path.join(filesystem, "media/meteoswiss/icon/icon-ch2-eps")
+    if os.path.isdir(forecast_folder):
+        fc_files = sorted([f for f in os.listdir(forecast_folder) if f.endswith(".nc")])
+        if fc_files:
+            forecast_file = os.path.join(forecast_folder, fc_files[-1])
+
+    if not reanalysis_files and forecast_file is None:
+        raise HTTPException(status_code=404, detail="No ICON data available for the requested period.")
+
+    def get_grid(ds):
+        if len(ds.variables["lat_1"].shape) == 3:
+            return ds.variables["lat_1"][0].values, ds.variables["lon_1"][0].values
+        return ds.variables["lat_1"].values, ds.variables["lon_1"].values
+
+    # Compute the canonical bbox on the reanalysis (fine) grid so geometry is identical
+    # regardless of source. For forecast-only, derive the equivalent reanalysis bbox from
+    # the forecast indices using the known grid relationship: reanalysis index = 2 * forecast index.
+    if reanalysis_files:
+        with xr.open_dataset(reanalysis_files[0]) as ds_grid:
+            lat_g_r, lng_g_r = get_grid(ds_grid)
+        xa, ya = np.where((lat_g_r >= ll_lat) & (lat_g_r <= ur_lat) & (lng_g_r >= ll_lng) & (lng_g_r <= ur_lng))
+        if len(xa) == 0:
+            raise HTTPException(status_code=400, detail="Requested area is outside of the ICON coverage area, or is too small.")
+        xn, xx = int(min(xa)), int(max(xa)) + 1
+        yn, yx = int(min(ya)), int(max(ya)) + 1
+        F_X = (lat_g_r.shape[0] + 1) // 2
+        F_Y = (lat_g_r.shape[1] + 1) // 2
+    else:
+        with xr.open_dataset(forecast_file) as ds_grid:
+            lat_g_f, lng_g_f = get_grid(ds_grid)
+        xa, ya = np.where((lat_g_f >= ll_lat) & (lat_g_f <= ur_lat) & (lng_g_f >= ll_lng) & (lng_g_f <= ur_lng))
+        if len(xa) == 0:
+            raise HTTPException(status_code=400, detail="Requested area is outside of the ICON coverage area, or is too small.")
+        xn_f0, xx_f0 = int(min(xa)), int(max(xa)) + 1
+        yn_f0, yx_f0 = int(min(ya)), int(max(ya)) + 1
+        xn, xx = 2 * xn_f0, 2 * (xx_f0 - 1) + 1
+        yn, yx = 2 * yn_f0, 2 * (yx_f0 - 1) + 1
+        F_X, F_Y = lat_g_f.shape[0], lat_g_f.shape[1]
+
+    def resolve_variable(ds, var):
+        if var.replace("_MEAN", "") in ds.variables.keys():
+            return var.replace("_MEAN", "")
+        elif var + "_MEAN" in ds.variables.keys():
+            return var + "_MEAN"
+        return None
+
+    def extract_spatial(ds, var_name, xn, xx, yn, yx):
+        ndims = len(ds.variables[var_name].dims)
+        if ndims == 3:
+            return ds.variables[var_name][:, xn:xx, yn:yx].values
+        elif ndims == 4:
+            return ds.variables[var_name][:, 0, xn:xx, yn:yx].values
+        elif ndims == 5:
+            return ds.variables[var_name][:, 0, 0, xn:xx, yn:yx].values
+        return None
+
+    def to_geometry_string(lat_sub, lng_sub):
+        geometry = np.concatenate((lat_sub, lng_sub), axis=1)
+        return '\n'.join(','.join('%0.8f' % v for v in row) for row in geometry).replace("nan", "")
+
+    def upsample(data):
+        """Bilinear upsample to (2n-1) per spatial axis.
+        Handles 2D (X, Y) arrays (e.g. lat/lng) and 3D (T, X, Y) arrays (variable data)."""
+        if data.ndim == 2:
+            X, Y = data.shape
+            return ndimage_zoom(data, (((2 * X) - 1) / X, ((2 * Y) - 1) / Y), order=1)
+        T, X, Y = data.shape
+        return ndimage_zoom(data, (1.0, ((2 * X) - 1) / X, ((2 * Y) - 1) / Y), order=1)
+
+    # Forecast bbox derived from the canonical reanalysis bbox:
+    # include the surrounding forecast cell on each edge so the upsampled result
+    # covers the full reanalysis bbox, then crop back to exact size.
+    xn_f = xn // 2
+    xx_f = min(F_X, xx // 2 + 1)
+    yn_f = yn // 2
+    yx_f = min(F_Y, yx // 2 + 1)
+    xs, ys = xn - 2 * xn_f, yn - 2 * yn_f  # crop offsets after upsample
+    xsize, ysize = xx - xn, yx - yn
+
+    def crop_upsample(d):
+        u = upsample(d)
+        return u[xs:xs + xsize, ys:ys + ysize] if d.ndim == 2 else u[:, xs:xs + xsize, ys:ys + ysize]
+
+    combined_times = []
+    combined_data = []
+
+    # Process reanalysis
+    if reanalysis_files:
+        if variable == "geometry":
+            return to_geometry_string(lat_g_r[xn:xx, yn:yx], lng_g_r[xn:xx, yn:yx])
+        try:
+            with xr.open_mfdataset(reanalysis_files, data_vars="all") as ds:
+                if variable == "UV":
+                    u_name = resolve_variable(ds, "U")
+                    v_name = resolve_variable(ds, "V")
+                    if u_name is None or v_name is None:
+                        raise HTTPException(status_code=400, detail="U and V variables not available in ICON data.")
+                    u_data = extract_spatial(ds, u_name, xn, xx, yn, yx)
+                    v_data = extract_spatial(ds, v_name, xn, xx, yn, yx)
+                    data = np.concatenate([u_data, v_data], axis=-1) if u_data is not None and v_data is not None else None
+                else:
+                    var_name = resolve_variable(ds, variable)
+                    if var_name is None:
+                        raise HTTPException(status_code=400, detail="Variable {} not available in ICON data. Please select from: {}".format(variable, ", ".join(ds.keys())))
+                    data = extract_spatial(ds, var_name, xn, xx, yn, yx)
+                times = meteoswiss_time_iso(ds.variables["time"])
+                if data is not None:
+                    combined_times.extend(times)
+                    combined_data.append(data)
+        except HTTPException:
+            raise
+        except xr.MergeError:
+            raise HTTPException(status_code=400, detail="KENDA grid is not consistent across the requested date range, please access individual days.")
+
+    # Process forecast — derive bbox from canonical reanalysis indices, upsample and crop.
+    if forecast_file is not None:
+        with xr.open_dataset(forecast_file) as ds:
+            if variable == "geometry":
+                lat_g, lng_g = get_grid(ds)
+                return to_geometry_string(crop_upsample(lat_g[xn_f:xx_f, yn_f:yx_f]), crop_upsample(lng_g[xn_f:xx_f, yn_f:yx_f]))
+            if variable == "UV":
+                u_name = resolve_variable(ds, "U")
+                v_name = resolve_variable(ds, "V")
+                forecast_data = None
+                if u_name is not None and v_name is not None:
+                    u_data = extract_spatial(ds, u_name, xn_f, xx_f, yn_f, yx_f)
+                    v_data = extract_spatial(ds, v_name, xn_f, xx_f, yn_f, yx_f)
+                    if u_data is not None and v_data is not None:
+                        forecast_data = np.concatenate([crop_upsample(u_data), crop_upsample(v_data)], axis=-1)
+                elif not combined_times:
+                    raise HTTPException(status_code=400, detail="U and V variables not available in ICON data.")
+            else:
+                var_name_f = resolve_variable(ds, variable)
+                forecast_data = extract_spatial(ds, var_name_f, xn_f, xx_f, yn_f, yx_f) if var_name_f is not None else None
+                if forecast_data is not None:
+                    forecast_data = crop_upsample(forecast_data)
+                if var_name_f is None and not combined_times:
+                    raise HTTPException(status_code=400, detail="Variable {} not available in ICON data.".format(variable))
+            if forecast_data is not None:
+                forecast_times = meteoswiss_time_iso(ds.variables["time"])
+                last_r_time = combined_times[-1] if combined_times else None
+                start_idx = next((i for i, t in enumerate(forecast_times) if last_r_time is None or t > last_r_time), None)
+                if start_idx is not None:
+                    combined_times.extend(forecast_times[start_idx:])
+                    combined_data.append(forecast_data[start_idx:])
+
+    if not combined_times:
+        raise HTTPException(status_code=404, detail="No ICON data available for the requested period.")
+
+    all_data = np.concatenate(combined_data, axis=0)
+
+    if variable == "T_2M":
+        all_data = all_data - 273.15
+
+    start_dt = datetime.combine(start_date, datetime.min.time()).replace(tzinfo=timezone.utc)
+    end_dt = datetime.combine(end_date + timedelta(days=1), datetime.min.time()).replace(tzinfo=timezone.utc)
+
+    fmt = "%0.5f" if variable == "UV" else "%0.2f"
+    out = ""
+    for t_idx, t in enumerate(combined_times):
+        if t < start_dt or t >= end_dt:
+            continue
+        out += t.strftime("%Y%m%d%H%M") + "\n"
+        out += '\n'.join(','.join(fmt % v for v in row) for row in all_data[t_idx]).replace("nan", "") + "\n"
+    return out
+
 
 class VariableKeyModelMeteoMeta(BaseModel):
     unit: str
