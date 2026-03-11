@@ -337,10 +337,10 @@ async def meteoswiss_icon_layer_alplakes(
                              description="Variable name (e.g. geometry, T_2M, UV, GLOB, RELHUM_2M, PMSL, CLCT)"),
         start: str = validate.path_date(description="The start date in YYYYmmdd format", example="20240729"),
         end: str = validate.path_date(description="The end date in YYYYmmdd format", example="20240731"),
-        ll_lat: float = validate.path_latitude(example="46.49", description="Latitude of lower left corner of bounding box (WGS 84)"),
-        ll_lng: float = validate.path_longitude(example="6.65", description="Longitude of lower left corner of bounding box (WGS 84)"),
-        ur_lat: float = validate.path_latitude(example="46.51", description="Latitude of upper right corner of bounding box (WGS 84)"),
-        ur_lng: float = validate.path_longitude(example="6.67", description="Longitude of upper right corner of bounding box (WGS 84)")):
+        ll_lat: float = validate.path_latitude(example="46.19", description="Latitude of lower left corner of bounding box (WGS 84)"),
+        ll_lng: float = validate.path_longitude(example="6.12", description="Longitude of lower left corner of bounding box (WGS 84)"),
+        ur_lat: float = validate.path_latitude(example="46.53", description="Latitude of upper right corner of bounding box (WGS 84)"),
+        ur_lng: float = validate.path_longitude(example="6.94", description="Longitude of upper right corner of bounding box (WGS 84)")):
     """
     Plain text formatted MeteoSwiss ICON data for a bounding box over a time range.
 
