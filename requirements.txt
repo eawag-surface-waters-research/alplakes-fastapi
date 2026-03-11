@@ -10,6 +10,7 @@ pytest==9.0.2
 python-dateutil==2.9.0.post0
 rasterio==1.4.4
 requests==2.32.5
+scipy==1.16.3
 seaborn==0.13.2
 sentry-sdk==2.47.0
 xarray==2025.12.0
