@@ -646,15 +646,35 @@ def get_icon_layer_alplakes(filesystem, variable, start_date, end_date, ll_lat, 
     if not reanalysis_files and forecast_file is None:
         raise HTTPException(status_code=404, detail="No ICON data available for the requested period.")
 
-    def bbox_indices(ds):
+    def get_grid(ds):
         if len(ds.variables["lat_1"].shape) == 3:
-            lat_g = ds.variables["lat_1"][0].values
-            lng_g = ds.variables["lon_1"][0].values
-        else:
-            lat_g = ds.variables["lat_1"].values
-            lng_g = ds.variables["lon_1"].values
-        xa, ya = np.where((lat_g >= ll_lat) & (lat_g <= ur_lat) & (lng_g >= ll_lng) & (lng_g <= ur_lng))
-        return xa, ya, lat_g, lng_g
+            return ds.variables["lat_1"][0].values, ds.variables["lon_1"][0].values
+        return ds.variables["lat_1"].values, ds.variables["lon_1"].values
+
+    # Compute the canonical bbox on the reanalysis (fine) grid so geometry is identical
+    # regardless of source. For forecast-only, derive the equivalent reanalysis bbox from
+    # the forecast indices using the known grid relationship: reanalysis index = 2 * forecast index.
+    if reanalysis_files:
+        with xr.open_dataset(reanalysis_files[0]) as ds_grid:
+            lat_g_r, lng_g_r = get_grid(ds_grid)
+        xa, ya = np.where((lat_g_r >= ll_lat) & (lat_g_r <= ur_lat) & (lng_g_r >= ll_lng) & (lng_g_r <= ur_lng))
+        if len(xa) == 0:
+            raise HTTPException(status_code=400, detail="Requested area is outside of the ICON coverage area, or is too small.")
+        xn, xx = int(min(xa)), int(max(xa)) + 1
+        yn, yx = int(min(ya)), int(max(ya)) + 1
+        F_X = (lat_g_r.shape[0] + 1) // 2
+        F_Y = (lat_g_r.shape[1] + 1) // 2
+    else:
+        with xr.open_dataset(forecast_file) as ds_grid:
+            lat_g_f, lng_g_f = get_grid(ds_grid)
+        xa, ya = np.where((lat_g_f >= ll_lat) & (lat_g_f <= ur_lat) & (lng_g_f >= ll_lng) & (lng_g_f <= ur_lng))
+        if len(xa) == 0:
+            raise HTTPException(status_code=400, detail="Requested area is outside of the ICON coverage area, or is too small.")
+        xn_f0, xx_f0 = int(min(xa)), int(max(xa)) + 1
+        yn_f0, yx_f0 = int(min(ya)), int(max(ya)) + 1
+        xn, xx = 2 * xn_f0, 2 * (xx_f0 - 1) + 1
+        yn, yx = 2 * yn_f0, 2 * (yx_f0 - 1) + 1
+        F_X, F_Y = lat_g_f.shape[0], lat_g_f.shape[1]
 
     def resolve_variable(ds, var):
         if var.replace("_MEAN", "") in ds.variables.keys():
@@ -673,33 +693,42 @@ def get_icon_layer_alplakes(filesystem, variable, start_date, end_date, ll_lat, 
             return ds.variables[var_name][:, 0, 0, xn:xx, yn:yx].values
         return None
 
-    def geometry_string(lat_g, lng_g, xn, xx, yn, yx):
-        lat_sub = lat_g[xn:xx, yn:yx]
-        lng_sub = lng_g[xn:xx, yn:yx]
+    def to_geometry_string(lat_sub, lng_sub):
         geometry = np.concatenate((lat_sub, lng_sub), axis=1)
         return '\n'.join(','.join('%0.8f' % v for v in row) for row in geometry).replace("nan", "")
 
-    def upsample_to(data, target_x, target_y):
-        """Bilinear upsample data (T, X, Y) to (T, target_x, target_y) using scipy zoom."""
-        if data.shape[1] == target_x and data.shape[2] == target_y:
-            return data
-        return ndimage_zoom(data, (1.0, target_x / data.shape[1], target_y / data.shape[2]), order=1)
+    def upsample(data):
+        """Bilinear upsample to (2n-1) per spatial axis.
+        Handles 2D (X, Y) arrays (e.g. lat/lng) and 3D (T, X, Y) arrays (variable data)."""
+        if data.ndim == 2:
+            X, Y = data.shape
+            return ndimage_zoom(data, (((2 * X) - 1) / X, ((2 * Y) - 1) / Y), order=1)
+        T, X, Y = data.shape
+        return ndimage_zoom(data, (1.0, ((2 * X) - 1) / X, ((2 * Y) - 1) / Y), order=1)
+
+    # Forecast bbox derived from the canonical reanalysis bbox:
+    # include the surrounding forecast cell on each edge so the upsampled result
+    # covers the full reanalysis bbox, then crop back to exact size.
+    xn_f = xn // 2
+    xx_f = min(F_X, xx // 2 + 1)
+    yn_f = yn // 2
+    yx_f = min(F_Y, yx // 2 + 1)
+    xs, ys = xn - 2 * xn_f, yn - 2 * yn_f  # crop offsets after upsample
+    xsize, ysize = xx - xn, yx - yn
+
+    def crop_upsample(d):
+        u = upsample(d)
+        return u[xs:xs + xsize, ys:ys + ysize] if d.ndim == 2 else u[:, xs:xs + xsize, ys:ys + ysize]
 
     combined_times = []
     combined_data = []
-    ref_shape = None  # (X, Y) spatial shape from first source processed
 
     # Process reanalysis
     if reanalysis_files:
+        if variable == "geometry":
+            return to_geometry_string(lat_g_r[xn:xx, yn:yx], lng_g_r[xn:xx, yn:yx])
         try:
             with xr.open_mfdataset(reanalysis_files) as ds:
-                xa, ya, lat_g, lng_g = bbox_indices(ds)
-                if len(xa) == 0:
-                    raise HTTPException(status_code=400, detail="Requested area is outside of the ICON coverage area, or is too small.")
-                xn, xx = int(min(xa)), int(max(xa)) + 1
-                yn, yx = int(min(ya)), int(max(ya)) + 1
-                if variable == "geometry":
-                    return geometry_string(lat_g, lng_g, xn, xx, yn, yx)
                 if variable == "UV":
                     u_name = resolve_variable(ds, "U")
                     v_name = resolve_variable(ds, "V")
@@ -707,18 +736,12 @@ def get_icon_layer_alplakes(filesystem, variable, start_date, end_date, ll_lat, 
                         raise HTTPException(status_code=400, detail="U and V variables not available in ICON data.")
                     u_data = extract_spatial(ds, u_name, xn, xx, yn, yx)
                     v_data = extract_spatial(ds, v_name, xn, xx, yn, yx)
-                    if u_data is not None and v_data is not None:
-                        ref_shape = (u_data.shape[1], u_data.shape[2])
-                        data = np.concatenate([u_data, v_data], axis=-1)
-                    else:
-                        data = None
+                    data = np.concatenate([u_data, v_data], axis=-1) if u_data is not None and v_data is not None else None
                 else:
                     var_name = resolve_variable(ds, variable)
                     if var_name is None:
                         raise HTTPException(status_code=400, detail="Variable {} not available in ICON data. Please select from: {}".format(variable, ", ".join(ds.keys())))
                     data = extract_spatial(ds, var_name, xn, xx, yn, yx)
-                    if data is not None:
-                        ref_shape = (data.shape[1], data.shape[2])
                 times = meteoswiss_time_iso(ds.variables["time"])
                 if data is not None:
                     combined_times.extend(times)
@@ -728,43 +751,37 @@ def get_icon_layer_alplakes(filesystem, variable, start_date, end_date, ll_lat, 
         except xr.MergeError:
             raise HTTPException(status_code=400, detail="KENDA grid is not consistent across the requested date range, please access individual days.")
 
-    # Process forecast
+    # Process forecast — derive bbox from canonical reanalysis indices, upsample and crop.
     if forecast_file is not None:
-        with xr.open_mfdataset(forecast_file) as ds:
-            xa, ya, lat_g, lng_g = bbox_indices(ds)
-            if len(xa) > 0:
-                xn_f, xx_f = int(min(xa)), int(max(xa)) + 1
-                yn_f, yx_f = int(min(ya)), int(max(ya)) + 1
-                if variable == "geometry":
-                    return geometry_string(lat_g, lng_g, xn_f, xx_f, yn_f, yx_f)
-                if variable == "UV":
-                    u_name = resolve_variable(ds, "U")
-                    v_name = resolve_variable(ds, "V")
-                    forecast_data = None
-                    if u_name is not None and v_name is not None:
-                        u_data = extract_spatial(ds, u_name, xn_f, xx_f, yn_f, yx_f)
-                        v_data = extract_spatial(ds, v_name, xn_f, xx_f, yn_f, yx_f)
-                        if u_data is not None and v_data is not None:
-                            if ref_shape is not None:
-                                u_data = upsample_to(u_data, *ref_shape)
-                                v_data = upsample_to(v_data, *ref_shape)
-                            forecast_data = np.concatenate([u_data, v_data], axis=-1)
-                    elif not combined_times:
-                        raise HTTPException(status_code=400, detail="U and V variables not available in ICON data.")
-                else:
-                    var_name_f = resolve_variable(ds, variable)
-                    forecast_data = extract_spatial(ds, var_name_f, xn_f, xx_f, yn_f, yx_f) if var_name_f is not None else None
-                    if forecast_data is not None and ref_shape is not None:
-                        forecast_data = upsample_to(forecast_data, *ref_shape)
-                    if var_name_f is None and not combined_times:
-                        raise HTTPException(status_code=400, detail="Variable {} not available in ICON data.".format(variable))
+        with xr.open_dataset(forecast_file) as ds:
+            if variable == "geometry":
+                lat_g, lng_g = get_grid(ds)
+                return to_geometry_string(crop_upsample(lat_g[xn_f:xx_f, yn_f:yx_f]), crop_upsample(lng_g[xn_f:xx_f, yn_f:yx_f]))
+            if variable == "UV":
+                u_name = resolve_variable(ds, "U")
+                v_name = resolve_variable(ds, "V")
+                forecast_data = None
+                if u_name is not None and v_name is not None:
+                    u_data = extract_spatial(ds, u_name, xn_f, xx_f, yn_f, yx_f)
+                    v_data = extract_spatial(ds, v_name, xn_f, xx_f, yn_f, yx_f)
+                    if u_data is not None and v_data is not None:
+                        forecast_data = np.concatenate([crop_upsample(u_data), crop_upsample(v_data)], axis=-1)
+                elif not combined_times:
+                    raise HTTPException(status_code=400, detail="U and V variables not available in ICON data.")
+            else:
+                var_name_f = resolve_variable(ds, variable)
+                forecast_data = extract_spatial(ds, var_name_f, xn_f, xx_f, yn_f, yx_f) if var_name_f is not None else None
                 if forecast_data is not None:
-                    forecast_times = meteoswiss_time_iso(ds.variables["time"])
-                    last_r_time = combined_times[-1] if combined_times else None
-                    for t_idx, t in enumerate(forecast_times):
-                        if last_r_time is None or t > last_r_time:
-                            combined_times.append(t)
-                            combined_data.append(forecast_data[t_idx:t_idx + 1])
+                    forecast_data = crop_upsample(forecast_data)
+                if var_name_f is None and not combined_times:
+                    raise HTTPException(status_code=400, detail="Variable {} not available in ICON data.".format(variable))
+            if forecast_data is not None:
+                forecast_times = meteoswiss_time_iso(ds.variables["time"])
+                last_r_time = combined_times[-1] if combined_times else None
+                start_idx = next((i for i, t in enumerate(forecast_times) if last_r_time is None or t > last_r_time), None)
+                if start_idx is not None:
+                    combined_times.extend(forecast_times[start_idx:])
+                    combined_data.append(forecast_data[start_idx:])
 
     if not combined_times:
         raise HTTPException(status_code=404, detail="No ICON data available for the requested period.")
@@ -777,12 +794,13 @@ def get_icon_layer_alplakes(filesystem, variable, start_date, end_date, ll_lat, 
     start_dt = datetime.combine(start_date, datetime.min.time()).replace(tzinfo=timezone.utc)
     end_dt = datetime.combine(end_date + timedelta(days=1), datetime.min.time()).replace(tzinfo=timezone.utc)
 
+    fmt = "%0.5f" if variable == "UV" else "%0.2f"
     out = ""
     for t_idx, t in enumerate(combined_times):
         if t < start_dt or t >= end_dt:
             continue
         out += t.strftime("%Y%m%d%H%M") + "\n"
-        out += '\n'.join(','.join("%0.2f" % v for v in row) for row in all_data[t_idx]).replace("nan", "") + "\n"
+        out += '\n'.join(','.join(fmt % v for v in row) for row in all_data[t_idx]).replace("nan", "") + "\n"
     return out
 
 

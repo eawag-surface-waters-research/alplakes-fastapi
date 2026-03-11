@@ -96,6 +96,11 @@ def test_icon_point_forecast():
     assert "lat" in data
     assert "lng" in data
 
+def test_meteoswiss_layer_alplakes_icon():
+    response = client.get("/meteoswiss/icon/layer/alplakes/T_2M/20260217/20260221/46.194/6.13/46.526/6.945")
+    assert response.status_code == 200
+    response = client.get("/meteoswiss/icon/layer/alplakes/geometry/20260217/20260221/46.194/6.13/46.526/6.945")
+    assert response.status_code == 200
 
 def test_meteoswiss_meteodata_station_metadata_station():
     response = client.get("/meteoswiss/meteodata/metadata/PUY")
