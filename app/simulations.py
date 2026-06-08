@@ -1478,6 +1478,316 @@ def get_simulations_transect_period_mitgcm(filesystem, lake, start, end, latitud
     return output
 
 
+class TwoDimensionalModels(str, Enum):
+    swan = "swan"
+
+
+class TwoDimensionalVariables(str, Enum):
+    geometry = "geometry"
+    significant_wave_height = "significant_wave_height"
+    mean_wave_period = "mean_wave_period"
+    wave_direction = "wave_direction"
+
+
+# Mapping from API variable names to SWAN NetCDF variables and output formatting
+SWAN_VARIABLES = {
+    "significant_wave_height": {"nc": "HS", "unit": "m", "format": "%0.3f", "decimals": 3,
+                                "description": "Significant wave height"},
+    "mean_wave_period": {"nc": "TM01", "unit": "s", "format": "%0.3f", "decimals": 3,
+                         "description": "Mean wave period"},
+    "wave_direction": {"nc": "PDIR", "unit": "deg", "format": "%0.2f", "decimals": 2,
+                       "description": "Mean wave direction"},
+}
+
+
+class MetadataKeyModel2DSimple(BaseModel):
+    unit: Union[str, None] = None
+    description: Union[str, None] = None
+
+
+class MetadataLake2D(BaseModel):
+    name: str
+    start_date: date
+    end_date: date
+    missing_dates: List[date]
+    height: int
+    width: int
+    variables: Dict[str, MetadataKeyModel2DSimple]
+
+
+class Metadata2D(BaseModel):
+    model: str
+    lakes: List[MetadataLake2D]
+
+
+class ResponseModel2DPoint(functions.TimeBaseModel):
+    time: List[datetime]
+    lat: float
+    lng: float
+    distance: functions.VariableKeyModel1D
+    variables: Dict[str, functions.VariableKeyModel1D]
+    @field_validator('time')
+    @classmethod
+    def validate_timezone(cls, value):
+        if isinstance(value, list):
+            for v in value:
+                if v.tzinfo is None:
+                    raise ValueError('time must have a timezone')
+        elif value.tzinfo is None:
+            raise ValueError('time must have a timezone')
+        return value
+
+
+class ResponseModel2DLayer(functions.TimeBaseModel):
+    time: datetime
+    lat: List[List[Any]]
+    lng: List[List[Any]]
+    variables: Dict[str, functions.VariableKeyModel2D]
+    @field_validator('time')
+    @classmethod
+    def validate_timezone(cls, value):
+        if isinstance(value, list):
+            for v in value:
+                if v.tzinfo is None:
+                    raise ValueError('time must have a timezone')
+        elif value.tzinfo is None:
+            raise ValueError('time must have a timezone')
+        return value
+
+
+def get_two_dimensional_metadata(filesystem):
+    metadata = []
+    base = os.path.join(filesystem, "media/simulations")
+    models = [m for m in os.listdir(base) if m in ["swan"]]
+    for model in models:
+        lakes = os.listdir(os.path.join(base, model, "results"))
+        m = {"model": model, "lakes": []}
+        for lake in lakes:
+            try:
+                m["lakes"].append(get_two_dimensional_metadata_lake(filesystem, model, lake))
+            except:
+                print("Failed for {}".format(lake))
+        metadata.append(m)
+    return metadata
+
+
+def get_two_dimensional_metadata_lake(filesystem, model, lake):
+    path = os.path.join(filesystem, "media/simulations", model, "results", lake)
+    if not os.path.isdir(path):
+        raise HTTPException(status_code=400,
+                            detail="{} simulation results are not available for {}"
+                            .format(model, lake))
+    files = os.listdir(path)
+    files = [file for file in files if file.endswith(".nc") and len(file.split(".")[0]) == 8 and file.count(".") == 1]
+    files.sort()
+    combined = '_'.join(files)
+    missing_dates = []
+
+    if model == "swan":
+        with netCDF4.Dataset(os.path.join(path, files[0])) as nc:
+            height = len(nc.dimensions["eta"])
+            width = len(nc.dimensions["xi"])
+            start_date = functions.convert_from_unit(nc.variables["time"][0], nc.variables["time"].units)
+        with netCDF4.Dataset(os.path.join(path, files[-1])) as nc:
+            end_date = functions.convert_from_unit(nc.variables["time"][-1], nc.variables["time"].units)
+        variables = {key: {"unit": value["unit"], "description": value["description"]}
+                     for key, value in SWAN_VARIABLES.items()}
+    else:
+        raise ValueError("Model not recognised.")
+
+    for d in functions.daterange(start_date, end_date, days=7):
+        if d.strftime('%Y%m%d') not in combined:
+            missing_dates.append(d.strftime("%Y-%m-%d"))
+
+    return {"name": lake,
+            "start_date": start_date.strftime("%Y-%m-%d"),
+            "end_date": end_date.strftime("%Y-%m-%d"),
+            "missing_dates": missing_dates,
+            "height": height,
+            "width": width,
+            "variables": variables}
+
+
+def get_two_dimensional_point(filesystem, model, lake, start, end, latitude, longitude, variables):
+    if model == "swan":
+        return get_two_dimensional_point_swan(filesystem, lake, start, end, latitude, longitude, variables)
+    else:
+        raise HTTPException(status_code=400,
+                            detail="Apologies point extraction not available for {}".format(model))
+
+
+def get_two_dimensional_point_swan(filesystem, lake, start, end, latitude, longitude, variables):
+    model = "swan"
+    lakes = os.path.join(filesystem, "media/simulations", model, "results")
+    variables = [v.lower() for v in variables]
+    for v in variables:
+        if v not in SWAN_VARIABLES:
+            raise HTTPException(status_code=400,
+                                detail="Variable {} not recognised, please select from: [{}]"
+                                .format(v, ", ".join(SWAN_VARIABLES.keys())))
+    if not os.path.isdir(os.path.join(lakes, lake)):
+        raise HTTPException(status_code=400,
+                            detail="{} simulation results are not available for {} please select from: [{}]"
+                            .format(model, lake, ", ".join(os.listdir(lakes))))
+    weeks = functions.sundays_between_dates(datetime.strptime(start[0:8], "%Y%m%d").replace(tzinfo=timezone.utc),
+                                            datetime.strptime(end[0:8], "%Y%m%d").replace(tzinfo=timezone.utc))
+    files = [os.path.join(lakes, lake, "{}.nc".format(week.strftime("%Y%m%d"))) for week in weeks]
+    files = [file for file in files if os.path.isfile(file)]
+    if len(files) == 0:
+        raise HTTPException(status_code=400, detail="Apologies data is not available for your requested period")
+
+    start_datetime = datetime.strptime(start, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
+    end_datetime = datetime.strptime(end, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
+
+    with xr.open_mfdataset(files, data_vars='minimal', compat='override', coords='minimal') as ds:
+        ds['time'] = ds.indexes['time'].tz_localize('UTC')
+        ds = ds.sel(time=slice(start_datetime, end_datetime))
+        if len(ds['time']) == 0:
+            raise HTTPException(status_code=400,
+                                detail="No timesteps available between {} and {}".format(start, end))
+        lat_grid, lng_grid = ds.lat.values, ds.lon.values
+        mask = np.isnan(ds.HS.isel(time=0).values)
+        lat_grid[mask] = np.nan
+        lng_grid[mask] = np.nan
+        x_index, y_index, distance = functions.get_closest_location(latitude, longitude, lat_grid, lng_grid, yx=True)
+        time = functions.alplakes_time(ds.time.values, "nano")
+        output = {"time": time,
+                  "lat": lat_grid[y_index, x_index],
+                  "lng": lng_grid[y_index, x_index],
+                  "distance": {"data": distance, "unit": "m",
+                               "description": "Distance from requested location to center of closest grid point"},
+                  "variables": {}
+                  }
+        for v in variables:
+            meta = SWAN_VARIABLES[v]
+            data = ds[meta["nc"]].isel(eta=y_index, xi=x_index).values
+            output["variables"][v] = {"data": functions.filter_variable(data, decimals=meta["decimals"]),
+                                      "unit": meta["unit"], "description": meta["description"]}
+    return output
+
+
+def get_two_dimensional_layer(filesystem, model, lake, time, variables):
+    if model == "swan":
+        return get_two_dimensional_layer_swan(filesystem, lake, time, variables)
+    else:
+        raise HTTPException(status_code=400,
+                            detail="Apologies data is not available for {}".format(model))
+
+
+def get_two_dimensional_layer_swan(filesystem, lake, time, variables):
+    model = "swan"
+    variables = [v.lower() for v in variables]
+    for v in variables:
+        if v not in SWAN_VARIABLES:
+            raise HTTPException(status_code=400,
+                                detail="Variable {} not recognised, please select from: [{}]"
+                                .format(v, ", ".join(SWAN_VARIABLES.keys())))
+    origin = datetime.strptime(time, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
+    last_sunday = origin + relativedelta(weekday=SU(-1))
+    previous_sunday = last_sunday - timedelta(days=7)
+    lakes = os.path.join(filesystem, "media/simulations", model, "results")
+    if not os.path.isdir(os.path.join(lakes, lake)):
+        raise HTTPException(status_code=400,
+                            detail="{} simulation results are not available for {} please select from: [{}]"
+                            .format(model, lake, ", ".join(os.listdir(lakes))))
+    if os.path.isfile(os.path.join(lakes, lake, "{}.nc".format(last_sunday.strftime("%Y%m%d")))):
+        file = os.path.join(lakes, lake, "{}.nc".format(last_sunday.strftime("%Y%m%d")))
+    elif os.path.isfile(os.path.join(lakes, lake, "{}.nc".format(previous_sunday.strftime("%Y%m%d")))):
+        file = os.path.join(lakes, lake, "{}.nc".format(previous_sunday.strftime("%Y%m%d")))
+    else:
+        raise HTTPException(status_code=400,
+                            detail="Apologies data is not available for {} at {}".format(lake, time))
+    with netCDF4.Dataset(file) as nc:
+        converted_time = functions.convert_to_unit(origin, nc.variables["time"].units)
+        time_index = functions.get_closest_index(converted_time, np.array(nc.variables["time"][:]))
+        time = nc.variables["time"][time_index].tolist()
+        lat_grid, lng_grid = nc.variables["lat"][:], nc.variables["lon"][:]
+        output = {"time": functions.alplakes_time(time, nc.variables["time"].units),
+                  "lat": functions.filter_variable(lat_grid, decimals=5, nodata=np.nan),
+                  "lng": functions.filter_variable(lng_grid, decimals=5, nodata=np.nan),
+                  "variables": {}
+                  }
+        for v in variables:
+            meta = SWAN_VARIABLES[v]
+            output["variables"][v] = {
+                "data": functions.filter_variable(nc.variables[meta["nc"]][time_index, :], decimals=meta["decimals"]),
+                "unit": meta["unit"], "description": meta["description"]}
+    return output
+
+
+def get_two_dimensional_layer_alplakes(filesystem, model, lake, variable, start, end):
+    if model == "swan":
+        return get_two_dimensional_layer_alplakes_swan(filesystem, lake, variable, start, end)
+    else:
+        raise HTTPException(status_code=400,
+                            detail="Apologies data is not available for {}".format(model))
+
+
+def get_two_dimensional_layer_alplakes_swan(filesystem, lake, variable, start, end):
+    model = "swan"
+    lakes = os.path.join(filesystem, "media/simulations", model, "results")
+    if not os.path.isdir(os.path.join(lakes, lake)):
+        raise HTTPException(status_code=400,
+                            detail="{} simulation results are not available for {} please select from: [{}]"
+                            .format(model, lake, ", ".join(os.listdir(lakes))))
+    if variable != "geometry" and variable not in SWAN_VARIABLES:
+        raise HTTPException(status_code=400,
+                            detail="Variable {} not recognised, please select from: [geometry, {}]"
+                            .format(variable, ", ".join(SWAN_VARIABLES.keys())))
+    weeks = functions.sundays_between_dates(datetime.strptime(start[0:8], "%Y%m%d").replace(tzinfo=timezone.utc),
+                                            datetime.strptime(end[0:8], "%Y%m%d").replace(tzinfo=timezone.utc))
+
+    for week in weeks:
+        if not os.path.isfile(os.path.join(lakes, lake, "{}.nc".format(week.strftime("%Y%m%d")))):
+            raise HTTPException(status_code=400,
+                                detail="Apologies data is not available for {} week starting {}".format(lake, week))
+
+    start_datetime = datetime.strptime(start[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
+    end_datetime = datetime.strptime(end[0:10], "%Y%m%d%H").replace(tzinfo=timezone.utc)
+    out = None
+    times = None
+    for week in weeks:
+        with netCDF4.Dataset(os.path.join(lakes, lake, "{}.nc".format(week.strftime("%Y%m%d")))) as nc:
+            if variable == "geometry":
+                geometry = np.concatenate((nc.variables["lat"][:], nc.variables["lon"][:]), axis=1)
+                return '\n'.join(','.join('%0.8f' % x for x in y) for y in geometry).replace("nan", "")
+            time = np.array(nc.variables["time"][:])
+            min_time = np.min(time)
+            max_time = np.max(time)
+            start_time = functions.convert_to_unit(start_datetime, nc.variables["time"].units)
+            end_time = functions.convert_to_unit(end_datetime, nc.variables["time"].units)
+            if start_time > max_time:
+                continue
+            if min_time <= start_time:
+                time_index_start = functions.get_closest_index(start_time, time)
+            else:
+                time_index_start = 0
+            if min_time <= end_time <= max_time:
+                time_index_end = functions.get_closest_index(end_time, time) + 1
+            else:
+                time_index_end = len(time)
+
+            meta = SWAN_VARIABLES[variable]
+            f = meta["format"]
+            p = functions.alplakes_variable(nc.variables[meta["nc"]][time_index_start:time_index_end, :])
+            t = np.array([functions.convert_from_unit(x, nc.variables["time"].units).strftime("%Y%m%d%H%M")
+                          for x in time[time_index_start:time_index_end]])
+            if out is None:
+                out = p
+                times = t
+            else:
+                out = np.concatenate((out, p), axis=0)
+                times = np.concatenate((times, t), axis=0)
+
+    shape = out.shape
+    string_arr = ""
+    for timestep in range(shape[0]):
+        string_arr += (times[timestep] + "\n" + '\n'.join(','.join(f % x for x in y) for y in out[timestep, :]).replace(
+            "nan", "") + "\n")
+
+    return string_arr
+
+
 class OneDimensionalModels(str, Enum):
     simstrat = "simstrat"
 

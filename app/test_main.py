@@ -429,6 +429,48 @@ def test_simulations_transect_period(url):
     assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
 
 
+def test_two_dimensional_simulations_metadata():
+    response = client.get("/simulations/2d/metadata")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, list)
+
+
+def test_two_dimensional_simulations_metadata_lake():
+    response = client.get("/simulations/2d/metadata/swan/geneva")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, dict)
+    assert "significant_wave_height" in data["variables"]
+
+
+def test_two_dimensional_simulations_point():
+    response = client.get("/simulations/2d/point/swan/geneva/202605170000/202605252300/46.45/6.5")
+    assert response.status_code == 200
+    data = response.json()
+    assert datetime.strptime(data["time"][0], "%Y-%m-%dT%H:%M:%S%z")
+    assert "lat" in data
+    assert "lng" in data
+    assert "significant_wave_height" in data["variables"]
+
+
+def test_two_dimensional_simulations_layer():
+    response = client.get("/simulations/2d/layer/swan/geneva/202605170300")
+    assert response.status_code == 200
+    data = response.json()
+    assert datetime.strptime(data["time"], "%Y-%m-%dT%H:%M:%S%z")
+    assert "lat" in data
+    assert "lng" in data
+    assert "significant_wave_height" in data["variables"]
+
+
+def test_two_dimensional_simulations_layer_alplakes():
+    response = client.get("/simulations/2d/layer_alplakes/swan/geneva/significant_wave_height/202605170000/202605170600")
+    assert response.status_code == 200
+    response = client.get("/simulations/2d/layer_alplakes/swan/geneva/geometry/202605170000/202605170600")
+    assert response.status_code == 200
+
+
 def test_one_dimensional_simulations_metadata():
     response = client.get("/simulations/1d/metadata")
     assert response.status_code == 200

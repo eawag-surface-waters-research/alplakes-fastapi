@@ -870,6 +870,98 @@ async def simulations_transect_period(model: simulations.Models = Path(..., titl
     return simulations.get_simulations_transect_period(filesystem, model.value, lake, start_time, end_time, lats, lngs, variables)
 
 
+@app.get("/simulations/2d/metadata", tags=["2D Simulations"], response_model=List[simulations.Metadata2D])
+async def two_dimensional_simulations_metadata():
+    """
+    Metadata for all available 2D simulations.
+    """
+    return simulations.get_two_dimensional_metadata(filesystem)
+
+
+@app.get("/simulations/2d/metadata/{model}/{lake}", tags=["2D Simulations"], response_model=simulations.MetadataLake2D)
+async def two_dimensional_simulations_metadata_lake(
+        model: simulations.TwoDimensionalModels = Path(..., title="Model", description="Model name"),
+        lake: str = Path(..., title="Lake", description="Lake name", example="geneva")):
+    """
+    Available 2D simulation data for a specific lake and model. Includes information on available variables.
+    """
+    return simulations.get_two_dimensional_metadata_lake(filesystem, model.value, lake)
+
+
+@app.get("/simulations/2d/file/{model}/{lake}/{sunday}", tags=["2D Simulations"], response_class=FileResponse)
+async def two_dimensional_simulations_file(
+        model: simulations.TwoDimensionalModels = Path(..., title="Model", description="Model name"),
+        lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
+        sunday: str = validate.path_date(description="The Sunday (week start) in YYYYmmdd format", example="20260517")):
+    """
+    Full weekly model output in NetCDF.
+
+    The file is named by the Sunday on which the simulation week begins.
+    """
+    validate.sunday(sunday)
+    path = os.path.join(filesystem, "media/simulations", model.value, "results", lake, "{}.nc".format(sunday))
+    if not os.path.isfile(path):
+        raise HTTPException(status_code=400,
+                            detail="Apologies data is not available for {} week beginning {}".format(lake, sunday))
+    return FileResponse(path, media_type="application/nc", filename="{}_{}_{}.nc".format(model.value, lake, sunday))
+
+
+@app.get("/simulations/2d/point/{model}/{lake}/{start_time}/{end_time}/{lat}/{lng}", tags=["2D Simulations"], response_model=simulations.ResponseModel2DPoint)
+async def two_dimensional_simulations_point(
+        model: simulations.TwoDimensionalModels = Path(..., title="Model", description="Model name"),
+        lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
+        start_time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202605070300"),
+        end_time: str = validate.path_time(description="The end time in YYYYmmddHHMM format (UTC)", example="202605071200"),
+        lat: float = validate.path_latitude(example="46.5"),
+        lng: float = validate.path_longitude(example="6.67"),
+        variables: list[str] = Query(default=["significant_wave_height", "mean_wave_period", "wave_direction"])):
+    """
+    Wave timeseries for a given location.
+
+    See the metadata endpoints for the list of available variables.
+
+    ⚠️ **Warning**: If your request returns a 502 timeout error reduce the period you are requesting.
+    For longer durations, it is recommended to make multiple requests with shorter intervals between them.
+    """
+    validate.time_range(start_time, end_time)
+    return simulations.get_two_dimensional_point(filesystem, model.value, lake, start_time, end_time, lat, lng, variables)
+
+
+@app.get("/simulations/2d/layer/{model}/{lake}/{time}", tags=["2D Simulations"], response_model=simulations.ResponseModel2DLayer)
+async def two_dimensional_simulations_layer(
+        model: simulations.TwoDimensionalModels = Path(..., title="Model", description="Model name"),
+        lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
+        time: str = validate.path_time(description="The time in YYYYmmddHHMM format (UTC)", example="202605170300"),
+        variables: list[str] = Query(default=["significant_wave_height", "mean_wave_period", "wave_direction"])):
+    """
+    Wave results across the entire lake surface at a specific time.
+
+    See the metadata endpoints for the list of available variables.
+    """
+    validate.time(time)
+    return simulations.get_two_dimensional_layer(filesystem, model.value, lake, time, variables)
+
+
+@app.get("/simulations/2d/layer_alplakes/{model}/{lake}/{variable}/{start_time}/{end_time}", tags=["2D Simulations"],
+         response_class=PlainTextResponse, include_in_schema=internal)
+async def two_dimensional_simulations_layer_alplakes(
+        model: simulations.TwoDimensionalModels = Path(..., title="Model", description="Model name"),
+        lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
+        variable: simulations.TwoDimensionalVariables = Path(..., title="Variable", description="Variable"),
+        start_time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202605070300"),
+        end_time: str = validate.path_time(description="The end time in YYYYmmddHHMM format (UTC)", example="202605071200")):
+    """
+    Raster string of a wave variable across the lake surface for a period, formatted for the Alplakes map animation.
+
+    Use `geometry` to retrieve the grid coordinates.
+
+    ⚠️ **Warning**: If your request returns a 502 timeout error reduce the period you are requesting.
+    For longer durations, it is recommended to make multiple requests with shorter intervals between them.
+    """
+    validate.time_range(start_time, end_time)
+    return simulations.get_two_dimensional_layer_alplakes(filesystem, model.value, lake, variable.value, start_time, end_time)
+
+
 @app.get("/simulations/1d/metadata", tags=["1D Simulations"], response_model=List[simulations.Metadata1D])
 async def one_dimensional_simulations_metadata():
     """

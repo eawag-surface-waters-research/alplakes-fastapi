@@ -40,6 +40,30 @@ class TaskResponseModel(BaseModel):
     status_code: int
 
 
+def parse_since_units(units):
+    """Parse a generic '<seconds|minutes|hours|days> since <datetime>' unit string.
+
+    Returns a (seconds_per_step, reference_datetime) tuple, or None if the string
+    doesn't match this pattern.
+    """
+    parts = units.split(" since ")
+    if len(parts) != 2:
+        return None
+    multipliers = {"second": 1, "seconds": 1, "minute": 60, "minutes": 60,
+                   "hour": 3600, "hours": 3600, "day": 86400, "days": 86400}
+    step = parts[0].strip().lower()
+    if step not in multipliers:
+        return None
+    reference = parts[1].strip()
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
+        try:
+            ref = datetime.strptime(reference, fmt).replace(tzinfo=timezone.utc)
+            return multipliers[step], ref
+        except ValueError:
+            continue
+    return None
+
+
 def convert_to_unit(time, units):
     if units == "seconds since 2008-03-01 00:00:00":
         return (time.replace(tzinfo=timezone.utc) - datetime(2008, 3, 1).replace(tzinfo=timezone.utc)).total_seconds()
@@ -47,9 +71,12 @@ def convert_to_unit(time, units):
         return time.timestamp()
     elif units == "nano":
         return time.timestamp() * 1000000000
-    else:
-        raise HTTPException(status_code=400,
-                            detail="Apologies unable to read NetCDF with time unit: {}".format(units))
+    parsed = parse_since_units(units)
+    if parsed is not None:
+        multiplier, ref = parsed
+        return (time.replace(tzinfo=timezone.utc) - ref).total_seconds() / multiplier
+    raise HTTPException(status_code=400,
+                        detail="Apologies unable to read NetCDF with time unit: {}".format(units))
 
 
 def convert_from_unit(time, units):
@@ -62,9 +89,12 @@ def convert_from_unit(time, units):
         return datetime.fromtimestamp(float(time), tz=timezone.utc)
     elif units == "nano":
         return datetime.fromtimestamp(float(time) / 1000000000, tz=timezone.utc)
-    else:
-        raise HTTPException(status_code=400,
-                            detail="Apologies unable to read NetCDF with time unit: {}".format(units))
+    parsed = parse_since_units(units)
+    if parsed is not None:
+        multiplier, ref = parsed
+        return ref + timedelta(seconds=float(time) * multiplier)
+    raise HTTPException(status_code=400,
+                        detail="Apologies unable to read NetCDF with time unit: {}".format(units))
 
 
 def meteostation_variables():
