@@ -498,12 +498,40 @@ def projection_to_latlng(x, y, projection):
     return lat, lng
 
 
-def coordinates_to_latlng(x, y):
-    x = np.asarray(x).astype(np.float64)
-    y = np.asarray(y).astype(np.float64)
-    x[x == 0.] = np.nan
-    y[y == 0.] = np.nan
-    # Detect coordinate system from values
+def get_d3d_properties(filesystem, simulation):
+    try:
+        local_path = os.path.join(filesystem, "media/simulations/delft3d-flow/properties", simulation, "properties.json")
+        url = "https://raw.githubusercontent.com/eawag-surface-waters-research/alplakes-simulations/refs/heads/master/static/delft3d-flow/{}/properties.json".format(simulation)
+        if os.path.isfile(local_path):
+            with open(local_path, 'r') as f:
+                return json.load(f)
+        else:
+            response = requests.get(url)
+            if response.status_code == 200:
+                data = response.json()
+                os.makedirs(os.path.dirname(local_path), exist_ok=True)
+                with open(local_path, 'w') as f:
+                    json.dump(data, f)
+                return data
+            else:
+                return None
+    except Exception as e:
+        print(f"Error fetching properties for simulation {simulation}: {e}")
+        return None
+
+
+def _utm_to_latlng_masked(x, y, zone_number, zone_letter):
+    # Only project valid points, keeping NaNs in place so output shape matches input
+    valid = ~np.isnan(x) & ~np.isnan(y)
+    lat_out = np.full(x.shape, np.nan)
+    lng_out = np.full(x.shape, np.nan)
+    lat, lng = utm_to_latlng(x[valid], y[valid], zone_number, zone_letter)
+    lat_out[valid] = lat
+    lng_out[valid] = lng
+    return lat_out, lng_out
+
+
+def _detect_and_convert(x, y):
     x_example = x[~np.isnan(x)][0]
     y_example = y[~np.isnan(y)][0]
     if -180 <= x_example <= 180 and -180 <= y_example <= 180:
@@ -511,20 +539,39 @@ def coordinates_to_latlng(x, y):
         return x, y
     elif 420000 <= x_example <= 900000 and 30000 <= y_example <= 350000:
         # CH1903
-        lat, lng = ch1903_to_latlng(x, y)
-        return lat, lng
+        return ch1903_to_latlng(x, y)
     else:
         # UTM - Default
-        x_nan = x[~np.isnan(x)]
-        y_nan = y[~np.isnan(x)]
-        lat_out = np.zeros(x.shape)
-        lng_out = np.zeros(x.shape)
-        lat_out[:] = np.nan
-        lng_out[:] = np.nan
-        lat, lng = utm_to_latlng(x_nan, y_nan, 32, "T")
-        lat_out[~np.isnan(x)] = lat
-        lng_out[~np.isnan(x)] = lng
-        return lat_out, lng_out
+        return _utm_to_latlng_masked(x, y, 32, "T")
+
+
+def coordinates_to_latlng(x, y, properties=None):
+    x = np.asarray(x).astype(np.float64)
+    y = np.asarray(y).astype(np.float64)
+    x[x == 0.] = np.nan
+    y[y == 0.] = np.nan
+
+    if properties is None:
+        return _detect_and_convert(x, y)
+
+    try:
+        system = properties["grid"]["system"]
+        if system == "WGS84":
+            return x, y
+        elif system == "CH1903":
+            return ch1903_to_latlng(x, y)
+        elif system == "CH1903+":
+            return ch1903_plus_to_latlng(x, y)
+        elif system == "UTM":
+            return _utm_to_latlng_masked(
+                x, y, properties["grid"]["zone_number"], properties["grid"]["zone_letter"]
+            )
+        else:
+            raise ValueError('Coordinate system {} unrecognised.'.format(system))
+    except Exception as e:
+        print("Failed to convert using properties ({}), falling back to auto detection.".format(e))
+        return _detect_and_convert(x, y)
+
 
 
 def latlng_to_ch1903(lat, lng):

@@ -275,7 +275,8 @@ def get_simulations_point_delft3dflow(filesystem, lake, start, end, depth, latit
         z = ds.ZK_LYR[0, :].values * -1 if len(ds.ZK_LYR.shape) == 2 else ds.ZK_LYR[:].values * -1
         depth_index = functions.get_closest_positive_index(depth, z)
         depth = float(z[depth_index])
-        lat_grid, lng_grid = functions.coordinates_to_latlng(ds.XZ[:].values, ds.YZ[:].values)
+        properties = functions.get_d3d_properties(filesystem, lake)
+        lat_grid, lng_grid = functions.coordinates_to_latlng(ds.XZ[:].values, ds.YZ[:].values, properties)
         x_index, y_index, distance = functions.get_closest_location(latitude, longitude, lat_grid, lng_grid)
         time = functions.alplakes_time(ds.time.values, "nano")
         output = {"time": time,
@@ -391,7 +392,8 @@ def get_simulations_layer_delft3dflow(filesystem, lake, time, depth, variables):
         depth_index = functions.get_closest_positive_index(depth, np.array(nc.variables["ZK_LYR"][:]) * -1)
         time = nc.variables["time"][time_index].tolist()
         depth = nc.variables["ZK_LYR"][depth_index].tolist() * -1
-        lat_grid, lng_grid = functions.coordinates_to_latlng(nc.variables["XZ"][:], nc.variables["YZ"][:])
+        properties = functions.get_d3d_properties(filesystem, lake)
+        lat_grid, lng_grid = functions.coordinates_to_latlng(nc.variables["XZ"][:], nc.variables["YZ"][:], properties)
         output = {"time": functions.alplakes_time(time, nc.variables["time"].units),
                "depth": {"description": "Distance from the surface to the closest grid point to requested depth",
                          "units": nc.variables["ZK_LYR"].units,
@@ -492,7 +494,8 @@ def get_simulations_layer_alplakes_delft3dflow(filesystem, lake, variable, start
     for week in weeks:
         with netCDF4.Dataset(os.path.join(lakes, lake, "{}.nc".format(week.strftime("%Y%m%d")))) as nc:
             if variable == "geometry":
-                lat_grid, lng_grid = functions.coordinates_to_latlng(nc.variables["XZ"][:], nc.variables["YZ"][:])
+                properties = functions.get_d3d_properties(filesystem, lake)
+                lat_grid, lng_grid = functions.coordinates_to_latlng(nc.variables["XZ"][:], nc.variables["YZ"][:], properties)
                 geometry = np.concatenate((lat_grid, lng_grid), axis=1)
                 return '\n'.join(','.join('%0.8f' % x for x in y) for y in geometry).replace("nan", "")
             time = np.array(nc.variables["time"][:])
@@ -764,8 +767,8 @@ def get_simulations_average_bottom_temperature_delft3dflow(filesystem, lake, sta
         bottom_indices[no_valid_data_mask] = -1
         rows, cols = np.meshgrid(np.arange(t.shape[2]), np.arange(t.shape[3]), indexing='ij')
         result = functions.safe_nanmean(t[:, bottom_indices, rows, cols], axis=0)
-
-        lat_grid, lng_grid = functions.coordinates_to_latlng(ds["XZ"].values, ds["YZ"].values)
+        properties = functions.get_d3d_properties(filesystem, lake)
+        lat_grid, lng_grid = functions.coordinates_to_latlng(ds["XZ"].values, ds["YZ"].values, properties)
 
         output = {"variable": {"data": functions.filter_variable(result), "unit": "degC", "description": "Average bottom temperature"},
                   "lat": functions.filter_variable(lat_grid, decimals=5, nodata=np.nan),
@@ -853,7 +856,8 @@ def get_simulations_profile_delft3dflow(filesystem, lake, dt, latitude, longitud
         time_index = functions.get_closest_index(converted_time, time)
 
         depth = (np.array(nc.variables["ZK_LYR"][:]) * -1).tolist()
-        lat_grid, lng_grid = functions.coordinates_to_latlng(nc.variables["XZ"][:], nc.variables["YZ"][:])
+        properties = functions.get_d3d_properties(filesystem, lake)
+        lat_grid, lng_grid = functions.coordinates_to_latlng(nc.variables["XZ"][:], nc.variables["YZ"][:], properties)
         x_index, y_index, distance = functions.get_closest_location(latitude, longitude, lat_grid, lng_grid)
 
         t = functions.filter_variable(nc.variables["R1"][time_index, 0, :, x_index, y_index])
@@ -984,7 +988,8 @@ def get_simulations_depthtime_delft3dflow(filesystem, lake, start, end, latitude
         if len(ds['time']) == 0:
             raise HTTPException(status_code=400,
                                 detail="No timesteps available between {} and {}".format(start, end))
-        lat_grid, lng_grid = functions.coordinates_to_latlng(ds.XZ[:].values, ds.YZ[:].values)
+        properties = functions.get_d3d_properties(filesystem, lake)
+        lat_grid, lng_grid = functions.coordinates_to_latlng(ds.XZ[:].values, ds.YZ[:].values, properties)
         x_index, y_index, distance = functions.get_closest_location(latitude, longitude, lat_grid, lng_grid)
         t = ds.R1.isel(time=0, M=x_index, N=y_index, LSTSCI=0).values
         depth = ds.ZK_LYR[0, :].values * -1 if len(ds.ZK_LYR.shape) == 2 else ds.ZK_LYR[:].values * -1
