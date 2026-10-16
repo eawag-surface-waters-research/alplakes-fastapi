@@ -130,6 +130,7 @@ def get_icon_metadata(filesystem):
     return models
 
 
+@functions.netcdf_locked
 def get_cosmo_area_forecast(filesystem, model, input_variables, forecast_date, ll_lat, ll_lng, ur_lat, ur_lng):
     file = os.path.join(filesystem, "media/meteoswiss/cosmo", model, "{}.{}0000.nc".format(model, forecast_date))
     if not os.path.isfile(file):
@@ -182,6 +183,7 @@ def get_cosmo_area_forecast(filesystem, model, input_variables, forecast_date, l
     return output
 
 
+@functions.netcdf_locked
 def get_cosmo_point_forecast(filesystem, model, input_variables, forecast_date, lat, lng):
     file = os.path.join(filesystem, "media/meteoswiss/cosmo", model, "{}.{}0000.nc".format(model, forecast_date))
     if not os.path.isfile(file):
@@ -232,6 +234,7 @@ def get_cosmo_point_forecast(filesystem, model, input_variables, forecast_date, 
     return output
 
 
+@functions.netcdf_locked
 def get_icon_area_forecast(filesystem, model, input_variables, forecast_date, ll_lat, ll_lng, ur_lat, ur_lng):
     formatted_forecast_date = datetime.strptime(forecast_date, "%Y%m%d").strftime("%Y_%m_%d")
     file = os.path.join(filesystem, "media/meteoswiss/icon", model, "{}_00_{}_eawag_lakes.nc".format(formatted_forecast_date, model))
@@ -282,6 +285,7 @@ def get_icon_area_forecast(filesystem, model, input_variables, forecast_date, ll
     return output
 
 
+@functions.netcdf_locked
 def get_icon_point_forecast(filesystem, model, input_variables, forecast_date, lat, lng):
     formatted_forecast_date = datetime.strptime(forecast_date, "%Y%m%d").strftime("%Y_%m_%d")
     file = os.path.join(filesystem, "media/meteoswiss/icon", model, "{}_00_{}_eawag_lakes.nc".format(formatted_forecast_date, model))
@@ -335,6 +339,7 @@ class CosmoReanalysis(str, Enum):
     VNXQ34 = "VNXQ34"
 
 
+@functions.netcdf_locked
 def get_cosmo_area_reanalysis(filesystem, model, input_variables, start_date, end_date, ll_lat, ll_lng, ur_lat, ur_lng):
     # For reanalysis files the date on the file is one day after the data in the file
     folder = os.path.join(filesystem, "media/meteoswiss/cosmo", model)
@@ -409,6 +414,7 @@ def get_cosmo_area_reanalysis(filesystem, model, input_variables, start_date, en
         raise
 
 
+@functions.netcdf_locked
 def get_cosmo_point_reanalysis(filesystem, model, input_variables, start_date, end_date, lat, lng):
     # For reanalysis files the date on the file is one day after the data in the file
     folder = os.path.join(filesystem, "media/meteoswiss/cosmo", model)
@@ -478,6 +484,7 @@ class IconReanalysis(str, Enum):
     kenda_ch1 = "kenda-ch1"
 
 
+@functions.netcdf_locked
 def get_icon_area_reanalysis(filesystem, model, input_variables, start_date, end_date, ll_lat, ll_lng, ur_lat, ur_lng):
     # For reanalysis files the date on the file is one day after the data in the file
     folder = os.path.join(filesystem, "media/meteoswiss/icon", model)
@@ -554,6 +561,7 @@ def get_icon_area_reanalysis(filesystem, model, input_variables, start_date, end
         raise
 
 
+@functions.netcdf_locked
 def get_icon_point_reanalysis(filesystem, model, input_variables, start_date, end_date, lat, lng):
     # For reanalysis files the date on the file is one day after the data in the file
     folder = os.path.join(filesystem, "media/meteoswiss/icon", model)
@@ -617,6 +625,7 @@ def get_icon_point_reanalysis(filesystem, model, input_variables, start_date, en
     except Exception as e:
         raise
 
+@functions.netcdf_locked
 def get_icon_layer_alplakes(filesystem, variable, start_date, end_date, ll_lat, ll_lng, ur_lat, ur_lng):
     """Return ICON data in Alplakes compact plain-text format for a bounding box and time range.
 
@@ -867,7 +876,7 @@ def get_meteodata_station_metadata(filesystem, station_id):
     partners_file = os.path.join(filesystem, "media/meteoswiss/meteodata/partners.json")
     if not os.path.exists(stations_file):
         response = requests.get(
-            "https://alplakes-eawag.s3.eu-central-1.amazonaws.com/static/meteoswiss/meteoswiss_meteodata.json")
+            "https://alplakes-eawag.s3.eu-central-1.amazonaws.com/static/meteoswiss/meteoswiss_meteodata.json", timeout=30)
         response.raise_for_status()
         stations_data = response.json()
         with open(stations_file, 'w') as f:
@@ -877,7 +886,7 @@ def get_meteodata_station_metadata(filesystem, station_id):
             stations_data = json.load(f)
     if not os.path.exists(partners_file):
         response = requests.get(
-            "https://alplakes-eawag.s3.eu-central-1.amazonaws.com/static/meteoswiss/meteoswiss_partner_meteostations.json")
+            "https://alplakes-eawag.s3.eu-central-1.amazonaws.com/static/meteoswiss/meteoswiss_partner_meteostations.json", timeout=30)
         response.raise_for_status()
         partner_data = response.json()
         with open(partners_file, 'w') as f:

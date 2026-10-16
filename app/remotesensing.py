@@ -18,8 +18,8 @@ aws_session = AWSSession(
     aws_unsigned=True
 )
 
-rasterio_env = rasterio.Env(
-    session=aws_session,
+# Options for a per-call rasterio.Env (a shared Env instance is not safe to enter from multiple threads)
+rasterio_options = dict(
     GDAL_DISABLE_READDIR_ON_OPEN='EMPTY_DIR',
     CPL_VSIL_CURL_ALLOWED_EXTENSIONS='.tif,.tiff',
     GDAL_HTTP_TIMEOUT='30',
@@ -63,7 +63,7 @@ class ResponseModelSatellite(RootModel):
 def get_remote_sensing_products(lake, satellite, variable, start_date, end_date, valid_pixels):
     url = "https://eawagrs.s3.eu-central-1.amazonaws.com/alplakes/metadata/{}/{}/{}_public.json".format(satellite, lake, variable)
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=30)
         metadata = response.json()
     except:
         raise HTTPException(status_code=400, detail="Unable to collect metadata for that combination of lake, satellite and variable.")
@@ -93,7 +93,7 @@ def format_response(data, satellite, lake):
 def get_remote_sensing_timeseries(lake, satellite, variable, lat, lng, start_date, end_date, window, valid_pixels):
     url = "https://eawagrs.s3.eu-central-1.amazonaws.com/alplakes/metadata/{}/{}/{}_public.json".format(satellite, lake, variable)
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=30)
         metadata = response.json()
     except:
         raise HTTPException(status_code=400, detail="Unable to collect metadata for that combination of lake, satellite and variable.")
@@ -125,7 +125,7 @@ def generate_timeseries(lng, lat, window, metadata):
 
 
 def get_pixel_value(url, lng, lat, window_radius):
-    with rasterio_env:
+    with rasterio.Env(session=aws_session, **rasterio_options):
         try:
             with rasterio.open(url) as src:
                 py, px = src.index(lng, lat)

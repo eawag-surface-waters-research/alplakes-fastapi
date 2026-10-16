@@ -173,6 +173,7 @@ def get_metadata(filesystem):
     return metadata
 
 
+@functions.netcdf_locked
 def get_metadata_lake(filesystem, model, lake):
     path = os.path.join(os.path.join(filesystem, "media/simulations", model, "results", lake))
     if not os.path.isdir(path):
@@ -247,6 +248,7 @@ def get_simulations_point(filesystem, model, lake, start, end, depth, latitude, 
                             detail="Apologies profile extraction not available for {}".format(model))
 
 
+@functions.netcdf_locked
 def get_simulations_point_delft3dflow(filesystem, lake, start, end, depth, latitude, longitude, variables, nodata=-999.0):
     model = "delft3d-flow"
     lakes = os.path.join(filesystem, "media/simulations", model, "results")
@@ -301,6 +303,7 @@ def get_simulations_point_delft3dflow(filesystem, lake, start, end, depth, latit
     return output
 
 
+@functions.netcdf_locked
 def get_simulations_point_mitgcm(filesystem, lake, start, end, depth, latitude, longitude, variables, nodata=-999.0):
     model = "mitgcm"
     lakes = os.path.join(filesystem, "media/simulations", model, "results")
@@ -368,6 +371,7 @@ def get_simulations_layer(filesystem, model, lake, time, depth, variables):
                             detail="Apologies data is not available for {}".format(model))
 
 
+@functions.netcdf_locked
 def get_simulations_layer_delft3dflow(filesystem, lake, time, depth, variables):
     model = "delft3d-flow"
     variables = [v.lower() for v in variables]
@@ -417,6 +421,7 @@ def get_simulations_layer_delft3dflow(filesystem, lake, time, depth, variables):
     return output
 
 
+@functions.netcdf_locked
 def get_simulations_layer_mitgcm(filesystem, lake, time, depth, variables):
     model = "mitgcm"
     variables = [v.lower() for v in variables]
@@ -472,6 +477,7 @@ def get_simulations_layer_alplakes(filesystem, model, lake, variable, start, end
                             detail="Apologies data is not available for {}".format(model))
 
 
+@functions.netcdf_locked
 def get_simulations_layer_alplakes_delft3dflow(filesystem, lake, variable, start, end, depth):
     model = "delft3d-flow"
     lakes = os.path.join(filesystem, "media/simulations", model, "results")
@@ -555,6 +561,7 @@ def get_simulations_layer_alplakes_delft3dflow(filesystem, lake, variable, start
     return string_arr
 
 
+@functions.netcdf_locked
 def get_simulations_layer_alplakes_mitgcm(filesystem, lake, variable, start, end, depth):
     model = "mitgcm"
     lakes = os.path.join(filesystem, "media/simulations", model, "results")
@@ -644,6 +651,7 @@ def get_simulations_layer_average_temperature(filesystem, model, lake, start, en
                             detail="Apologies data is not available for {}".format(model))
 
 
+@functions.netcdf_locked
 def get_simulations_layer_average_temperature_delft3dflow(filesystem, lake, start, end, depth, nodata=-999.0):
     model = "delft3d-flow"
     lakes = os.path.join(filesystem, "media/simulations", model, "results")
@@ -683,6 +691,7 @@ def get_simulations_layer_average_temperature_delft3dflow(filesystem, lake, star
     return output
 
 
+@functions.netcdf_locked
 def get_simulations_layer_average_temperature_mitgcm(filesystem, lake, start, end, depth, nodata=-999.0):
     model = "mitgcm"
     lakes = os.path.join(filesystem, "media/simulations", model, "results")
@@ -732,6 +741,7 @@ def get_simulations_average_bottom_temperature(filesystem, model, lake, start, e
                             detail="Apologies data is not available for {}".format(model))
 
 
+@functions.netcdf_locked
 def get_simulations_average_bottom_temperature_delft3dflow(filesystem, lake, start, end, nodata=-999.0):
     model = "delft3d-flow"
     lakes = os.path.join(filesystem, "media/simulations", model, "results")
@@ -777,6 +787,7 @@ def get_simulations_average_bottom_temperature_delft3dflow(filesystem, lake, sta
     return output
 
 
+@functions.netcdf_locked
 def get_simulations_average_bottom_temperature_mitgcm(filesystem, lake, start, end, nodata=-999.0):
     model = "mitgcm"
     lakes = os.path.join(filesystem, "media/simulations", model, "results")
@@ -832,6 +843,7 @@ def get_simulations_profile(filesystem, model, lake, dt, latitude, longitude, va
                             detail="Apologies profile extraction not available for {}".format(model))
 
 
+@functions.netcdf_locked
 def get_simulations_profile_delft3dflow(filesystem, lake, dt, latitude, longitude, variables):
     model = "delft3d-flow"
     lakes = os.path.join(filesystem, "media/simulations", model, "results")
@@ -892,6 +904,7 @@ def get_simulations_profile_delft3dflow(filesystem, lake, dt, latitude, longitud
     return output
 
 
+@functions.netcdf_locked
 def get_simulations_profile_mitgcm(filesystem, lake, dt, latitude, longitude, variables):
     model = "mitgcm"
     lakes = os.path.join(filesystem, "media/simulations", model, "results")
@@ -963,6 +976,7 @@ def get_simulations_depthtime(filesystem, model, lake, start, end, latitude, lon
                             detail="Apologies profile extraction not available for {}".format(model))
 
 
+@functions.netcdf_locked
 def get_simulations_depthtime_delft3dflow(filesystem, lake, start, end, latitude, longitude, variables, nodata=-999.0):
     model = "delft3d-flow"
     lakes = os.path.join(filesystem, "media/simulations", model, "results")
@@ -1026,6 +1040,7 @@ def get_simulations_depthtime_delft3dflow(filesystem, lake, start, end, latitude
     return output
 
 
+@functions.netcdf_locked
 def get_simulations_depthtime_mitgcm(filesystem, lake, start, end, latitude, longitude, variables, nodata=-999.0):
     model = "mitgcm"
     lakes = os.path.join(filesystem, "media/simulations", model, "results")
@@ -1098,6 +1113,7 @@ def get_simulations_transect(filesystem, model, lake, dt, latitude_list, longitu
                             detail="Apologies profile extraction not available for {}".format(model))
 
 
+@functions.netcdf_locked
 def get_simulations_transect_delft3dflow(filesystem, lake, time, latitude_str, longitude_str, variables, nodata=-999.0):
     model = "delft3d-flow"
     variables = [v.lower() for v in variables]
@@ -1197,6 +1213,7 @@ def get_simulations_transect_delft3dflow(filesystem, lake, time, latitude_str, l
     return output
 
 
+@functions.netcdf_locked
 def get_simulations_transect_mitgcm(filesystem, lake, time, latitude_str, longitude_str, variables, nodata=-999.0):
     model = "mitgcm"
     variables = [v.lower() for v in variables]
@@ -1298,6 +1315,7 @@ def get_simulations_transect_period(filesystem, model, lake, start, end, latitud
                             detail="Apologies profile extraction not available for {}".format(model))
 
 
+@functions.netcdf_locked
 def get_simulations_transect_period_delft3dflow(filesystem, lake, start, end, latitude_str, longitude_str, variables, nodata=-999.0):
     model = "delft3d-flow"
     variables = [v.lower() for v in variables]
@@ -1397,6 +1415,7 @@ def get_simulations_transect_period_delft3dflow(filesystem, lake, start, end, la
     return output
 
 
+@functions.netcdf_locked
 def get_simulations_transect_period_mitgcm(filesystem, lake, start, end, latitude_str, longitude_str, variables, nodata=-999.0):
     model = "mitgcm"
     variables = [v.lower() for v in variables]
@@ -1576,6 +1595,7 @@ def get_two_dimensional_metadata(filesystem):
     return metadata
 
 
+@functions.netcdf_locked
 def get_two_dimensional_metadata_lake(filesystem, model, lake):
     path = os.path.join(filesystem, "media/simulations", model, "results", lake)
     if not os.path.isdir(path):
@@ -1621,6 +1641,7 @@ def get_two_dimensional_point(filesystem, model, lake, start, end, latitude, lon
                             detail="Apologies point extraction not available for {}".format(model))
 
 
+@functions.netcdf_locked
 def get_two_dimensional_point_swan(filesystem, lake, start, end, latitude, longitude, variables):
     model = "swan"
     lakes = os.path.join(filesystem, "media/simulations", model, "results")
@@ -1679,6 +1700,7 @@ def get_two_dimensional_layer(filesystem, model, lake, time, variables):
                             detail="Apologies data is not available for {}".format(model))
 
 
+@functions.netcdf_locked
 def get_two_dimensional_layer_swan(filesystem, lake, time, variables):
     model = "swan"
     variables = [v.lower() for v in variables]
@@ -1728,6 +1750,7 @@ def get_two_dimensional_layer_alplakes(filesystem, model, lake, variable, start,
                             detail="Apologies data is not available for {}".format(model))
 
 
+@functions.netcdf_locked
 def get_two_dimensional_layer_alplakes_swan(filesystem, lake, variable, start, end):
     model = "swan"
     lakes = os.path.join(filesystem, "media/simulations", model, "results")
@@ -1894,6 +1917,7 @@ class ResponseModel1DDOY(BaseModel):
         return value
 
 
+@functions.netcdf_locked
 def get_one_dimensional_metadata(filesystem):
     metadata = []
     models = os.listdir(os.path.join(filesystem, "media/1dsimulations"))
@@ -1948,6 +1972,7 @@ def get_one_dimensional_metadata(filesystem):
     return metadata
 
 
+@functions.netcdf_locked
 def get_one_dimensional_metadata_lake(filesystem, model, lake):
     path = os.path.join(os.path.join(filesystem, "media/1dsimulations", model, "results", lake))
     files = os.listdir(path)
@@ -2011,6 +2036,7 @@ def get_one_dimensional_point(filesystem, model, lake, start_time, end_time, dep
                             detail="Apologies not available for {}".format(model))
 
 
+@functions.netcdf_locked
 def get_one_dimensional_point_simstrat(filesystem, lake, start, end, depth, variables, resample):
     model = "simstrat"
     out = {"variables": {}}
@@ -2078,6 +2104,7 @@ def get_one_dimensional_profile(filesystem, model, lake, time, variables):
         raise HTTPException(status_code=400, detail="Apologies not available for {}".format(model))
 
 
+@functions.netcdf_locked
 def get_one_dimensional_profile_simstrat(filesystem, lake, time, variables):
     model = "simstrat"
     out = {"variables":{}}
@@ -2121,6 +2148,7 @@ def get_one_dimensional_depth_time(filesystem, model, lake, start_time, end_time
         raise HTTPException(status_code=400, detail="Apologies not available for {}".format(model))
 
 
+@functions.netcdf_locked
 def get_one_dimensional_depth_time_simstrat(filesystem, lake, start, end, variables):
     model = "simstrat"
     out = {"variables":{}}
@@ -2218,6 +2246,7 @@ def write_one_dimensional_day_of_year(filesystem, model, lake, variable, depth):
         raise HTTPException(status_code=400, detail="Apologies not available for {}".format(model))
 
 
+@functions.netcdf_locked
 def write_one_dimensional_day_of_year_simstrat(filesystem, lake, variable, depth):
     model = "simstrat"
     lakes = os.path.join(filesystem, "media/1dsimulations", model, "results")

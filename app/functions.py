@@ -4,15 +4,31 @@ import math
 import shutil
 import requests
 import warnings
+import threading
 import numpy as np
 import pandas as pd
 from fastapi import HTTPException
 from typing import Dict, List, Union, Any
+from functools import wraps
 
 from pandas.util.version import Infinity
 from pydantic import BaseModel, field_serializer
 from datetime import datetime, timedelta, timezone
 from dateutil.relativedelta import relativedelta, SU
+
+
+# netCDF-C/HDF5 are not thread-safe and netCDF4>=1.6.1 releases the GIL. xarray only locks file opens and array
+# reads (not metadata), so any two threads touching netCDF files can crash the process. Serialise all netCDF work
+# in a process: decorate every function that opens a netCDF file (directly or via xarray) with @netcdf_locked.
+netcdf_lock = threading.RLock()
+
+
+def netcdf_locked(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        with netcdf_lock:
+            return func(*args, **kwargs)
+    return wrapper
 
 
 class TimeBaseModel(BaseModel):
@@ -200,7 +216,7 @@ def download_file(url, local):
             os.remove(local)
     elif not os.path.exists(os.path.dirname(local)):
         os.makedirs(os.path.dirname(local))
-    with requests.get(url, stream=True) as r:
+    with requests.get(url, stream=True, timeout=30) as r:
         with open(local, 'wb') as f:
             shutil.copyfileobj(r.raw, f)
     if exists:
@@ -506,7 +522,7 @@ def get_d3d_properties(filesystem, simulation):
             with open(local_path, 'r') as f:
                 return json.load(f)
         else:
-            response = requests.get(url)
+            response = requests.get(url, timeout=30)
             if response.status_code == 200:
                 data = response.json()
                 os.makedirs(os.path.dirname(local_path), exist_ok=True)

@@ -3,7 +3,9 @@ from fastapi.responses import RedirectResponse, PlainTextResponse, JSONResponse,
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, List, Union, Any
+from contextlib import asynccontextmanager
 import warnings
+import anyio.to_thread
 import sentry_sdk
 
 from app import simulations, meteoswiss, bafu, remotesensing, insitu, validate, thredds, geosphere, arso, mistral, dwd
@@ -43,7 +45,15 @@ Additionally, we cannot guarantee continuous availability of the API. Service di
 For bug reports, collaboration requests, or to join our mailing list for updates, feel free to [get in touch](mailto:james.runnalls@eawag.ch).
 """
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Endpoints are sync and run in AnyIO's threadpool; cap concurrent handlers per worker to bound memory
+    anyio.to_thread.current_default_thread_limiter().total_tokens = int(os.getenv("THREADPOOL_SIZE", "8"))
+    yield
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="Alplakes API",
     description=description,
     version="2.0.0",
@@ -93,21 +103,21 @@ async def value_error_exception_handler(request: Request, exc: ValueError):
 
 
 @app.get("/", include_in_schema=False)
-def welcome():
+async def welcome():
     return {"Welcome to the Alplakes API from Eawag. Navigate to /docs or /redoc for documentation. For "
             "queries please contact James Runnalls (james.runnall@eawag.ch)."}
 
 
 if internal:
     @app.get("/meteoswiss/cosmo/metadata", tags=["Meteoswiss"], response_model=List[meteoswiss.Metadata])
-    async def meteoswiss_cosmo_metadata():
+    def meteoswiss_cosmo_metadata():
         """
         Metadata for available MeteoSwiss COSMO data.
         """
         return meteoswiss.get_cosmo_metadata(filesystem)
 
     @app.get("/meteoswiss/cosmo/area/reanalysis/{model}/{start_date}/{end_date}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}", tags=["Meteoswiss"], response_model=meteoswiss.ResponseModel2D)
-    async def meteoswiss_cosmo_area_reanalysis(model: meteoswiss.CosmoReanalysis,
+    def meteoswiss_cosmo_area_reanalysis(model: meteoswiss.CosmoReanalysis,
                                                start_date: str = validate.path_date(description="The start date in YYYYmmdd format"),
                                                end_date: str = validate.path_date(description="The end date in YYYYmmdd format"),
                                                ll_lat: float = validate.path_latitude(example="46.49", description="Latitude of lower left corner of bounding box (WGS 84)"),
@@ -128,7 +138,7 @@ if internal:
         return meteoswiss.get_cosmo_area_reanalysis(filesystem, model.value, variables, start_date, end_date, ll_lat, ll_lng, ur_lat, ur_lng)
 
     @app.get("/meteoswiss/cosmo/area/forecast/{model}/{forecast_date}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}", tags=["Meteoswiss"], response_model=meteoswiss.ResponseModel2D)
-    async def meteoswiss_cosmo_area_forecast(model: meteoswiss.CosmoForecast,
+    def meteoswiss_cosmo_area_forecast(model: meteoswiss.CosmoForecast,
                                              forecast_date: str = validate.path_date(description="The forecast date in YYYYmmdd format"),
                                              ll_lat: float = validate.path_latitude(example="46.49", description="Latitude of lower left corner of bounding box (WGS 84)"),
                                              ll_lng: float = validate.path_longitude(example="6.65", description="Longitude of lower left corner of bounding box (WGS 84)"),
@@ -146,7 +156,7 @@ if internal:
         return meteoswiss.get_cosmo_area_forecast(filesystem, model.value, variables, forecast_date, ll_lat, ll_lng, ur_lat, ur_lng)
 
     @app.get("/meteoswiss/cosmo/point/reanalysis/{model}/{start_date}/{end_date}/{lat}/{lng}", tags=["Meteoswiss"], response_model=meteoswiss.ResponseModel1D)
-    async def meteoswiss_cosmo_point_reanalysis(model: meteoswiss.CosmoReanalysis,
+    def meteoswiss_cosmo_point_reanalysis(model: meteoswiss.CosmoReanalysis,
                                                 start_date: str = validate.path_date(description="The start date in YYYYmmdd format"),
                                                 end_date: str = validate.path_date(description="The end date in YYYYmmdd format"),
                                                 lat: float = validate.path_latitude(),
@@ -165,7 +175,7 @@ if internal:
         return meteoswiss.get_cosmo_point_reanalysis(filesystem, model.value, variables, start_date, end_date, lat, lng)
 
     @app.get("/meteoswiss/cosmo/point/forecast/{model}/{forecast_date}/{lat}/{lng}", tags=["Meteoswiss"], response_model=meteoswiss.ResponseModel1D)
-    async def meteoswiss_cosmo_point_forecast(model: meteoswiss.CosmoForecast,
+    def meteoswiss_cosmo_point_forecast(model: meteoswiss.CosmoForecast,
                                               forecast_date: str = validate.path_date(description="The forecast date in YYYYmmdd format"),
                                               lat: float = validate.path_latitude(),
                                               lng: float = validate.path_longitude(),
@@ -184,7 +194,7 @@ if internal:
 
 
     @app.get("/meteoswiss/icon/metadata", tags=["Meteoswiss"], response_model=List[meteoswiss.Metadata])
-    async def meteoswiss_icon_metadata():
+    def meteoswiss_icon_metadata():
         """
         Metadata for available MeteoSwiss ICON data.
         """
@@ -192,7 +202,7 @@ if internal:
 
 
     @app.get("/meteoswiss/icon/area/reanalysis/{model}/{start_date}/{end_date}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}", tags=["Meteoswiss"], response_model=meteoswiss.ResponseModel2D)
-    async def meteoswiss_icon_area_reanalysis(model: meteoswiss.IconReanalysis,
+    def meteoswiss_icon_area_reanalysis(model: meteoswiss.IconReanalysis,
                                                start_date: str = validate.path_date(
                                                    description="The start date in YYYYmmdd format", example="20240729"),
                                                end_date: str = validate.path_date(
@@ -221,7 +231,7 @@ if internal:
                                                     ur_lat, ur_lng)
 
     @app.get("/meteoswiss/icon/area/forecast/{model}/{forecast_date}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}", tags=["Meteoswiss"], response_model=meteoswiss.ResponseModel2D)
-    async def meteoswiss_icon_area_forecast(model: meteoswiss.IconForecast,
+    def meteoswiss_icon_area_forecast(model: meteoswiss.IconForecast,
                                              forecast_date: str = validate.path_date(
                                                  description="The forecast date in YYYYmmdd format", example="20240703"),
                                              ll_lat: float = validate.path_latitude(example="46.49",
@@ -247,7 +257,7 @@ if internal:
                                                   ur_lng)
 
     @app.get("/meteoswiss/icon/point/reanalysis/{model}/{start_date}/{end_date}/{lat}/{lng}", tags=["Meteoswiss"], response_model=meteoswiss.ResponseModel1D)
-    async def meteoswiss_icon_point_reanalysis(model: meteoswiss.IconReanalysis,
+    def meteoswiss_icon_point_reanalysis(model: meteoswiss.IconReanalysis,
                                                start_date: str = validate.path_date(
                                                    description="The start date in YYYYmmdd format", example="20240729"),
                                                end_date: str = validate.path_date(
@@ -269,7 +279,7 @@ if internal:
         return meteoswiss.get_icon_point_reanalysis(filesystem, model.value, variables, start_date, end_date, lat, lng)
 
     @app.get("/meteoswiss/icon/point/forecast/{model}/{forecast_date}/{lat}/{lng}", tags=["Meteoswiss"], response_model=meteoswiss.ResponseModel1D)
-    async def meteoswiss_icon_point_forecast(model: meteoswiss.IconForecast,
+    def meteoswiss_icon_point_forecast(model: meteoswiss.IconForecast,
                                               forecast_date: str = validate.path_date(
                                                   description="The forecast date in YYYYmmdd format", example="20240703"),
                                               lat: float = validate.path_latitude(),
@@ -290,7 +300,7 @@ if internal:
 
 
     @app.get("/meteoswiss/meteodata/metadata", tags=["Meteoswiss"], response_class=RedirectResponse, response_description="Redirect to a GeoJSON file")
-    async def meteoswiss_meteodata_metadata():
+    def meteoswiss_meteodata_metadata():
         """
         Metadata for all Meteoswiss metreological stations.
 
@@ -302,7 +312,7 @@ if internal:
 
 
     @app.get("/meteoswiss/meteodata/metadata/{station_id}", tags=["Meteoswiss"], response_model=meteoswiss.ResponseModelMeteoMeta)
-    async def meteoswiss_meteodata_station_metadata(
+    def meteoswiss_meteodata_station_metadata(
             station_id: str = Path(..., pattern=r"^[a-zA-Z0-9]{3,6}$", title="Station ID", example="PUY",
                                    description="3 digit station identification code")):
         """
@@ -313,7 +323,7 @@ if internal:
         return meteoswiss.get_meteodata_station_metadata(filesystem, station_id)
 
     @app.get("/meteoswiss/meteodata/measured/{station_id}/{start_date}/{end_date}", tags=["Meteoswiss"], response_model=meteoswiss.ResponseModelMeteo)
-    async def meteoswiss_meteodata_measured(station_id: str = Path(..., pattern=r"^[a-zA-Z0-9]{3,6}$", title="Station ID", example="PUY", description="3 digit station identification code"),
+    def meteoswiss_meteodata_measured(station_id: str = Path(..., pattern=r"^[a-zA-Z0-9]{3,6}$", title="Station ID", example="PUY", description="3 digit station identification code"),
                                             start_date: str = validate.path_date(description="The start date in YYYYmmdd format"),
                                             end_date: str = validate.path_date(description="The end date in YYYYmmdd format"),
                                             variables: list[str] = Query(
@@ -332,7 +342,7 @@ if internal:
 
 @app.get("/meteoswiss/icon/layer/alplakes/{variable}/{start}/{end}/{ll_lat}/{ll_lng}/{ur_lat}/{ur_lng}",
              tags=["Meteoswiss"], response_class=PlainTextResponse, include_in_schema=internal)
-async def meteoswiss_icon_layer_alplakes(
+def meteoswiss_icon_layer_alplakes(
         variable: str = Path(..., title="Variable", example="T_2M",
                              description="Variable name (e.g. geometry, T_2M, UV, GLOB, RELHUM_2M, PMSL, CLCT)"),
         start: str = validate.path_date(description="The start date in YYYYmmdd format", example="20240729"),
@@ -356,7 +366,7 @@ async def meteoswiss_icon_layer_alplakes(
 if internal:
     @app.get("/thredds/meteodata/metadata", tags=["Thredds"], response_class=RedirectResponse,
              response_description="Redirect to a GeoJSON file")
-    async def thredds_meteodata_metadata():
+    def thredds_meteodata_metadata():
         """
         Metadata for all available Thredds metreological stations (France).
         """
@@ -366,7 +376,7 @@ if internal:
 
     @app.get("/thredds/meteodata/metadata/{station_id}", tags=["Thredds"],
              response_model=thredds.ResponseModelMeteoMeta)
-    async def thredds_meteodata_station_metadata(
+    def thredds_meteodata_station_metadata(
             station_id: str = Path(..., title="Station ID", example="73329001",
                                    description="Station identification code")):
         """
@@ -379,7 +389,7 @@ if internal:
 
     @app.get("/thredds/meteodata/measured/{station_id}/{start_date}/{end_date}", tags=["Thredds"],
              response_model=thredds.ResponseModelMeteo)
-    async def thredds_meteodata_measured(
+    def thredds_meteodata_measured(
             station_id: str = Path(..., title="Station ID", example="73329001",
                                    description="Station identification code"),
             start_date: str = validate.path_date(description="The start date in YYYYmmdd format"),
@@ -401,7 +411,7 @@ if internal:
 if internal:
     @app.get("/dwd/meteodata/metadata", tags=["DWD"], response_class=RedirectResponse,
              response_description="Redirect to a GeoJSON file")
-    async def dwd_meteodata_metadata():
+    def dwd_meteodata_metadata():
         """
         Metadata for all available DWD metreological stations (Germany).
         """
@@ -411,7 +421,7 @@ if internal:
 
     @app.get("/dwd/meteodata/metadata/{station_id}", tags=["DWD"],
              response_model=dwd.ResponseModelMeteoMeta)
-    async def dwd_meteodata_station_metadata(
+    def dwd_meteodata_station_metadata(
             station_id: str = Path(..., title="Station ID", example="2559",
                                    description="Station identification code")):
         """
@@ -424,7 +434,7 @@ if internal:
 
     @app.get("/dwd/meteodata/measured/{station_id}/{start_date}/{end_date}", tags=["DWD"],
              response_model=dwd.ResponseModelMeteo)
-    async def dwd_meteodata_measured(
+    def dwd_meteodata_measured(
             station_id: str = Path(..., title="Station ID", example="2559",
                                    description="Station identification code"),
             start_date: str = validate.path_date(description="The start date in YYYYmmdd format"),
@@ -447,7 +457,7 @@ if internal:
 if internal:
     @app.get("/arso/meteodata/metadata", tags=["ARSO"], response_class=RedirectResponse,
              response_description="Redirect to a GeoJSON file")
-    async def arso_meteodata_metadata():
+    def arso_meteodata_metadata():
         """
         Metadata for all available ARSO metreological stations (Slovenia).
         """
@@ -457,7 +467,7 @@ if internal:
 
     @app.get("/arso/meteodata/metadata/{station_id}", tags=["ARSO"],
              response_model=arso.ResponseModelMeteoMeta)
-    async def arso_meteodata_station_metadata(
+    def arso_meteodata_station_metadata(
             station_id: str = Path(..., title="Station ID", example="2213",
                                    description="Station identification code")):
         """
@@ -470,7 +480,7 @@ if internal:
 
     @app.get("/arso/meteodata/measured/{station_id}/{start_date}/{end_date}", tags=["ARSO"],
              response_model=arso.ResponseModelMeteo)
-    async def arso_meteodata_measured(
+    def arso_meteodata_measured(
             station_id: str = Path(..., title="Station ID", example="2213",
                                    description="Station identification code"),
             start_date: str = validate.path_date(description="The start date in YYYYmmdd format"),
@@ -492,7 +502,7 @@ if internal:
 if internal:
     @app.get("/mistral/meteodata/metadata", tags=["Mistral"], response_class=RedirectResponse,
              response_description="Redirect to a GeoJSON file")
-    async def mistral_meteodata_metadata():
+    def mistral_meteodata_metadata():
         """
         Metadata for all available Mistral metreological stations (Italy).
         """
@@ -502,7 +512,7 @@ if internal:
 
     @app.get("/mistral/meteodata/metadata/{station_id}", tags=["Mistral"],
              response_model=mistral.ResponseModelMeteoMeta)
-    async def mistral_meteodata_station_metadata(
+    def mistral_meteodata_station_metadata(
             station_id: str = Path(..., title="Station ID", example="trn196",
                                    description="Station identification code")):
         """
@@ -515,7 +525,7 @@ if internal:
 
     @app.get("/mistral/meteodata/measured/{station_id}/{start_date}/{end_date}", tags=["Mistral"],
              response_model=mistral.ResponseModelMeteo)
-    async def mistral_meteodata_measured(
+    def mistral_meteodata_measured(
             station_id: str = Path(..., title="Station ID", example="trn196",
                                    description="Station identification code"),
             start_date: str = validate.path_date(description="The start date in YYYYmmdd format"),
@@ -537,7 +547,7 @@ if internal:
 if internal:
     @app.get("/geosphere/meteodata/metadata", tags=["GeoSphere"], response_class=RedirectResponse,
              response_description="Redirect to a GeoJSON file")
-    async def geosphere_meteodata_metadata():
+    def geosphere_meteodata_metadata():
         """
         Metadata for all available GeoSphere metreological stations (Austria).
         """
@@ -547,7 +557,7 @@ if internal:
 
     @app.get("/geosphere/meteodata/metadata/{station_id}", tags=["GeoSphere"],
              response_model=geosphere.ResponseModelMeteoMeta)
-    async def geosphere_meteodata_station_metadata(
+    def geosphere_meteodata_station_metadata(
             station_id: str = Path(..., title="Station ID", example="6512",
                                    description="Station identification code")):
         """
@@ -560,7 +570,7 @@ if internal:
 
     @app.get("/geosphere/meteodata/measured/{station_id}/{start_date}/{end_date}", tags=["GeoSphere"],
              response_model=geosphere.ResponseModelMeteo)
-    async def geosphere_meteodata_measured(
+    def geosphere_meteodata_measured(
             station_id: str = Path(..., title="Station ID", example="6512",
                                    description="Station identification code"),
             start_date: str = validate.path_date(description="The start date in YYYYmmdd format"),
@@ -582,7 +592,7 @@ if internal:
 
 if internal:
     @app.get("/bafu/hydrodata/metadata", tags=["Bafu"], response_class=RedirectResponse, response_description="Redirect to a GeoJSON file")
-    async def bafu_hydrodata_metadata():
+    def bafu_hydrodata_metadata():
         """
         Metadata for all the available BAFU hydrodata.
 
@@ -592,7 +602,7 @@ if internal:
 
 
     @app.get("/bafu/hydrodata/metadata/{station_id}", tags=["Bafu"], response_model=bafu.ResponseModelMeta)
-    async def bafu_hydrodata_station_metadata(station_id: str = Path(..., pattern=r"^\d{4}$", title="Station ID", example="2009", description="4 digit station identification code")):
+    def bafu_hydrodata_station_metadata(station_id: str = Path(..., pattern=r"^\d{4}$", title="Station ID", example="2009", description="4 digit station identification code")):
         """
         Hydrological data from the automatic measuring network of Bafu.
 
@@ -601,7 +611,7 @@ if internal:
         return bafu.get_hydrodata_station_metadata(filesystem, station_id)
 
     @app.get("/bafu/hydrodata/measured/{station_id}/{variable}/{start_date}/{end_date}", tags=["Bafu"], response_model=bafu.ResponseModel)
-    async def bafu_hydrodata_measured(station_id: str = Path(..., pattern=r"^\d{4}$", title="Station ID", example="2009", description="4 digit station identification code"),
+    def bafu_hydrodata_measured(station_id: str = Path(..., pattern=r"^\d{4}$", title="Station ID", example="2009", description="4 digit station identification code"),
                                       variable: str = Path(..., title="Variable", example="AbflussPneumatikunten", description="Variable"),
                                       start_date: str = validate.path_date(description="The start date in YYYYmmdd format"),
                                       end_date: str = validate.path_date(description="The end date in YYYYmmdd format"),
@@ -621,7 +631,7 @@ if internal:
 
 if internal:
     @app.get("/insitu/secchi/metadata", tags=["Insitu"], response_model=List[insitu.Metadata])
-    async def insitu_secchi_metadata():
+    def insitu_secchi_metadata():
         """
         Insitu Secchi depth measurements from assorted monitoring programs
 
@@ -631,7 +641,7 @@ if internal:
 
 
     @app.get("/insitu/secchi/{lake}", tags=["Insitu"], response_model=insitu.ResponseModel)
-    async def insitu_secchi_lake(lake: str = Path(..., title="Lake", example="geneva", description="Lake name")):
+    def insitu_secchi_lake(lake: str = Path(..., title="Lake", example="geneva", description="Lake name")):
         """
         Insitu Secchi depth measurements from assorted monitoring programs
 
@@ -643,7 +653,7 @@ if internal:
 if internal:
     @app.get("/insitu/temperature/metadata", tags=["Insitu"], response_class=RedirectResponse,
              response_description="Redirect to a GeoJSON file")
-    async def insitu_temperature_metadata():
+    def insitu_temperature_metadata():
         """
         Metadata for all available insitu temperature measurements.
         """
@@ -653,7 +663,7 @@ if internal:
 
     @app.get("/insitu/temperature/metadata/{station_id}", tags=["Insitu"],
              response_model=insitu.ResponseModelTemperatureMeta)
-    async def insitu_temperature_station_metadata(
+    def insitu_temperature_station_metadata(
             station_id: str = Path(..., title="Station ID", example="zurich_police_mythenquai",
                                    description="Station identification code")):
         """
@@ -666,7 +676,7 @@ if internal:
 
     @app.get("/insitu/temperature/measured/{station_id}/{start_date}/{end_date}", tags=["Insitu"],
              response_model=insitu.ResponseModel)
-    async def insitu_temperature_measured(
+    def insitu_temperature_measured(
             station_id: str = Path(..., title="Station ID", example="zurich_police_mythenquai",
                                    description="Station identification code"),
             start_date: str = validate.path_date(description="The start date in YYYYmmdd format", example="20250715"),
@@ -682,7 +692,7 @@ if internal:
 
 
 @app.get("/simulations/metadata", tags=["3D Simulations"], response_model=List[simulations.Metadata])
-async def simulations_metadata():
+def simulations_metadata():
     """
     Metadata for all available 3D simulations.
     """
@@ -690,7 +700,7 @@ async def simulations_metadata():
 
 
 @app.get("/simulations/metadata/{model}/{lake}", tags=["3D Simulations"], response_model=simulations.MetadataLake)
-async def simulations_metadata_lake(model: simulations.Models = Path(..., title="Model", description="Model name"),
+def simulations_metadata_lake(model: simulations.Models = Path(..., title="Model", description="Model name"),
                                     lake: str = Path(..., title="Lake", description="Lake name", example="geneva")):
     """
     Metadata for a specific 3D model and lake.
@@ -699,7 +709,7 @@ async def simulations_metadata_lake(model: simulations.Models = Path(..., title=
 
 
 @app.get("/simulations/file/{model}/{lake}/{sunday}", tags=["3D Simulations"], response_class=FileResponse)
-async def simulations_file(model: simulations.Models = Path(..., title="Model", description="Model name"),
+def simulations_file(model: simulations.Models = Path(..., title="Model", description="Model name"),
                            lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
                            sunday: str = validate.path_date(description="The Sunday in YYYYmmdd format", example="20230402")):
     """
@@ -724,7 +734,7 @@ async def simulations_file(model: simulations.Models = Path(..., title="Model", 
 
 
 @app.get("/simulations/point/{model}/{lake}/{start_time}/{end_time}/{depth}/{lat}/{lng}", tags=["3D Simulations"], response_model=simulations.ResponseModelPoint)
-async def simulations_point(model: simulations.Models = Path(..., title="Model", description="Model name"),
+def simulations_point(model: simulations.Models = Path(..., title="Model", description="Model name"),
                             lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
                             start_time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202304050300"),
                             end_time: str = validate.path_time(description="The end time in YYYYmmddHHMM format (UTC)", example="202304112300"),
@@ -743,7 +753,7 @@ async def simulations_point(model: simulations.Models = Path(..., title="Model",
 
 
 @app.get("/simulations/layer/{model}/{lake}/{time}/{depth}", tags=["3D Simulations"], response_model=simulations.ResponseModelLayer)
-async def simulations_layer(model: simulations.Models = Path(..., title="Model", description="Model name"),
+def simulations_layer(model: simulations.Models = Path(..., title="Model", description="Model name"),
                             lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
                             time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202304050300"),
                             depth: float = validate.path_depth(),
@@ -757,7 +767,7 @@ async def simulations_layer(model: simulations.Models = Path(..., title="Model",
 
 @app.get("/simulations/layer_alplakes/{model}/{lake}/{variable}/{start_time}/{end_time}/{depth}", tags=["3D Simulations"],
          response_class=PlainTextResponse, include_in_schema=internal)
-async def simulations_layer_alplakes(model: simulations.Models = Path(..., title="Model", description="Model name"),
+def simulations_layer_alplakes(model: simulations.Models = Path(..., title="Model", description="Model name"),
                                      lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
                                      variable: simulations.Variables = Path(..., title="Variable", description="Variable"),
                                      start_time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202304050300"),
@@ -773,7 +783,7 @@ async def simulations_layer_alplakes(model: simulations.Models = Path(..., title
 
 
 @app.get("/simulations/layer/average_temperature/{model}/{lake}/{start_time}/{end_time}/{depth}", tags=["3D Simulations"], response_model=simulations.ResponseModelAverageLayer)
-async def simulations_layer_average_temperature(model: simulations.Models = Path(..., title="Model", description="Model name"),
+def simulations_layer_average_temperature(model: simulations.Models = Path(..., title="Model", description="Model name"),
                                                 lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
                                                 start_time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202304050300"),
                                                 end_time: str = validate.path_time(description="The end time in YYYYmmddHHMM format (UTC)", example="202304112300"),
@@ -789,7 +799,7 @@ async def simulations_layer_average_temperature(model: simulations.Models = Path
 
 
 @app.get("/simulations/layer/average_bottom_temperature/{model}/{lake}/{start_time}/{end_time}", tags=["3D Simulations"], response_model=simulations.ResponseModelAverageBottom)
-async def simulations_layer_average_temperature(model: simulations.Models = Path(..., title="Model", description="Model name"),
+def simulations_layer_average_temperature(model: simulations.Models = Path(..., title="Model", description="Model name"),
                                                 lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
                                                 start_time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202304050300"),
                                                 end_time: str = validate.path_time(description="The end time in YYYYmmddHHMM format (UTC)", example="202304112300")):
@@ -804,7 +814,7 @@ async def simulations_layer_average_temperature(model: simulations.Models = Path
 
 
 @app.get("/simulations/profile/{model}/{lake}/{time}/{lat}/{lng}", tags=["3D Simulations"], response_model=simulations.ResponseModelProfile)
-async def simulations_profile(model: simulations.Models = Path(..., title="Model", description="Model name"),
+def simulations_profile(model: simulations.Models = Path(..., title="Model", description="Model name"),
                               lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
                               time: str = validate.path_time(),
                               lat: float = validate.path_latitude(),
@@ -818,7 +828,7 @@ async def simulations_profile(model: simulations.Models = Path(..., title="Model
 
 
 @app.get("/simulations/depthtime/{model}/{lake}/{start_time}/{end_time}/{lat}/{lng}", tags=["3D Simulations"], response_model=simulations.ResponseModelDepthTime)
-async def simulations_depth_time(model: simulations.Models = Path(..., title="Model", description="Model name"),
+def simulations_depth_time(model: simulations.Models = Path(..., title="Model", description="Model name"),
                                  lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
                                  start_time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202304050300"),
                                  end_time: str = validate.path_time(description="The end time in YYYYmmddHHMM format (UTC)", example="202304112300"),
@@ -836,7 +846,7 @@ async def simulations_depth_time(model: simulations.Models = Path(..., title="Mo
 
 
 @app.get("/simulations/transect/{model}/{lake}/{time}/{lats}/{lngs}", tags=["3D Simulations"], response_model=simulations.ResponseModelTransect)
-async def simulations_transect(model: simulations.Models = Path(..., title="Model", description="Model name"),
+def simulations_transect(model: simulations.Models = Path(..., title="Model", description="Model name"),
                                lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
                                time: str = validate.path_time(),
                                lats: str = Path(..., title="Lats", description="Comma separated list of latitudes (WGS84), minimum 2", example="46.37,46.54"),
@@ -851,7 +861,7 @@ async def simulations_transect(model: simulations.Models = Path(..., title="Mode
 
 
 @app.get("/simulations/transect/{model}/{lake}/{start_time}/{end_time}/{lats}/{lngs}", tags=["3D Simulations"], response_model=simulations.ResponseModelTransectPeriod)
-async def simulations_transect_period(model: simulations.Models = Path(..., title="Model", description="Model name"),
+def simulations_transect_period(model: simulations.Models = Path(..., title="Model", description="Model name"),
                                       lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
                                       start_time: str = validate.path_time( description="The start time in YYYYmmddHHMM format (UTC)", example="202304050300"),
                                       end_time: str = validate.path_time( description="The end time in YYYYmmddHHMM format (UTC)", example="202304051200"),
@@ -871,7 +881,7 @@ async def simulations_transect_period(model: simulations.Models = Path(..., titl
 
 
 @app.get("/simulations/2d/metadata", tags=["2D Simulations"], response_model=List[simulations.Metadata2D])
-async def two_dimensional_simulations_metadata():
+def two_dimensional_simulations_metadata():
     """
     Metadata for all available 2D simulations.
     """
@@ -879,7 +889,7 @@ async def two_dimensional_simulations_metadata():
 
 
 @app.get("/simulations/2d/metadata/{model}/{lake}", tags=["2D Simulations"], response_model=simulations.MetadataLake2D)
-async def two_dimensional_simulations_metadata_lake(
+def two_dimensional_simulations_metadata_lake(
         model: simulations.TwoDimensionalModels = Path(..., title="Model", description="Model name"),
         lake: str = Path(..., title="Lake", description="Lake name", example="geneva")):
     """
@@ -889,7 +899,7 @@ async def two_dimensional_simulations_metadata_lake(
 
 
 @app.get("/simulations/2d/file/{model}/{lake}/{sunday}", tags=["2D Simulations"], response_class=FileResponse)
-async def two_dimensional_simulations_file(
+def two_dimensional_simulations_file(
         model: simulations.TwoDimensionalModels = Path(..., title="Model", description="Model name"),
         lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
         sunday: str = validate.path_date(description="The Sunday (week start) in YYYYmmdd format", example="20260517")):
@@ -907,7 +917,7 @@ async def two_dimensional_simulations_file(
 
 
 @app.get("/simulations/2d/point/{model}/{lake}/{start_time}/{end_time}/{lat}/{lng}", tags=["2D Simulations"], response_model=simulations.ResponseModel2DPoint)
-async def two_dimensional_simulations_point(
+def two_dimensional_simulations_point(
         model: simulations.TwoDimensionalModels = Path(..., title="Model", description="Model name"),
         lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
         start_time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202605070300"),
@@ -928,7 +938,7 @@ async def two_dimensional_simulations_point(
 
 
 @app.get("/simulations/2d/layer/{model}/{lake}/{time}", tags=["2D Simulations"], response_model=simulations.ResponseModel2DLayer)
-async def two_dimensional_simulations_layer(
+def two_dimensional_simulations_layer(
         model: simulations.TwoDimensionalModels = Path(..., title="Model", description="Model name"),
         lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
         time: str = validate.path_time(description="The time in YYYYmmddHHMM format (UTC)", example="202605170300"),
@@ -944,7 +954,7 @@ async def two_dimensional_simulations_layer(
 
 @app.get("/simulations/2d/layer_alplakes/{model}/{lake}/{variable}/{start_time}/{end_time}", tags=["2D Simulations"],
          response_class=PlainTextResponse, include_in_schema=internal)
-async def two_dimensional_simulations_layer_alplakes(
+def two_dimensional_simulations_layer_alplakes(
         model: simulations.TwoDimensionalModels = Path(..., title="Model", description="Model name"),
         lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
         variable: simulations.TwoDimensionalVariables = Path(..., title="Variable", description="Variable"),
@@ -963,7 +973,7 @@ async def two_dimensional_simulations_layer_alplakes(
 
 
 @app.get("/simulations/1d/metadata", tags=["1D Simulations"], response_model=List[simulations.Metadata1D])
-async def one_dimensional_simulations_metadata():
+def one_dimensional_simulations_metadata():
     """
     Metadata for all available 1D simulations.
 
@@ -973,7 +983,7 @@ async def one_dimensional_simulations_metadata():
 
 
 @app.get("/simulations/1d/metadata/{model}/{lake}", tags=["1D Simulations"], response_model=simulations.MetadataLake1DDetail)
-async def one_dimensional_simulations_metadata_lake(
+def one_dimensional_simulations_metadata_lake(
         model: simulations.OneDimensionalModels = Path(..., title="Model", description="Model name"),
         lake: str = Path(..., title="Lake", description="Lake key", example="aegeri")):
     """
@@ -983,7 +993,7 @@ async def one_dimensional_simulations_metadata_lake(
 
 
 @app.get("/simulations/1d/file/{model}/{lake}/{month}", tags=["1D Simulations"], response_class=FileResponse)
-async def one_dimensional_simulations_file(
+def one_dimensional_simulations_file(
         model: simulations.OneDimensionalModels = Path(..., title="Model", description="Model name"),
         lake: str = Path(..., title="Lake", description="Lake key", example="aegeri"),
         month: str = validate.path_month(description="The month in YYYYmm format")):
@@ -998,7 +1008,7 @@ async def one_dimensional_simulations_file(
     return FileResponse(path, media_type="application/nc", filename="{}_{}_{}.nc".format(model, lake, month))
 
 @app.get("/simulations/1d/point/{model}/{lake}/{start_time}/{end_time}/{depth}", tags=["1D Simulations"], response_model=simulations.ResponseModel1DPoint)
-async def one_dimensional_simulations_point(
+def one_dimensional_simulations_point(
         model: simulations.OneDimensionalModels = Path(..., title="Model", description="Model name"),
         lake: str = Path(..., title="Lake", description="Lake key", example="aegeri"),
         start_time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202405050300"),
@@ -1019,7 +1029,7 @@ async def one_dimensional_simulations_point(
 
 
 @app.get("/simulations/1d/profile/{model}/{lake}/{time}", tags=["1D Simulations"], response_model=simulations.ResponseModel1DProfile)
-async def one_dimensional_simulations_profile(
+def one_dimensional_simulations_profile(
         model: simulations.OneDimensionalModels = Path(..., title="Model", description="Model name"),
         lake: str = Path(..., title="Lake", description="Lake key", example="aegeri"),
         time: str = validate.path_time(description="The time in YYYYmmddHHMM format (UTC)", example="202405050300"),
@@ -1032,7 +1042,7 @@ async def one_dimensional_simulations_profile(
 
 
 @app.get("/simulations/1d/depthtime/{model}/{lake}/{start_time}/{end_time}", tags=["1D Simulations"], response_model=simulations.ResponseModel1DDepthTime)
-async def one_dimensional_simulations_depth_time(
+def one_dimensional_simulations_depth_time(
         model: simulations.OneDimensionalModels = Path(..., title="Model", description="Model name"),
         lake: str = Path(..., title="Lake", description="Lake key", example="aegeri"),
         start_time: str = validate.path_time(description="The start time in YYYYmmddHHMM format (UTC)", example="202405050300"),
@@ -1049,7 +1059,7 @@ async def one_dimensional_simulations_depth_time(
 
 
 @app.get("/simulations/1d/doy/metadata", tags=["1D Simulations"], response_model=List[simulations.Metadata1DDOY])
-async def one_dimensional_simulations_day_of_year_metadata():
+def one_dimensional_simulations_day_of_year_metadata():
     """
     Metadata for all available DOY products
     """
@@ -1057,7 +1067,7 @@ async def one_dimensional_simulations_day_of_year_metadata():
 
 
 @app.get("/simulations/1d/doy/{model}/{lake}/{variable}/{depth}", tags=["1D Simulations"], response_model=simulations.ResponseModel1DDOY)
-async def one_dimensional_simulations_day_of_year(
+def one_dimensional_simulations_day_of_year(
         model: simulations.OneDimensionalModels = Path(..., title="Model", description="Model name"),
         lake: str = Path(..., title="Lake", description="Lake key", example="aegeri"),
         variable: str = Path(..., title="Variable", description="Variable", example="T"),
@@ -1072,7 +1082,7 @@ async def one_dimensional_simulations_day_of_year(
 
 if internal:
     @app.get("/simulations/1d/doy/write/{model}/{lake}/{variable}/{depth}", tags=["1D Simulations"], responses={202: {"description": "Computing DOY"}})
-    async def write_one_dimensional_simulations_day_of_year(
+    def write_one_dimensional_simulations_day_of_year(
             background_tasks: BackgroundTasks,
             model: simulations.OneDimensionalModels = Path(..., title="Model", description="Model name"),
             lake: str = Path(..., title="Lake", description="Lake key", example="aegeri"),
@@ -1089,7 +1099,7 @@ if internal:
 
 
 @app.get("/remotesensing/metadata", tags=["Remote Sensing"], response_class=RedirectResponse, response_description="Redirect to a GeoJSON file")
-async def remote_sensing_metadata():
+def remote_sensing_metadata():
     """
     Directory of remote sensing product types, organised by lake, satellite and variable.
     """
@@ -1097,7 +1107,7 @@ async def remote_sensing_metadata():
 
 
 @app.get("/remotesensing/products/{lake}/{satellite}/{variable}", tags=["Remote Sensing"], response_model=remotesensing.ResponseModelSatellite)
-async def remote_sensing_products(lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
+def remote_sensing_products(lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
                                   satellite: remotesensing.Satellites = Path(..., title="Satellite", description="Satellite name"),
                                   variable: str = Path(..., title="Variable", description="Variable", example="chla"),
                                   start_date: str = Query(None, description="Minimum date in YYYYmmdd", example="20250701"),
@@ -1117,7 +1127,7 @@ async def remote_sensing_products(lake: str = Path(..., title="Lake", descriptio
 
 
 @app.get("/remotesensing/timeseries/{lake}/{satellite}/{variable}/{lat}/{lng}/{start_date}/{end_date}", tags=["Remote Sensing"])
-async def remote_sensing_products(lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
+def remote_sensing_products(lake: str = Path(..., title="Lake", description="Lake name", example="geneva"),
                                   satellite: remotesensing.Satellites = Path(..., title="Satellite", description="Satellite name"),
                                   variable: str = Path(..., title="Variable", description="Variable", example="chla"),
                                   lat: float = validate.path_latitude(example="46.49", description="Latitude"),

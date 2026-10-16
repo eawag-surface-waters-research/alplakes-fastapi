@@ -86,7 +86,7 @@ def get_temperature_metadata(filesystem, station_id):
     out = {"id": station_id}
     station_dir = os.path.join(filesystem, "media/lake-scrape/temperature/", station_id)
     response = requests.get(
-        "https://alplakes-eawag.s3.eu-central-1.amazonaws.com/insitu/summary/water_temperature.geojson")
+        "https://alplakes-eawag.s3.eu-central-1.amazonaws.com/insitu/summary/water_temperature.geojson", timeout=30)
     response.raise_for_status()
     stations_data = response.json()
     data = next((s for s in stations_data["features"] if s.get('id') == station_id), None)
