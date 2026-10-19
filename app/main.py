@@ -14,7 +14,7 @@ import os
 
 sentry_sdk.init(
     dsn="https://9b346d9bd9aa4309a18f5a47746b0a54@o1106970.ingest.sentry.io/4504402334777344",
-    traces_sample_rate=1.0,
+    traces_sample_rate=0.1,
 )
 warnings.filterwarnings("ignore", message=".*example.*deprecated.*")
 origins = [
@@ -95,11 +95,11 @@ if os.getenv('EXTERNAL') is not None:
 @app.exception_handler(ValueError)
 async def value_error_exception_handler(request: Request, exc: ValueError):
     print(exc)
-    raise
+    sentry_sdk.capture_exception(exc)
     return JSONResponse(
         status_code=500,
         content={"message": "Server processing error - please check your inputs. The developer has been notified, for "
-                            "updates on bug fixes please contact James Runnalls (james.runnall@eawag.ch)"})
+                            "updates on bug fixes please contact James Runnalls (james.runnalls@eawag.ch)"})
 
 
 @app.get("/", include_in_schema=False)
