@@ -14,7 +14,7 @@ import remotesensing
 
 filesystem = "../filesystem"
 
-function = "meteoswiss.get_icon_layer_alplakes"
+function = "simulations.get_simulations_point"
 
 if function == "meteoswiss.get_cosmo_metadata":
     data = meteoswiss.get_cosmo_metadata(filesystem)
@@ -109,7 +109,7 @@ if function == "simulations.get_metadata_lake":
     print(data)
 
 if function == "simulations.get_simulations_point":
-    data = simulations.get_simulations_point(filesystem, "delft3d-flow", "geneva", "202304050300", "202304172300", 1, 46.5, 6.67, ["temperature", "velocity"])
+    data = simulations.get_simulations_point(filesystem, "delft3d-flow", "garda", "202312060300", "202312072300", 1, 45.54417033852492, 10.640377055137954, ["temperature", "velocity"])
     plt.plot(data["time"], data["variables"]["temperature"]["data"])
     plt.show()
 

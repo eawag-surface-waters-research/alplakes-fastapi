@@ -5,3 +5,4 @@ app/__pycache__
 notebooks
 filesystem/*
 !filesystem/.gitkeep
+logs/

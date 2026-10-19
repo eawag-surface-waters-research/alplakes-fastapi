@@ -65,7 +65,7 @@ def get_meteodata_station_metadata(filesystem, station_id):
     stations_file = os.path.join(filesystem, "media/geosphere/meteodata/stations.json")
     if not os.path.exists(stations_file):
         response = requests.get(
-            "https://alplakes-eawag.s3.eu-central-1.amazonaws.com/static/geosphere/geosphere_meteodata.json")
+            "https://alplakes-eawag.s3.eu-central-1.amazonaws.com/static/geosphere/geosphere_meteodata.json", timeout=30)
         response.raise_for_status()
         stations_data = response.json()
         with open(stations_file, 'w') as f:

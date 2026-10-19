@@ -4,15 +4,31 @@ import math
 import shutil
 import requests
 import warnings
+import threading
 import numpy as np
 import pandas as pd
 from fastapi import HTTPException
 from typing import Dict, List, Union, Any
+from functools import wraps
 
 from pandas.util.version import Infinity
 from pydantic import BaseModel, field_serializer
 from datetime import datetime, timedelta, timezone
 from dateutil.relativedelta import relativedelta, SU
+
+
+# netCDF-C/HDF5 are not thread-safe and netCDF4>=1.6.1 releases the GIL. xarray only locks file opens and array
+# reads (not metadata), so any two threads touching netCDF files can crash the process. Serialise all netCDF work
+# in a process: decorate every function that opens a netCDF file (directly or via xarray) with @netcdf_locked.
+netcdf_lock = threading.RLock()
+
+
+def netcdf_locked(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        with netcdf_lock:
+            return func(*args, **kwargs)
+    return wrapper
 
 
 class TimeBaseModel(BaseModel):
@@ -200,7 +216,7 @@ def download_file(url, local):
             os.remove(local)
     elif not os.path.exists(os.path.dirname(local)):
         os.makedirs(os.path.dirname(local))
-    with requests.get(url, stream=True) as r:
+    with requests.get(url, stream=True, timeout=30) as r:
         with open(local, 'wb') as f:
             shutil.copyfileobj(r.raw, f)
     if exists:
@@ -237,6 +253,38 @@ def rotate_velocity(u, v, alpha):
     v_e = v * np.cos(alpha) + u * np.sin(alpha)
 
     return u_n, v_e
+
+
+def centre_velocity(u_prev, u, v_prev, v, nodata=-999.0):
+    """Interpolate Delft3D-FLOW face velocities to the cell centre.
+
+    U1[m] and V1[n] sit on the faces between cells m/m+1 and n/n+1, so the centre of cell (m, n)
+    is the mean of U1[m-1], U1[m] and of V1[n-1], V1[n]. Closed faces (nodata) carry no flow and
+    count as zero. Cells without any active face are returned as NaN.
+    """
+    faces = [np.asarray(f).astype(np.float64) for f in (u_prev, u, v_prev, v)]
+    valid = [f != nodata for f in faces]
+    u_prev, u, v_prev, v = [np.where(m, f, 0.0) for f, m in zip(faces, valid)]
+    wet = valid[0] | valid[1] | valid[2] | valid[3]
+    u_c = np.where(wet, 0.5 * (u_prev + u), np.nan)
+    v_c = np.where(wet, 0.5 * (v_prev + v), np.nan)
+    return u_c, v_c
+
+
+def _previous_face(x, axis, nodata):
+    x = np.asarray(x).astype(np.float64)
+    out = np.full(x.shape, nodata, dtype=np.float64)
+    src = [slice(None)] * x.ndim
+    dst = [slice(None)] * x.ndim
+    src[axis] = slice(None, -1)
+    dst[axis] = slice(1, None)
+    out[tuple(dst)] = x[tuple(src)]
+    return out
+
+
+def centre_velocity_grid(u, v, m_axis=-2, n_axis=-1, nodata=-999.0):
+    """centre_velocity for full grids, the face before the first cell is treated as closed."""
+    return centre_velocity(_previous_face(u, m_axis, nodata), u, _previous_face(v, n_axis, nodata), v, nodata=nodata)
 
 
 def alplakes_variable(x):
@@ -506,7 +554,7 @@ def get_d3d_properties(filesystem, simulation):
             with open(local_path, 'r') as f:
                 return json.load(f)
         else:
-            response = requests.get(url)
+            response = requests.get(url, timeout=30)
             if response.status_code == 200:
                 data = response.json()
                 os.makedirs(os.path.dirname(local_path), exist_ok=True)

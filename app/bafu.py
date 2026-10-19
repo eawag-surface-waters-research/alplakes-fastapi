@@ -57,7 +57,7 @@ def get_hydrodata_station_metadata(filesystem, station_id):
     stations_file = os.path.join(filesystem, "media/bafu/hydrodata/stations/stations.json")
     if not os.path.exists(stations_file):
         response = requests.get(
-            "https://alplakes-eawag.s3.eu-central-1.amazonaws.com/static/bafu/bafu_hydrodata.json")
+            "https://alplakes-eawag.s3.eu-central-1.amazonaws.com/static/bafu/bafu_hydrodata.json", timeout=30)
         response.raise_for_status()
         stations_data = response.json()
         with open(stations_file, 'w') as f:
