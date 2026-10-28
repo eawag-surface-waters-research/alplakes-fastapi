@@ -47,7 +47,6 @@ docker compose up --build -d
 When there are changes to the API the service needs to be rebuilt to reflect those changes.
 
 ```console
-docker compose down
 docker compose up --build -d
 ```
 
