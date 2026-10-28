@@ -48,6 +48,7 @@ When there are changes to the API the service needs to be rebuilt to reflect tho
 
 ```console
 docker compose up --build -d
+docker compose restart nginx-external
 ```
 
 ## Local Development
