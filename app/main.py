@@ -34,6 +34,21 @@ This includes terabytes of simulation data and remote sensing products. The API 
 
 This API serves as the backend for the website [www.alplakes.eawag.ch](http://www.alplakes.eawag.ch).
 
+### Licence
+
+Data provided by this API is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). You are free to use, share and adapt it, including commercially, provided you give appropriate credit. Suggested attribution: "Data: Alplakes, Eawag (CC BY 4.0)".
+
+### Fair use & rate limits
+
+The API is rate limited per client. Requests that are too frequent will receive an HTTP **429** response; space out your requests and back off before retrying when you receive one.
+
+To stay within the limits:
+- Request only the time range and bounding box you need.
+- Cache responses rather than re-requesting the same data.
+- Do not poll more often than the underlying data is updated.
+
+If you need higher-volume access, please get in touch.
+
 ### Disclaimer
 
 The **Alplakes API** is provided "as is," without any guarantees regarding the accuracy, completeness, or timeliness of the data. While we strive to ensure data quality, users are responsible for verifying information before making any decisions based on it.
@@ -62,8 +77,8 @@ app = FastAPI(
         "email": "james.runnalls@eawag.ch",
     },
     license_info={
-        "name": "Apache 2.0",
-        "url": "https://www.apache.org/licenses/LICENSE-2.0.html",
+        "name": "CC BY 4.0",
+        "url": "https://creativecommons.org/licenses/by/4.0/",
     }
 )
 
