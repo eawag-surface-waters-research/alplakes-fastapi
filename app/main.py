@@ -46,6 +46,7 @@ To stay within the limits:
 - Request only the time range and bounding box you need.
 - Cache responses rather than re-requesting the same data.
 - Do not poll more often than the underlying data is updated.
+- Identify your client with a descriptive User-Agent including an app name and contact, e.g. `MyLakeApp/1.0 (contact@example.com)`. Clients with generic User-Agents (e.g. python-requests, node, curl) that cause excessive load may be blocked without notice.
 
 If you need higher-volume access, please get in touch.
 

@@ -51,6 +51,20 @@ docker compose up --build -d
 docker compose restart nginx-external
 ```
 
+If `docker-compose.yml` volumes for nginx have changed, recreate the container instead of restarting it:
+
+```console
+docker compose up -d --force-recreate nginx-external
+```
+
+### Blocking clients
+Blocked IPs are kept in `nginx/blocklist/*.conf` (gitignored, server-local), one `<ip> 1;` per line. Blocked clients receive a 403 with a message asking them to get in touch.
+
+```console
+echo '1.2.3.4 1;' >> nginx/blocklist/blocked.conf
+docker compose exec nginx-external nginx -t && docker compose exec nginx-external nginx -s reload
+```
+
 ## Local Development
 
 ### 1. Install virtual environment

@@ -6,3 +6,4 @@ notebooks
 filesystem/*
 !filesystem/.gitkeep
 logs/
+nginx/blocklist/*.conf
