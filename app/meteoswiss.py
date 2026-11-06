@@ -21,6 +21,11 @@ class IconForecast(str, Enum):
     icon_ch2_eps = "icon-ch2-eps"
     icon_ch1_eps = "icon-ch1-eps"
 
+class IconPointForecast(str, Enum):
+    icon_ch2_eps = "icon-ch2-eps"
+    icon_ch1_eps = "icon-ch1-eps"
+    icon_ch2_eps_members = "icon-ch2-eps-members"
+
 class ResponseModel2D(functions.TimeBaseModel):
     time: List[datetime]
     lat: List[List[float]]
@@ -53,6 +58,9 @@ class ResponseModel1D(functions.TimeBaseModel):
         elif value.tzinfo is None:
             raise ValueError('time must have a timezone')
         return value
+
+class ResponseModel1DMembers(ResponseModel1D):
+    members: List[int]
 
 class Metadata(BaseModel):
     model: str
@@ -98,10 +106,12 @@ def get_cosmo_metadata(filesystem):
 def get_icon_metadata(filesystem):
     models = [{"model": "icon-ch1-eps", "description": "ICON-CH1-EPS 33 hour ensemble forecast"},
               {"model": "icon-ch2-eps", "description": "ICON-CH2-EPS 5 day ensemble forecast"},
+              {"model": "icon-ch2-eps-members", "description": "ICON-CH2-EPS 5 day forecast of all 21 ensemble members"},
               {"model": "kenda-ch1", "description": "KENDA-CH1 1 day deterministic reanalysis"}]
-
+    out = []
     for model in models:
-        files = os.listdir(os.path.join(filesystem, "media/meteoswiss/icon", model["model"]))
+        folder = os.path.join(filesystem, "media/meteoswiss/icon", model["model"])
+        files = [f for f in os.listdir(folder) if f.endswith(".nc")] if os.path.isdir(folder) else []
         if len(files) > 0:
             files.sort()
             combined = '_'.join(files)
@@ -124,10 +134,8 @@ def get_icon_metadata(filesystem):
             model["start_date"] = start_date.strftime("%Y-%m-%d")
             model["end_date"] = end_date.strftime("%Y-%m-%d")
             model["missing_dates"] = missing_dates
-        else:
-            model["start_date"] = "NA"
-            model["end_date"] = "NA"
-    return models
+            out.append(model)
+    return out
 
 
 @functions.netcdf_locked
@@ -332,6 +340,43 @@ def get_icon_point_forecast(filesystem, model, input_variables, forecast_date, l
                 output["variables"][var.replace("_MEAN", "")] = {"description": ds.variables[var].attrs["long_name"],
                                "unit": ds.variables[var].attrs["units"],
                                "data": np.where(np.isnan(data), None, data).tolist()}
+    return output
+
+
+@functions.netcdf_locked
+def get_icon_members_point_forecast(filesystem, input_variables, forecast_date, lat, lng):
+    formatted_forecast_date = datetime.strptime(forecast_date, "%Y%m%d").strftime("%Y_%m_%d")
+    file = os.path.join(filesystem, "media/meteoswiss/icon/icon-ch2-eps-members", "{}_00_icon-ch2-eps_members.nc".format(formatted_forecast_date))
+    if not os.path.isfile(file):
+        raise HTTPException(status_code=400,
+                            detail="Data not available for ICON icon-ch2-eps-members for the following date: {}".format(forecast_date))
+    output = {}
+    with xr.open_dataset(file) as ds:
+        bad_variables = []
+        variables = []
+        for var in input_variables:
+            if var.replace("_MEAN", "") in ds.data_vars:
+                variables.append(var.replace("_MEAN", ""))
+            else:
+                bad_variables.append(var)
+        if len(bad_variables) > 0:
+            raise HTTPException(status_code=400,
+                                detail="{} are bad variables for ICON icon-ch2-eps-members. Please select from: {}".format(
+                                    ", ".join(bad_variables), ", ".join(ds.keys())))
+        output["time"] = meteoswiss_time_iso(ds.variables["time"])
+        output["members"] = ds.variables["epsd_1"].values.tolist()
+        lat_grid, lng_grid = ds.variables["lat_1"].values, ds.variables["lon_1"].values
+        _, cell, distance = functions.get_closest_location(lat, lng, lat_grid[np.newaxis, :], lng_grid[np.newaxis, :])
+        output["lat"] = float(lat_grid[cell])
+        output["lng"] = float(lng_grid[cell])
+        output["distance"] = {"data": float(distance), "unit": "m",
+                              "description": "Distance from requested location to center of closest grid cell"}
+        output["variables"] = {}
+        for var in variables:
+            data = ds[var].isel(cell=cell).values
+            output["variables"][var] = {"description": ds.variables[var].attrs["long_name"],
+                                        "unit": ds.variables[var].attrs["units"],
+                                        "data": np.where(np.isnan(data), None, data).tolist()}
     return output
 
 

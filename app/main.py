@@ -294,8 +294,8 @@ if internal:
         validate.date_range(start_date, end_date)
         return meteoswiss.get_icon_point_reanalysis(filesystem, model.value, variables, start_date, end_date, lat, lng)
 
-    @app.get("/meteoswiss/icon/point/forecast/{model}/{forecast_date}/{lat}/{lng}", tags=["Meteoswiss"], response_model=meteoswiss.ResponseModel1D)
-    def meteoswiss_icon_point_forecast(model: meteoswiss.IconForecast,
+    @app.get("/meteoswiss/icon/point/forecast/{model}/{forecast_date}/{lat}/{lng}", tags=["Meteoswiss"], response_model=Union[meteoswiss.ResponseModel1DMembers, meteoswiss.ResponseModel1D])
+    def meteoswiss_icon_point_forecast(model: meteoswiss.IconPointForecast,
                                               forecast_date: str = validate.path_date(
                                                   description="The forecast date in YYYYmmdd format", example="20240703"),
                                               lat: float = validate.path_latitude(),
@@ -310,8 +310,16 @@ if internal:
         Available models:
         - icon-ch2-eps (forecast):  ICON-CH2-EPS 5 day ensemble forecast
         - icon-ch1-eps (forecast):  ICON-CH1-EPS 33 hour ensemble forecast
+        - icon-ch2-eps-members (forecast):  ICON-CH2-EPS 5 day forecast of all 21 ensemble members
+
+        For icon-ch2-eps-members:
+        - Each variable's data is ordered [time][member], with the member numbers in `members` (0 is the control)
+        - Available variables are T_2M, U, V, GLOB, RELHUM_2M, PMSL, CLCT and TOT_PREC
+        - Only the most recent forecasts are kept, around 2 days
         """
         validate.date(forecast_date)
+        if model == meteoswiss.IconPointForecast.icon_ch2_eps_members:
+            return meteoswiss.get_icon_members_point_forecast(filesystem, variables, forecast_date, lat, lng)
         return meteoswiss.get_icon_point_forecast(filesystem, model.value, variables, forecast_date, lat, lng)
 
 
