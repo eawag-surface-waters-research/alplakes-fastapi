@@ -2074,7 +2074,8 @@ def get_one_dimensional_point_simstrat(filesystem, lake, start, end, depth, vari
     start_datetime = datetime.strptime(start, "%Y%m%d%H%M").replace(tzinfo=timezone.utc).astimezone().replace(tzinfo=None)
     end_datetime = datetime.strptime(end, "%Y%m%d%H%M").replace(tzinfo=timezone.utc).astimezone().replace(tzinfo=None)
 
-    with xr.open_mfdataset(files, data_vars='minimal', compat='override', coords='minimal') as ds:
+    with xr.open_mfdataset(files, combine='nested', concat_dim='time', data_vars='minimal',
+                           coords='minimal', compat='override', join='outer') as ds:
         dims = None
         for v in variables:
             if v not in ds.variables:
@@ -2184,7 +2185,8 @@ def get_one_dimensional_depth_time_simstrat(filesystem, lake, start, end, variab
     end_datetime = datetime.strptime(end, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
 
     files = [os.path.join(lakes, lake, "{}.nc".format(month.strftime("%Y%m"))) for month in months]
-    with xr.open_mfdataset(files, data_vars='minimal', compat='override', coords='minimal') as ds:
+    with xr.open_mfdataset(files, combine='nested', concat_dim='time', data_vars='minimal',
+                           coords='minimal', compat='override', join='outer') as ds:
         for v in variables:
             if v not in ds.variables:
                 raise HTTPException(status_code=400, detail="Variable {} is not available".format(v))
@@ -2273,7 +2275,8 @@ def write_one_dimensional_day_of_year_simstrat(filesystem, lake, variable, depth
     if len(files) > 48:
         files = files[24:]  # Remove first two years as a warmup
     try:
-        with xr.open_mfdataset(files, data_vars='minimal', compat='override', coords='minimal') as ds:
+        with xr.open_mfdataset(files, combine='nested', concat_dim='time', data_vars='minimal',
+                               coords='minimal', compat='override', join='outer') as ds:
             if variable not in ds.variables:
                 raise HTTPException(status_code=400, detail="Variable {} is not available".format(variable))
             ds['time'] = ds.indexes['time'].tz_localize('UTC')
